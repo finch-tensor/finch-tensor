@@ -83,6 +83,8 @@ pixi run test
 pixi run --environment=mindeps test
 # or to test the C backend:
 pixi run test-c
+# or to test the MLIR backend:
+pixi run test-mlir
 # or to test the Julia backend:
 pixi run test-julia
 ```
@@ -92,11 +94,27 @@ pixi run test-julia
 
 #### Optional Static Type Checking
 
-The pytest will run mypy to check for type errors, so you shouldn't need to run it manually.
-In case you do need to run mypy manually, you can do so with:
+The usual test command also runs [ty](https://github.com/astral-sh/ty) to check for type errors, so you shouldn't need to run it manually.
+In case you do need to run ty manually, you can do so with:
 
 ```bash
 pixi run type-check
+```
+
+In order to fix type checking failures, try the following, in order:
+
+1. Try to fix the type error by adding/modifying type annotations or fixing the code.
+2. Add `assert isinstance(...)` checks to the code to ensure the type is correct.
+3. If the type error persists, try to add an [ignore comment](https://docs.astral.sh/ty/suppression/) to suppress the error.
+
+Sometimes, these may need to be combined.
+
+#### Optional Array API Tests
+The usual test command also runs the Array API test to check for compliance with the Array API standard, so you shouldn't need to run it manually.
+In case you do need to run the Array API tests manually, you can do so with:
+
+```bash
+pixi run array-api-tests
 ```
 
 #### Regression Tests
@@ -105,6 +123,21 @@ pixi run type-check
 changes, and to better understand the impacts of compiler changes on the test outputs.
 To regenerate regression test outputs, run pytest with the `--regen-all` flag. Those
 who are curious can consult the [`pytest-regression` docs](https://pytest-regressions.readthedocs.io/en/latest/overview.html#using-data-regression).
+
+### Documentation
+You can generate the documentation locally by running:
+
+```bash
+pixi run build-docs
+```
+
+After running this command, the documentation will be generated in the `site/` directory. You can view it by opening `site/index.html` in your browser. You can also serve the documentation locally using a simple HTTP server, using the following command:
+
+```bash
+pixi run serve-docs
+```
+
+After running this command, the documentation will be served locally at [http://localhost:8000/](http://localhost:8000/).
 
 ## Development & Code Style
 
@@ -155,7 +188,7 @@ You can download it here: [vscode-finch-assembly](https://github.com/finch-tenso
 
 ### Compiler Passes
 - In general, each compiler pass should be implemented as a separate callable class,
-  inheriting from some subclass of `finchlite.symbolic.Stage`.
+  inheriting from some subclass of `finch.symbolic.Stage`.
 - Each pass should have a clear, single, documented responsibility.
 - Try to separate passes that do different things into different classes, rather than
   building an all-in-one monolithic pass.
@@ -168,13 +201,13 @@ You can download it here: [vscode-finch-assembly](https://github.com/finch-tenso
 Finch uses Python's standard `logging` module for debug output. To enable verbose
 logging and inspect internal compiler stages (e.g., Logic IR before/after optimization,
 Assembly IR, generated code), configure a logger handler using the helpers in
-`finchlite.util.logging`.
+`finch.util.logging`.
 
 #### Quick start
 
 ```python
 import logging
-from finchlite.util.logging import get_logger_handler, FORMAT
+from finch.util.logging import get_logger_handler, FORMAT
 
 # Show all Finch debug output
 handler = get_logger_handler("root")
@@ -204,7 +237,7 @@ Example — show only the Logic IR after optimization and Numba-generated code:
 
 ```python
 import logging
-from finchlite.util.logging import get_logger_handler, FORMAT
+from finch.util.logging import get_logger_handler, FORMAT
 
 handler = get_logger_handler("r.l.post,r.c.nb")
 logging.basicConfig(level=logging.DEBUG, handlers=[handler], format=FORMAT)

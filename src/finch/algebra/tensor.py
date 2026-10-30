@@ -1,0 +1,229 @@
+from __future__ import annotations
+
+import functools
+from abc import ABC, abstractmethod
+from typing import Any, Generic, TypeVar
+
+import numpy as np
+import scipy.sparse as sps
+
+from .devices import normalize_device, serial
+from .fill import AbstractFill, AbstractFillFType, DynamicFill, StaticFill, is_static
+from .ftypes import FType, FTyped
+
+
+def to_numpy(x):
+    if hasattr(x, "to_numpy"):
+        x = x.to_numpy()
+    if sps.issparse(x):
+        return x.toarray()
+    return np.asarray(x)
+
+
+def to_scipy(x):
+    if hasattr(x, "to_scipy"):
+        return x.to_scipy()
+    if sps.issparse(x):
+        return x
+    raise NotImplementedError(f"{type(x).__name__} does not support to_scipy.")
+
+
+FT = TypeVar("FT", bound=FType)
+
+
+class TensorFType(FType, ABC, Generic[FT]):
+    @property
+    def ndim(self) -> int:
+        """Number of dimensions of the tensor."""
+        return len(self.shape_type)
+
+    @property
+    def shape(self) -> tuple[int, ...]:
+        raise TypeError("TensorFType does not have a shape.")
+
+    @property
+    def size(self) -> int:
+        return functools.reduce(lambda x, y: x * int(y), self.shape, 1)
+
+    @property
+    @abstractmethod
+    def fill_type(self) -> AbstractFillFType:
+        """The fill of the format, either static or dynamic."""
+        ...
+
+    def with_fill(self, fill_type: AbstractFillFType) -> TensorFType:
+        """
+        This ftype carrying `fill_type` as its fill.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot replace its fill value"
+        )
+
+    @property
+    @abstractmethod
+    def element_type(self) -> FT:
+        """Data type of the tensor elements."""
+        ...
+
+    @property
+    def dtype(self):
+        return self.element_type
+
+    @property
+    def device(self):
+        return serial()
+
+    @property
+    def device_type(self) -> FType:
+        return self.device.ftype
+
+    @property
+    @abstractmethod
+    def shape_type(self) -> tuple[FType, ...]:
+        """Shape type of the tensor. The shape type is a tuple of the index
+        types in the tensor. It's the type of each element in tns.shape. It
+        should be an actual tuple, rather than a tuple type, so that it can hold
+        e.g. dtypes, formats, or types, and so that we can easily index it."""
+        ...
+
+    @abstractmethod
+    def construct(self, shape: tuple) -> Tensor:
+        """
+        Create a tensor instance with the given shape.
+
+        Args:
+            shape: The shape of the tensor to create.
+        Returns:
+            A tensor instance with the specified shape.
+        """
+        ...
+
+    @abstractmethod
+    def from_numpy(self, arr: np.ndarray) -> Tensor: ...
+
+
+class Tensor(FTyped[TensorFType[FT]], ABC):
+    """
+    Abstract base class for tensor-like data structures. Tensors are
+    multi-dimensional arrays that can be used to represent data in various
+    formats. They support operations such as indexing, slicing, and reshaping,
+    and can be used in mathematical computations. This class provides the basic
+    interface for tensors to be used with lazy ops in Finch, though more
+    advanced interfaces may be required for different backends.
+    """
+
+    @property
+    def ndim(self) -> int:
+        """Number of dimensions of the tensor."""
+        return int(self.ftype.ndim)
+
+    @property
+    def size(self):
+        size = 1
+        for dim in self.shape:
+            size *= int(dim)
+        return size
+
+    @property
+    @abstractmethod
+    def ftype(self) -> TensorFType[FT]:
+        """FType of the tensor, which may include metadata about the tensor."""
+        ...
+
+    @property
+    def fill_value(self) -> Any:
+        """The fill value for the tensor.  The fill value is the
+        default value for a tensor when it is created with a given shape and dtype,
+        as well as the background value for sparse tensors.
+        Note: this is the raw value NOT the AbstractFill. A tensor whose fill is
+        dynamic holds its own fill value.
+        """
+        fill_type = self.ftype.fill_type
+        if is_static(fill_type):
+            return fill_type.value
+        raise NotImplementedError(
+            f"{type(self).__name__} must hold its dynamic fill value"
+        )
+
+    @property
+    def fill(self) -> AbstractFill:
+        """
+        The fill of the tensor: its fill value, and whether kernels may
+        specialize on it. Its ftype is the fill of the tensor's format.
+        """
+        fill_type = self.ftype.fill_type
+        if is_static(fill_type):
+            return StaticFill(fill_type.value)
+        return DynamicFill(self.fill_value, fill_type.element_type)
+
+    def with_fill(self, fill_value: AbstractFill) -> Tensor:
+        """
+        An equivalent tensor carrying `fill_value` as its fill.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot replace its fill value"
+        )
+
+    @property
+    def element_type(self) -> FT:
+        """The element type of the tensor.  The element type is the scalar type of
+        the elements in a tensor, which may be different from the data type of the
+        tensor.
+        """
+        return self.ftype.element_type
+
+    @property
+    def dtype(self):
+        return self.element_type
+
+    @property
+    def device(self):
+        return getattr(self, "_device", self.ftype.device)
+
+    @property
+    def device_type(self) -> FType:
+        return self.ftype.device_type
+
+    def to_device(self, device, /, *, stream=None):
+        if stream is not None:
+            raise ValueError(f"stream argument is not supported; got {stream!r}")
+        device = normalize_device(device)
+        if device == self.device:
+            return self
+        raise ValueError(f"device argument is not supported; got {device!r}")
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        """Shape type of the tensor. The shape type is a tuple of the index
+        types in the tensor. It's the type of each element in tns.shape. It
+        should be an actual tuple, rather than a tupleftype, so that it can hold
+        e.g. dtypes, formats, or types, and so that we can easily index it."""
+        return self.ftype.shape_type
+
+    @property
+    @abstractmethod
+    def shape(self) -> tuple[int, ...]:
+        """Shape of the tensor."""
+        ...
+
+    @abstractmethod
+    def item(self):
+        """
+        Return the Python scalar stored in a zero-dimensional tensor.
+
+        Indexing tensor objects must keep returning tensor-like values, including for
+        zero-dimensional results. `item()` is the explicit escape hatch for code that
+        needs the underlying Python scalar value. Implementations should raise
+        `ValueError` when called on a non-scalar tensor.
+        """
+        ...
+
+    @abstractmethod
+    def to_numpy(self):
+        """Convert the tensor to a NumPy representation."""
+        ...
+
+    @abstractmethod
+    def to_scipy(self):
+        """Convert the tensor to a SciPy sparse representation."""
+        ...

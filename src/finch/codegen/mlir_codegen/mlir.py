@@ -1,0 +1,1963 @@
+from __future__ import annotations
+
+import ctypes
+import json
+import logging
+from abc import ABC, abstractmethod
+from collections.abc import Sequence
+from functools import lru_cache, reduce
+from typing import Any
+
+import numpy as np
+
+from finch import algebra
+from finch import finch_assembly as asm
+from finch.algebra import (
+    DynamicFillError,
+    FType,
+    MutableStructFType,
+    StructFType,
+    TupleFType,
+    ffuncs,
+    fisinstance,
+    is_dynamic,
+    is_static,
+    np_dtype,
+    promote_type,
+)
+from finch.algebra.ftypes import FDType
+from finch.finch_assembly import BufferFType
+from finch.symbolic import CompilerMode, Context, Form, Namespace, ScopedDict
+from finch.util.logging import LOG_BACKEND_MLIR
+
+from .stages import MLIRCode, MLIRLowerer
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_MLIR)
+
+
+mlir_memrefs: dict[Any, Any] = {}
+mlir_structs: dict[Any, Any] = {}
+mlir_globals: dict[str, str] = {}
+MLIR_PIPELINE = (
+    "builtin.module("
+    "expand-realloc,"
+    "expand-strided-metadata,"
+    "convert-scf-to-cf,"
+    "convert-cf-to-llvm,"
+    "convert-arith-to-llvm,"
+    "finalize-memref-to-llvm,"
+    "convert-func-to-llvm,"
+    "reconcile-unrealized-casts)"
+)
+
+
+class MLIROperator(ABC):
+    @abstractmethod
+    def mlir_name(self) -> str: ...
+
+    @abstractmethod
+    def mlir_function_call(
+        self, op: asm.AssemblyExpression, ctx: Any, *args: Any
+    ) -> Any: ...
+
+    @staticmethod
+    def is_float(arg) -> bool:
+        return algebra.isdtype(arg, "real floating")
+
+    @staticmethod
+    def is_unsigned(arg) -> bool:
+        return algebra.isdtype(arg, "unsigned integer")
+
+
+class MLIRNAryOperator(MLIROperator):
+    def mlir_function_call(
+        self, op: asm.AssemblyExpression, ctx: Any, *args: Any
+    ) -> Any:
+        return mlir_nary_function_call(self.mlir_name(), ctx, *args)
+
+
+class MLIRBinaryOperator(MLIROperator):
+    def mlir_function_call(
+        self, op: asm.AssemblyExpression, ctx: Any, *args: Any
+    ) -> Any:
+        return mlir_binary_function_call(self.mlir_name(), ctx, *args)
+
+
+class MLIRKernel(asm.AssemblyKernel):
+    """
+    A class to represent MLIR kernel. It validates and serializes arguments,
+    invokes the compiled function, and reconstructs the result.
+
+    """
+
+    def __init__(self, engine, func_name, type_):
+        super().__init__(type_)
+        self.engine = engine
+        self.func_name = func_name
+        self.ret_type = type_.result_type
+        self.argtypes = type_.arg_types
+
+    def __call__(self, *args):
+        if len(args) != len(self.argtypes):
+            raise ValueError(
+                f"Expected {len(self.argtypes)} arguments, got {len(args)}"
+            )
+        for argtype, arg in zip(self.argtypes, args, strict=False):
+            if not fisinstance(arg, argtype):
+                raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
+        serial_args = list(map(serialize_to_mlir, self.argtypes, args))
+
+        packed = []
+        for t, sa in zip(self.argtypes, serial_args, strict=False):
+            if isinstance(t, BufferFType) and mlir_type(t) != "!llvm.ptr":
+                packed.append(ctypes.pointer(ctypes.pointer(sa)))
+            else:
+                packed.append(ctypes.pointer(sa))
+
+        if self.ret_type == algebra.none_:
+            res = None
+            self.engine.invoke(self.func_name, *packed)
+        elif isinstance(self.ret_type, StructFType):
+            res = mlir_ctype(self.ret_type)()
+            self.engine.invoke(
+                self.func_name, *packed, ctypes.pointer(ctypes.pointer(res))
+            )
+        else:
+            res = mlir_ctype(self.ret_type)()
+            self.engine.invoke(self.func_name, *packed, ctypes.pointer(res))
+
+        for arg_type, arg, serial_arg in zip(
+            self.argtypes, args, serial_args, strict=False
+        ):
+            deserialize_from_mlir(arg_type, arg, serial_arg)
+
+        if self.ret_type is type(None):
+            return None
+        return construct_from_mlir(self.ret_type, res)
+
+
+class MLIRLibrary(asm.AssemblyLibrary):
+    """
+    A class to represent MLIR module.
+
+    """
+
+    def __init__(self, mlir_module, kernels):
+        self.mlir_module = mlir_module
+        self.kernels = kernels
+
+    def __getattr__(self, name):
+        if name in self.kernels:
+            return self.kernels[name]
+        raise AttributeError(
+            f"{type(self).__name__!r} object has no attribute {name!r}"
+        )
+
+
+@lru_cache(maxsize=10_000)
+def load_mlir_engine(mlir_code: str):
+    from mlir import ir
+    from mlir.execution_engine import ExecutionEngine
+    from mlir.passmanager import PassManager
+
+    context = ir.Context()
+    with context:
+        module = ir.Module.parse(mlir_code)
+        pm = PassManager.parse(MLIR_PIPELINE)
+        try:
+            pm.run(module.operation)
+        except Exception as e:
+            logger.error(
+                f"MLIR pass pipeline failed on the following code:\n{mlir_code}"
+                f"\nError message: {e}"
+            )
+            raise
+        engine = ExecutionEngine(module)
+    return context, module, engine
+
+
+class MLIRForm(Form):
+    """
+    Validates that a FinchAssembly program only uses constructs the MLIR
+    backend can lower, raising a named error for each known limitation
+    instead of failing deep inside code generation.
+    """
+
+    @classmethod
+    def validate_inputs(cls, prgm):
+        match prgm:
+            case asm.Module(funcs):
+                for func in funcs:
+                    cls.validate_function(func)
+            case _:
+                raise TypeError(f"MLIR backend expects an asm.Module, got {type(prgm)}")
+
+    @classmethod
+    def validate_function(cls, func):
+        match func:
+            case asm.Function(
+                asm.Variable(
+                    func_name, asm.AssemblyKernelFType(result_type=return_type)
+                ),
+                args,
+                body,
+            ):
+                pass
+            case _:
+                raise TypeError(f"MLIR backend expects asm.Function, got {func}")
+        defined = {}
+        for arg in args:
+            match arg:
+                case asm.Variable(name, t):
+                    cls.validate_type(func_name, f"argument {name!r}", t)
+                    defined[name] = 0
+                case _:
+                    raise TypeError(
+                        f"MLIR backend expects variable arguments in "
+                        f"{func_name!r}, got {arg}"
+                    )
+        if return_type != algebra.none_:
+            cls.validate_type(func_name, "return value", return_type)
+        cls.validate_stmt(func_name, body, defined, depth=0)
+
+    @classmethod
+    def validate_type(cls, func_name, what, t):
+        try:
+            mlir_type(t)
+        except NotImplementedError as e:
+            raise NotImplementedError(
+                f"MLIR backend cannot lower the type of {what} "
+                f"in function {func_name!r}: {t}"
+            ) from e
+
+    @classmethod
+    def validate_stmt(cls, func_name, node, defined, depth):
+        match node:
+            case asm.Block(bodies):
+                for body in bodies:
+                    cls.validate_stmt(func_name, body, defined, depth)
+            case asm.Assign(asm.Variable(name, _), _):
+                defined.setdefault(name, depth)
+            case asm.ForLoop(asm.Variable(name, _), _, _, body):
+                inner = dict(defined)
+                inner[name] = depth + 1
+                cls.validate_stmt(func_name, body, inner, depth + 1)
+            case asm.BufferLoop(_, asm.Variable(name, _), body):
+                inner = dict(defined)
+                inner[name] = depth + 1
+                cls.validate_stmt(func_name, body, inner, depth + 1)
+            case asm.If(_, body):
+                cls.validate_stmt(func_name, body, defined, depth)
+            case asm.IfElse(_, body, else_body):
+                cls.validate_stmt(func_name, body, defined, depth)
+                cls.validate_stmt(func_name, else_body, defined, depth)
+            case asm.WhileLoop(_, body):
+                cls.validate_stmt(func_name, body, defined, depth)
+            case (
+                asm.Unpack(_, _)
+                | asm.Repack(_)
+                | asm.SetAttr(_, _, _)
+                | asm.Store(_, _, _)
+                | asm.Resize(_, _)
+                | asm.Return(_)
+                | asm.Assert(_)
+            ):
+                pass
+
+            case _:
+                raise NotImplementedError(
+                    f"MLIR backend does not yet support "
+                    f"{type(node).__name__} (in function {func_name!r})"
+                )
+
+
+class MLIRCompiler(MLIRForm, asm.AssemblyLoader):
+    """
+    A class to compile and run FinchAssembly.
+
+    """
+
+    def __init__(self, ctx: MLIRLowerer | None = None):
+        self.ctx: MLIRLowerer = MLIRGenerator() if ctx is None else ctx
+
+    def lower(
+        self, prgm: asm.Module, *, mode: CompilerMode | None = None
+    ) -> MLIRLibrary:
+        if prgm.head() != asm.Module:
+            raise ValueError(
+                "MLIRCompiler expects a Module as the head of the program, "
+                f"got {type(prgm.head())}"
+            )
+        mlir_code = self.ctx(prgm, mode=mode).code
+        logger.debug(f"Compiling MLIR code:\n{mlir_code}")
+        context, module, engine = load_mlir_engine(mlir_code)
+        kernels = {}
+        for func in prgm.funcs:
+            match func:
+                case asm.Function(asm.Variable(func_name, func_type), _, _):
+                    kernels[func_name] = MLIRKernel(
+                        engine,
+                        func_name,
+                        func_type,
+                    )
+                case _:
+                    raise NotImplementedError(
+                        f"Unrecognized function type: {type(func)}"
+                    )
+        return MLIRLibrary((context, module, engine), kernels)
+
+
+def mlir_function_name(op, arg: FType) -> str:
+    match op:
+        case ffuncs._AddFType():
+            if MLIROperator.is_float(arg):
+                return "arith.addf"
+            return "arith.addi"
+        case ffuncs._SubFType():
+            if MLIROperator.is_float(arg):
+                return "arith.subf"
+            return "arith.subi"
+        case ffuncs._MulFType():
+            if MLIROperator.is_float(arg):
+                return "arith.mulf"
+            return "arith.muli"
+        case ffuncs._TrueDivFType():
+            if MLIROperator.is_float(arg):
+                return "arith.divf"
+            if MLIROperator.is_unsigned(arg):
+                return "arith.divui"
+            return "arith.divsi"
+        case ffuncs._FloorDivFType():
+            if MLIROperator.is_float(arg):
+                raise NotImplementedError(
+                    f"MLIR backend does not yet support floordiv on {arg}"
+                )
+            if MLIROperator.is_unsigned(arg):
+                return "arith.divui"
+            return "arith.floordivsi"
+        case ffuncs._ModFType():
+            if MLIROperator.is_unsigned(arg):
+                return "arith.remui"
+            raise NotImplementedError(f"MLIR backend does not yet support mod on {arg}")
+        case ffuncs._MinFType():
+            if MLIROperator.is_float(arg):
+                return "arith.minimumf"
+            if MLIROperator.is_unsigned(arg):
+                return "arith.minui"
+            return "arith.minsi"
+        case ffuncs._MaxFType():
+            if MLIROperator.is_float(arg):
+                return "arith.maximumf"
+            if MLIROperator.is_unsigned(arg):
+                return "arith.maxui"
+            return "arith.maxsi"
+        case ffuncs._AndFType():
+            return "arith.andi"
+        case ffuncs._OrFType():
+            return "arith.ori"
+        case ffuncs._XorFType():
+            return "arith.xori"
+        case ffuncs._LShiftFType():
+            return "arith.shli"
+        case ffuncs._RShiftFType():
+            if MLIROperator.is_unsigned(arg):
+                return "arith.shrui"
+            return "arith.shrsi"
+        case ffuncs._EqFType():
+            if MLIROperator.is_float(arg):
+                return "arith.cmpf oeq,"
+            return "arith.cmpi eq,"
+        case ffuncs._NeFType():
+            if MLIROperator.is_float(arg):
+                return "arith.cmpf one,"
+            return "arith.cmpi ne,"
+        case ffuncs._LtFType():
+            if MLIROperator.is_float(arg):
+                return "arith.cmpf olt,"
+            if MLIROperator.is_unsigned(arg):
+                return "arith.cmpi ult,"
+            return "arith.cmpi slt,"
+        case ffuncs._LeFType():
+            if MLIROperator.is_float(arg):
+                return "arith.cmpf ole,"
+            if MLIROperator.is_unsigned(arg):
+                return "arith.cmpi ule,"
+            return "arith.cmpi sle,"
+        case ffuncs._GtFType():
+            if MLIROperator.is_float(arg):
+                return "arith.cmpf ogt,"
+            if MLIROperator.is_unsigned(arg):
+                return "arith.cmpi ugt,"
+            return "arith.cmpi sgt,"
+        case ffuncs._GeFType():
+            if MLIROperator.is_float(arg):
+                return "arith.cmpf oge,"
+            if MLIROperator.is_unsigned(arg):
+                return "arith.cmpi uge,"
+            return "arith.cmpi sge,"
+        case ffuncs._InvertFType():
+            return "arith.xori -1"
+        case ffuncs._NotFType():
+            return "arith.xori 1"
+        case MLIROperator():
+            return op.mlir_name()
+        case _:
+            raise NotImplementedError(f"{op} has no MLIR representation.")
+
+
+def _promote_type_helper(args: Sequence[Any]) -> Any:
+    """
+    Determine an ftype that all operands can promote to.
+    """
+    types = [getattr(arg.result_type, "element_type", arg.result_type) for arg in args]
+    return reduce(promote_type, types)
+
+
+def mlir_nary_function_call(mlir_name: str, ctx: MLIRContext, *args: Any) -> str:
+    dtype = _promote_type_helper(args)
+    t = mlir_type(dtype)
+    acc = mlir_cast_value(
+        ctx,
+        ctx(args[0]),
+        getattr(args[0].result_type, "element_type", args[0].result_type),
+        dtype,
+    )
+    for arg in args[1:]:
+        rhs = mlir_cast_value(
+            ctx,
+            ctx(arg),
+            getattr(arg.result_type, "element_type", arg.result_type),
+            dtype,
+        )
+        res = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{res} = {mlir_name} {acc}, {rhs} : {t}")
+        acc = res
+    return acc
+
+
+def mlir_binary_function_call(mlir_name: str, ctx: MLIRContext, *args: Any) -> str:
+    a, b = args
+    dtype = _promote_type_helper(args)
+    av = mlir_cast_value(
+        ctx,
+        ctx(a),
+        getattr(a.result_type, "element_type", a.result_type),
+        dtype,
+    )
+    bv = mlir_cast_value(
+        ctx,
+        ctx(b),
+        getattr(b.result_type, "element_type", b.result_type),
+        dtype,
+    )
+    res = ctx.new_ssa()
+    t = mlir_type(dtype)
+    ctx.exec(f"{ctx.feed}{res} = {mlir_name} {av}, {bv} : {t}")
+    return res
+
+
+def mlir_new_function_call(mlir_name: str, ctx: MLIRContext, *args: Any) -> str:
+    name, const = mlir_name.split()
+    (a,) = args
+    av = ctx(a)
+    c = ctx.new_ssa()
+    ctx.exec(f"{ctx.feed}{c} = arith.constant {const} : {mlir_type(a.result_type)}")
+    res = ctx.new_ssa()
+    ctx.exec(f"{ctx.feed}{res} = {name} {av}, {c} : {mlir_type(a.result_type)}")
+    return res
+
+
+def mlir_call_function_call(
+    mlir_name: str, ret_type: FType, ctx: MLIRContext, *args: Any
+) -> str:
+    arg_values = []
+    arg_types = []
+    for arg in args:
+        match arg:
+            case asm.Slot():
+                buf_t = arg.result_type
+                buf = ctx.resolve(arg)
+                desc_t = "!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>"
+                descriptor = ctx.new_ssa()
+                ctx.exec(
+                    f"{ctx.feed}{descriptor} = llvm.load {buf.box} "
+                    f": !llvm.ptr -> {desc_t}"
+                )
+                buffer = ctx.new_ssa()
+                ctx.exec(
+                    f"{ctx.feed}{buffer} = builtin.unrealized_conversion_cast "
+                    f"{descriptor} : {desc_t} to {buf_t.mlir_buffer_type()}"
+                )
+                arg_values.append(buffer)
+                arg_types.append(buf_t.mlir_buffer_type())
+            case _:
+                arg_values.append(ctx(arg))
+                arg_types.append(mlir_type(arg.result_type))
+
+    res = ctx.new_ssa()
+    ctx.exec(
+        f"{ctx.feed}{res} = func.call @{mlir_name}("
+        f"{', '.join(arg_values)}) : ({', '.join(arg_types)}) "
+        f"-> {mlir_type(ret_type)}"
+    )
+    return res
+
+
+def mlir_cast_value(ctx, value, src_type, dst_type):
+    src, dst = mlir_type(src_type), mlir_type(dst_type)
+    if src == dst:
+        return value
+
+    match src_type, dst_type:
+        case TupleFType(), TupleFType():
+            if src_type.struct_fieldnames != dst_type.struct_fieldnames:
+                raise TypeError(f"Cannot cast {src_type} to {dst_type}")
+            result = ctx.new_ssa()
+            ctx.exec(f"{ctx.feed}{result} = llvm.mlir.undef : {dst}")
+            for k, field in enumerate(src_type.struct_fieldnames):
+                field_value = mlir_getattr(src_type, ctx, value, [field])
+                field_value = mlir_cast_value(
+                    ctx,
+                    field_value,
+                    src_type.struct_attrtype(field),
+                    dst_type.struct_attrtype(field),
+                )
+                updated = ctx.new_ssa()
+                ctx.exec(
+                    f"{ctx.feed}{updated} = llvm.insertvalue {field_value}, "
+                    f"{result}[{k}] : {dst}"
+                )
+                result = updated
+            return result
+
+    src_int = src == "index" or src.startswith("i")
+    dst_int = dst == "index" or dst.startswith("i")
+    src_ft = src.startswith("f")
+    dst_ft = dst.startswith("f")
+
+    if src == "i1" and dst == "index":
+        extended = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{extended} = arith.extui {value} : i1 to i64")
+        result = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{result} = arith.index_cast {extended} : i64 to index")
+        return result
+    if src == "index" and dst_ft:
+        integer = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{integer} = arith.index_cast {value} : index to i64")
+        result = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{result} = arith.sitofp {integer} : i64 to {dst}")
+        return result
+    if src_ft and dst == "index":
+        integer = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{integer} = arith.fptosi {value} : {src} to i64")
+        result = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{result} = arith.index_cast {integer} : i64 to index")
+        return result
+
+    if src_int and dst_int:
+        if src == "index" or dst == "index":
+            job = "arith.index_cast"
+        elif int(src[1:]) > int(dst[1:]):
+            job = "arith.trunci"
+        else:
+            job = (
+                "arith.extui"
+                if np_dtype(src_type).kind in {"b", "u"}
+                else "arith.extsi"
+            )
+    elif src_int and dst_ft:
+        job = (
+            "arith.uitofp" if np_dtype(src_type).kind in {"b", "u"} else "arith.sitofp"
+        )
+    elif src_ft and dst_int:
+        job = (
+            "arith.fptoui" if np_dtype(dst_type).kind in {"b", "u"} else "arith.fptosi"
+        )
+    elif src_ft and dst_ft:
+        job = "arith.truncf" if int(src[1:]) > int(dst[1:]) else "arith.extf"
+    else:
+        raise NotImplementedError(f"MLIR cast from {src} to {dst}")
+
+    result = ctx.new_ssa()
+    ctx.exec(f"{ctx.feed}{result} = {job} {value} : {src} to {dst}")
+    return result
+
+
+def mlir_same(ctx, x, y, x_type, y_type):
+    match x_type, y_type:
+        case TupleFType(), TupleFType():
+            if x_type.struct_fieldnames != y_type.struct_fieldnames:
+                return ctx.constant(0, "i1")
+            result = None
+            for field in x_type.struct_fieldnames:
+                comparison = mlir_same(
+                    ctx,
+                    mlir_getattr(x_type, ctx, x, [field]),
+                    mlir_getattr(y_type, ctx, y, [field]),
+                    x_type.struct_attrtype(field),
+                    y_type.struct_attrtype(field),
+                )
+                if result is None:
+                    result = comparison
+                else:
+                    combined = ctx.new_ssa()
+                    ctx.exec(
+                        f"{ctx.feed}{combined} = arith.andi {result}, {comparison} : i1"
+                    )
+                    result = combined
+            return ctx.constant(1, "i1") if result is None else result
+        case FDType(), FDType():
+            dtype = promote_type(x_type, y_type)
+            x = mlir_cast_value(ctx, x, x_type, dtype)
+            y = mlir_cast_value(ctx, y, y_type, dtype)
+            t = mlir_type(dtype)
+            equal = ctx.new_ssa()
+            comparison = mlir_function_name(ffuncs.eq.ftype, dtype)
+            ctx.exec(f"{ctx.feed}{equal} = {comparison} {x}, {y} : {t}")
+            if not MLIROperator.is_float(dtype):
+                return equal
+            x_nan, y_nan, both_nan, result = (ctx.new_ssa() for _ in range(4))
+            ctx.exec(f"{ctx.feed}{x_nan} = arith.cmpf uno, {x}, {x} : {t}")
+            ctx.exec(f"{ctx.feed}{y_nan} = arith.cmpf uno, {y}, {y} : {t}")
+            ctx.exec(f"{ctx.feed}{both_nan} = arith.andi {x_nan}, {y_nan} : i1")
+            ctx.exec(f"{ctx.feed}{result} = arith.ori {equal}, {both_nan} : i1")
+            return result
+        case _:
+            raise NotImplementedError(f"Cannot compare {x_type} and {y_type}")
+
+
+def mlir_function_call(op, ctx, *args: Any) -> str | None:
+    op_type = op.result_type
+    match op_type:
+        case ffuncs._CastFType(dtype=dtype):
+            arg = args[0]
+            return mlir_cast_value(ctx, ctx(arg), arg.result_type, dtype)
+        case asm.AssemblyKernelFType():
+            ret = op_type.return_type(*(arg.result_type for arg in args))
+            callee = ctx(op)
+            values = [ctx(arg) for arg in args]
+            signature = mlir_type(op_type)
+            if isinstance(ret, StructFType):
+                ptr = ctx.new_ssa()
+                count = ctx.constant(1, "i64")
+                ctx.exec(
+                    f"{ctx.feed}{ptr} = llvm.alloca {count} x {mlir_type(ret)} "
+                    ": (i64) -> !llvm.ptr"
+                )
+                values.append(ptr)
+                ctx.exec(
+                    f"{ctx.feed}func.call_indirect {callee}({', '.join(values)}) "
+                    f": {signature}"
+                )
+                result = ctx.new_ssa()
+                ctx.exec(
+                    f"{ctx.feed}{result} = llvm.load {ptr} "
+                    f": !llvm.ptr -> {mlir_type(ret)}"
+                )
+                return result
+            result = ctx.new_ssa() if ret != algebra.none_ else None
+            assignment = f"{result} = " if result is not None else ""
+            ctx.exec(
+                f"{ctx.feed}{assignment}func.call_indirect {callee}"
+                f"({', '.join(values)}) : {signature}"
+            )
+            return result
+        case MLIROperator():
+            return op_type.mlir_function_call(op, ctx, *args)
+        case ffuncs._IdentityFType() | ffuncs._FirstArgFType():
+            return ctx(args[0])
+        case ffuncs._OverwriteFType():
+            return ctx(args[1])
+        case ffuncs._InitWriteFType(fill_type=fill):
+            if is_dynamic(fill) and isinstance(op, asm.Literal):
+                raise DynamicFillError(
+                    "Pass a dynamic init_write as a runtime operator"
+                )
+            return ctx(args[1])
+        case ffuncs._SameFType():
+            x, y = args
+            return mlir_same(ctx, ctx(x), ctx(y), x.result_type, y.result_type)
+        case ffuncs._ChooseFType(fill_type=fill):
+            if is_dynamic(fill) and isinstance(op, asm.Literal):
+                raise DynamicFillError("Pass a dynamic choose as a runtime operator")
+            value = (
+                asm.Literal(fill.value)
+                if is_static(fill)
+                else asm.GetAttr(op, asm.Literal("fill_value"))
+            )
+            fill_value = ctx(value)
+            arg_values = [ctx(arg) for arg in args]
+            result_type = op_type.return_type(*(arg.result_type for arg in args))
+            result = mlir_cast_value(ctx, fill_value, value.result_type, result_type)
+            for arg, arg_value in reversed(list(zip(args, arg_values, strict=True))):
+                cond = mlir_same(
+                    ctx, arg_value, fill_value, arg.result_type, value.result_type
+                )
+                arg_value = mlir_cast_value(
+                    ctx, arg_value, arg.result_type, result_type
+                )
+                selected = ctx.new_ssa()
+                ctx.exec(
+                    f"{ctx.feed}{selected} = arith.select {cond}, {result},"
+                    f" {arg_value} : {mlir_type(result_type)}"
+                )
+                result = selected
+            return result
+        case ffuncs._WhereFType():
+            cond_arg, x_arg, y_arg = args
+            cond = ctx(cond_arg)
+            result_type = op_type.return_type(
+                cond_arg.result_type, x_arg.result_type, y_arg.result_type
+            )
+            x = mlir_cast_value(ctx, ctx(x_arg), x_arg.result_type, result_type)
+            y = mlir_cast_value(ctx, ctx(y_arg), y_arg.result_type, result_type)
+            res = ctx.new_ssa()
+            ctx.exec(
+                f"{ctx.feed}{res} = arith.select {cond}, {x}, {y}"
+                f" : {mlir_type(result_type)}"
+            )
+            return res
+        case ffuncs._MakeTupleFType():
+            t = TupleFType.from_tuple(tuple(a.result_type for a in args))
+            st = mlir_type(t)
+            acc = ctx.new_ssa()
+            ctx.exec(f"{ctx.feed}{acc} = llvm.mlir.undef : {st}")
+            for k, a in enumerate(args):
+                v = ctx(a)
+                if mlir_type(a.result_type) == "index":
+                    cast = ctx.new_ssa()
+                    ctx.exec(f"{ctx.feed}{cast} = arith.index_cast {v} : index to i64")
+                    v = cast
+                nxt = ctx.new_ssa()
+                ctx.exec(f"{ctx.feed}{nxt} = llvm.insertvalue {v}, {acc}[{k}] : {st}")
+                acc = nxt
+            return acc
+        case (
+            ffuncs._AddFType()
+            | ffuncs._MulFType()
+            | ffuncs._AndFType()
+            | ffuncs._XorFType()
+            | ffuncs._OrFType()
+            | ffuncs._MinFType()
+            | ffuncs._MaxFType()
+        ):
+            return mlir_nary_function_call(
+                mlir_function_name(op_type, _promote_type_helper(args)), ctx, *args
+            )
+        case (
+            ffuncs._SubFType()
+            | ffuncs._TrueDivFType()
+            | ffuncs._FloorDivFType()
+            | ffuncs._ModFType()
+            | ffuncs._LShiftFType()
+            | ffuncs._RShiftFType()
+            | ffuncs._EqFType()
+            | ffuncs._NeFType()
+            | ffuncs._GtFType()
+            | ffuncs._LtFType()
+            | ffuncs._GeFType()
+            | ffuncs._LeFType()
+        ):
+            return mlir_binary_function_call(
+                mlir_function_name(op_type, _promote_type_helper(args)), ctx, *args
+            )
+        case ffuncs._NotFType() | ffuncs._InvertFType():
+            return mlir_new_function_call(
+                mlir_function_name(op_type, _promote_type_helper(args)), ctx, *args
+            )
+        case _:
+            raise NotImplementedError(f"{op} has no MLIR representation.")
+
+
+def mlir_getattr(fmt: FType, ctx, obj, attrs):
+    if not isinstance(fmt, StructFType):
+        raise TypeError(f"Expected struct type, got: {fmt}")
+
+    idxs = []
+    t: FType = fmt
+
+    for i, a in enumerate(attrs):
+        if not isinstance(t, StructFType):
+            raise TypeError(f"Expected struct type, got: {t}")
+        if not t.struct_hasattr(a):
+            raise ValueError(f"trying to get missing attr {a!r}")
+        if t.is_mutable:
+            if i:
+                obj = mlir_getattr(fmt, ctx, obj, attrs[:i])
+            ptr, res = ctx.new_ssa(), ctx.new_ssa()
+            field_t = t.struct_attrtype(a)
+            value_t = mlir_type(field_t)
+            stored_t = llvm_type(value_t)
+            ctx.exec(
+                f"{ctx.feed}{ptr} = llvm.getelementptr {obj}"
+                f"[0, {t.struct_fieldnames.index(a)}] : (!llvm.ptr) -> !llvm.ptr, "
+                f"{mlir_struct_type(t)}"
+            )
+            ctx.exec(f"{ctx.feed}{res} = llvm.load {ptr} : !llvm.ptr -> {stored_t}")
+            if stored_t != value_t:
+                cast = ctx.new_ssa()
+                if value_t == "index":
+                    ctx.exec(
+                        f"{ctx.feed}{cast} = arith.index_cast {res} : i64 to index"
+                    )
+                else:
+                    ctx.exec(
+                        f"{ctx.feed}{cast} = builtin.unrealized_conversion_cast "
+                        f"{res} : {stored_t} to {value_t}"
+                    )
+                res = cast
+            if i + 1 < len(attrs):
+                return mlir_getattr(field_t, ctx, res, attrs[i + 1 :])
+            # Mutable fields must be reloaded after writes through any alias.
+            return res
+        idxs.append(t.struct_fieldnames.index(a))
+        t = t.struct_attrtype(a)
+
+    key = f".getattr:{obj}[{','.join(map(str, idxs))}]"
+
+    if key in ctx.bindings:
+        return ctx.bindings[key][0]
+
+    res = ctx.new_ssa()
+    ctx.exec(
+        f"{ctx.feed}{res} = llvm.extractvalue {obj}"
+        f"[{', '.join(map(str, idxs))}] : {mlir_type(fmt)}"
+    )
+
+    if llvm_type(mlir_type(t)) != mlir_type(t):
+        cast = ctx.new_ssa()
+        if mlir_type(t) == "index":
+            ctx.exec(f"{ctx.feed}{cast} = arith.index_cast {res} : i64 to index")
+        else:
+            ctx.exec(
+                f"{ctx.feed}{cast} = builtin.unrealized_conversion_cast {res} "
+                f": {llvm_type(mlir_type(t))} to {mlir_type(t)}"
+            )
+        res = cast
+
+    ctx.bindings[key] = (res, mlir_type(t))
+    return res
+
+
+class MLIRGenerator(MLIRForm, MLIRLowerer):
+    def lower(
+        self, prgm: asm.AssemblyNode, *, mode: CompilerMode | None = None
+    ) -> MLIRCode:
+        ctx = MLIRContext(mode=mode)
+        if ctx.mode.debug:
+            ctx.namespace = Namespace(prgm)
+        ctx(prgm)
+        return MLIRCode(ctx.emit_global())
+
+
+class MLIRArgumentFType(ABC):
+    @abstractmethod
+    def mlir_type(self): ...
+
+    @abstractmethod
+    def serialize_to_mlir(self, obj): ...
+
+    @abstractmethod
+    def deserialize_from_mlir(self, obj, mlir_buffer): ...
+
+    @abstractmethod
+    def construct_from_mlir(self, mlir_buffer): ...
+
+
+def mlir_type(t: FType):
+    """
+    Convert an FType into the MLIR type string
+    """
+    match t:
+        case asm.AssemblyKernelFType():
+            args = [mlir_type(arg) for arg in t.arg_types]
+            if isinstance(t.result_type, StructFType):
+                args.append("!llvm.ptr")
+                ret = "()"
+            else:
+                ret = (
+                    "()" if t.result_type == algebra.none_ else mlir_type(t.result_type)
+                )
+            return f"({', '.join(args)}) -> {ret}"
+        case MLIRArgumentFType():
+            return t.mlir_type()
+        case algebra.bool_:
+            return "i1"
+        case algebra.intp | algebra.int_:
+            # A Python `int` is a 64-bit integer, which this backend represents
+            # as `index` like every other one. Mapping it to `i64` instead made
+            # the emitted type depend on whether a literal or a variable came
+            # first in a commutative call.
+            return "index"
+        case algebra.float_:
+            return "f64"
+        case algebra.ftypes.FDTypeNumpy():
+            dt = np_dtype(t)
+            match dt.kind:
+                case "b":
+                    return "i1"
+                case "i" | "u":
+                    return f"i{dt.itemsize * 8}"
+                case "f":
+                    return f"f{dt.itemsize * 8}"
+                case _:
+                    raise NotImplementedError(f"No MLIR type for numpy dtype {dt}")
+        case MutableStructFType():
+            return "!llvm.ptr"
+        case StructFType():
+            return mlir_struct_type(t)
+        case _:
+            raise NotImplementedError(f"No MLIR type mapping for {t}")
+
+
+def mlir_struct_type(t: StructFType) -> str:
+    fields = (llvm_type(mlir_type(field_type)) for _, field_type in t.struct_fields)
+    return f"!llvm.struct<({', '.join(fields)})>"
+
+
+def llvm_type(s: str) -> str:
+    """
+    Rewrite a MLIR type string into the LLVM dialect type
+    """
+    if s.startswith("memref<") and s.endswith(">"):
+        t = s[len("memref<") : -1].split("x")
+        rank = 0
+        while rank < len(t) - 1 and (t[rank] == "?" or t[rank].isdigit()):
+            rank += 1
+        return (
+            f"!llvm.struct<(ptr, ptr, i64, array<{rank} x i64>, array<{rank} x i64>)>"
+        )
+    if s == "index":
+        return "i64"
+    return s
+
+
+def mlir_ctype(s: FType | str):
+    """
+    Return the ctypes equivalent of an FType or MLIR type string, so Python
+    can pass arguments to and read results from a compiled MLIR kernel.
+    """
+    match s:
+        case MutableStructFType():
+            return ctypes.POINTER(mlir_struct_ctype(s))
+        case StructFType():
+            return mlir_struct_ctype(s)
+        case algebra.ftypes.FDTypeNumpy() if np_dtype(s).kind == "u":
+            # MLIR integers are signless, but serialization keeps the sign.
+            return np.ctypeslib.as_ctypes_type(np_dtype(s))
+        case FType():
+            return mlir_ctype(mlir_type(s))
+
+    if s.startswith("memref<") and s.endswith(">"):
+        res = mlir_memrefs.get(s)
+        if res is None:
+            from mlir.runtime import make_nd_memref_descriptor
+
+            t = s[len("memref<") : -1].split("x")
+            rank = 0
+            while rank < len(t) - 1 and (t[rank] == "?" or t[rank].isdigit()):
+                rank += 1
+            elem = "x".join(t[rank:])
+            res = make_nd_memref_descriptor(rank, mlir_ctype(elem))
+            mlir_memrefs[s] = res
+        return res
+
+    match s:
+        case "!llvm.ptr":
+            return ctypes.c_void_p
+        case "i1":
+            return ctypes.c_bool
+        case "i8":
+            return ctypes.c_int8
+        case "i16":
+            return ctypes.c_int16
+        case "i32":
+            return ctypes.c_int32
+        case "index" | "i64":
+            return ctypes.c_int64
+        case "f32":
+            return ctypes.c_float
+        case "f64":
+            return ctypes.c_double
+        case _:
+            raise NotImplementedError(f"No ctypes mapping for MLIR type {s}")
+
+
+def mlir_struct_ctype(fmt: StructFType):
+    """
+    Build a ctypes.Structure subclass named "MLIR<struct_name>" following
+    the fields of a StructFType, converting each field through mlir_ctype.
+    """
+    res = mlir_structs.get(fmt)
+    if res is None:
+        fields = [(name, mlir_ctype(t)) for name, t in fmt.struct_fields]
+        res = type("MLIR" + fmt.struct_name, (ctypes.Structure,), {"_fields_": fields})
+        mlir_structs[fmt] = res
+    return res
+
+
+def serialize_to_mlir(fmt: FType, obj):
+    match fmt:
+        case MLIRArgumentFType():
+            return fmt.serialize_to_mlir(obj)
+        case algebra.ftypes.FDTypeNumpy():
+            return np.ctypeslib.as_ctypes(np.array(obj, dtype=np_dtype(fmt)))
+        case algebra.int_ | algebra.float_ | algebra.bool_:
+            return mlir_ctype(mlir_type(fmt))(obj)
+        case algebra.none_:
+            return None
+        case StructFType():
+            return serialize_struct_to_mlir(fmt, obj)
+        case _:
+            raise NotImplementedError(f"No MLIR serialization mapping for {fmt}")
+
+
+def serialize_struct_to_mlir(fmt: StructFType, obj):
+    args = [
+        serialize_to_mlir(t, fmt.struct_getattr(obj, name))
+        for name, t in fmt.struct_fields
+    ]
+    value = mlir_struct_ctype(fmt)(*args)
+    return ctypes.pointer(value) if fmt.is_mutable else value
+
+
+def deserialize_from_mlir(fmt: FType, obj, c_obj):
+    match fmt:
+        case MLIRArgumentFType():
+            fmt.deserialize_from_mlir(obj, c_obj)
+        case StructFType():
+            deserialize_struct_from_mlir(fmt, obj, c_obj)
+        case _:
+            return
+
+
+def deserialize_struct_from_mlir(fmt: StructFType, obj, c_obj):
+    if fmt.is_mutable:
+        c_obj = c_obj.contents
+    for name, t in fmt.struct_fields:
+        value = getattr(c_obj, name)
+        match t:
+            case MLIRArgumentFType() | MutableStructFType():
+                deserialize_from_mlir(t, fmt.struct_getattr(obj, name), value)
+            case _ if fmt.is_mutable:
+                fmt.struct_setattr(obj, name, construct_from_mlir(t, value))
+            case _:
+                deserialize_from_mlir(t, fmt.struct_getattr(obj, name), value)
+
+
+def construct_from_mlir(fmt: FType, mlir_obj):
+    match fmt:
+        case MLIRArgumentFType():
+            return fmt.construct_from_mlir(mlir_obj)
+        case algebra.ftypes.FDTypeNumpy():
+            return fmt(mlir_obj.value if hasattr(mlir_obj, "value") else mlir_obj)
+        case algebra.int_:
+            return int(mlir_obj.value if hasattr(mlir_obj, "value") else mlir_obj)
+        case algebra.float_:
+            return float(mlir_obj.value if hasattr(mlir_obj, "value") else mlir_obj)
+        case algebra.bool_:
+            return bool(mlir_obj.value if hasattr(mlir_obj, "value") else mlir_obj)
+        case algebra.none_:
+            return None
+        case StructFType():
+            return construct_struct_from_mlir(fmt, mlir_obj)
+        case _:
+            return fmt(mlir_obj)
+
+
+def construct_struct_from_mlir(fmt: StructFType, mlir_obj):
+    if fmt.is_mutable:
+        mlir_obj = mlir_obj.contents
+    return fmt.from_fields(
+        *(
+            construct_from_mlir(t, getattr(mlir_obj, name))
+            for name, t in fmt.struct_fields
+        )
+    )
+
+
+class MLIRBufferFType(BufferFType, MLIRArgumentFType, ABC):
+    """
+    Abstract base class for the ftype of datastructures. The ftype defines how
+    the data in an Buffer is organized and accessed.
+    """
+
+    @abstractmethod
+    def mlir_length(self, ctx: MLIRContext, buffer):
+        """
+        Return MLIR code which loads a named buffer at the given index.
+        """
+        ...
+
+    @abstractmethod
+    def mlir_load(self, ctx: MLIRContext, buffer, index):
+        """
+        Return MLIR code which loads a named buffer at the given index.
+        """
+        ...
+
+    @abstractmethod
+    def mlir_store(self, ctx: MLIRContext, buffer, index, value=None):
+        """
+        Return MLIR code which stores a named buffer to the given index.
+        """
+        ...
+
+    @abstractmethod
+    def mlir_resize(self, ctx: MLIRContext, buffer, new_length):
+        """Resize a buffer and store its updated descriptor in the slot box."""
+        ...
+
+
+class MLIRStackFType(ABC):
+    """
+    Abstract base class for symbolic formats in MLIR. Stack formats must also
+    support other functions with symbolic inputs in addition to variable ones.
+    """
+
+    @abstractmethod
+    def mlir_unpack(self, ctx, lhs, rhs):
+        """
+        Convert a value to a symbolic representation in MLIR. Returns a NamedTuple
+        of unpacked variable names, etc. The `lhs` is the variable namespace to
+        assign to.
+        """
+        ...
+
+    @abstractmethod
+    def mlir_repack(self, ctx, lhs, rhs):
+        """
+        Update an object based on a symbolic representation. The `rhs` is the
+        symbolic representation to update from, and `lhs` is a variable name referring
+        to the original object to update.
+        """
+        ...
+
+
+class MLIRUnpackableFType(ABC):
+    """
+    Abstract base class for unpackable formats in MLIR. Unpackable formats must also
+    support other functions with unpacked inputs in addition to variable ones.
+    """
+
+    @abstractmethod
+    def mlir_unpack(self, ctx, lhs, rhs):
+        """
+        Convert a value to an unpacked representation in MLIR. Returns a NamedTuple
+        of unpacked variable names, etc. The `lhs` is the variable namespace to
+        assign to.
+        """
+        ...
+
+    @abstractmethod
+    def mlir_repack(self, ctx, lhs, rhs):
+        """
+        Update an object based on an unpacked representation. The `rhs` is the
+        unpacked representation to update from, and `lhs` is a variable name referring
+        to the original object to update.
+        """
+        ...
+
+
+class MLIRContext(Context):
+    """
+    A context for generating MLIR code.
+
+    The context tracks SSA values, variable and slot bindings, indentation,
+    nested blocks, constants, and operations emitted into the MLIR module.
+
+    """
+
+    def __init__(
+        self,
+        tab="  ",
+        indent=1,
+        bindings=None,
+        slots=None,
+        *,
+        mode=None,
+    ):
+        if bindings is None:
+            bindings = ScopedDict()
+        if slots is None:
+            slots = ScopedDict()
+
+        super().__init__(mode=mode)
+        self.tab = tab
+        self.indent = indent
+        self.bindings = bindings
+        self.slots = slots
+
+    @property
+    def feed(self) -> str:
+        return self.tab * self.indent
+
+    def new_ssa(self) -> str:
+        return "%" + self.freshen("v")
+
+    def constant(self, value, type_: str) -> str:
+        key = f".const:{value}:{type_}"
+        if key in self.bindings:
+            return self.bindings[key][0]
+        ssa = self.new_ssa()
+        self.exec(f"{self.feed}{ssa} = arith.constant {value} : {type_}")
+        self.bindings[key] = (ssa, type_)
+        return ssa
+
+    def resolve(self, node):
+        match node:
+            case asm.Slot(var_n, _):
+                if var_n in self.slots:
+                    fields, _ = self.slots[var_n]
+                    return fields
+                raise KeyError(f"Slot {var_n} not found in context")
+            case _:
+                raise ValueError(f"Expected Slot, got: {type(node)}")
+
+    def cache(self, name, val):
+        if isinstance(val, asm.Literal | asm.Variable):
+            return val
+        var = asm.Variable(self.freshen(name), val.result_type)
+        self(asm.Assign(var, val))
+        return var
+
+    def emit(self):
+        return "\n".join([*self.preamble, *self.epilogue])
+
+    def emit_global(self):
+        body = self.emit()
+        new_funcs = []
+
+        for name, value in mlir_globals.items():
+            if f"func.call @{name}(" in body:
+                new_funcs.append(value)
+
+        funcs = "\n".join(new_funcs)
+        if funcs:
+            funcs += "\n"
+
+        return f"module {{\n{funcs}{body}\n}}\n"
+
+    def block(self) -> MLIRContext:
+        blk = super().block()
+        blk.tab = self.tab
+        blk.indent = self.indent
+        blk.bindings = self.bindings
+        blk.slots = self.slots
+        return blk
+
+    def subblock(self):
+        blk = self.block()
+        blk.indent = self.indent + 1
+        blk.bindings = self.bindings.scope()
+        blk.slots = self.slots.scope()
+        return blk
+
+    def loop_carried_names(self, body):
+        names = []
+        nodes = [body]
+
+        while nodes:
+            node = nodes.pop()
+            match node:
+                case asm.Assign(asm.Variable(name, _), _):
+                    if name in self.bindings and name not in names:
+                        names.append(name)
+                case asm.SetAttr(obj, _, _):
+                    while isinstance(obj, asm.GetAttr):
+                        obj = obj.obj
+                    if (
+                        isinstance(obj, asm.Variable)
+                        and obj.name in self.bindings
+                        and obj.name not in names
+                    ):
+                        names.append(obj.name)
+                case asm.Block(bodies):
+                    nodes.extend(reversed(bodies))
+                case asm.IfElse(_, if_body, else_body):
+                    nodes.extend((else_body, if_body))
+                case (
+                    asm.If(_, nested)
+                    | asm.ForLoop(_, _, _, nested)
+                    | asm.BufferLoop(_, _, nested)
+                    | asm.WhileLoop(_, nested)
+                ):
+                    nodes.append(nested)
+
+        return names
+
+    def __call__(self, prgm: asm.AssemblyNode):
+        feed = self.feed
+        match prgm:
+            case asm.Assert(exp):
+                condition = self(exp)
+                message = json.dumps(f"Finch assertion failed: {exp}")
+                self.exec(f"{feed}cf.assert {condition}, {message}")
+                return None
+            case asm.Literal(value):
+                # A Scalar-wrapped literal (a sparse gap read) carries its dtype
+                # in element_type; the Scalar's own ftype is a struct, which is
+                # not a type `arith.constant` can be given.
+                value_type = _promote_type_helper([prgm])
+                value = getattr(value, "val", value)
+                t = mlir_type(value_type)
+                new = float(value) if MLIROperator.is_float(value_type) else int(value)
+                return self.constant(new, t)
+
+            case asm.Variable(name, _):
+                if name not in self.bindings:
+                    raise ValueError(f"Variable does not exist: {name!r}")
+                value, type_ = self.bindings[name]
+                if value.startswith("@"):
+                    result = self.new_ssa()
+                    self.exec(f"{feed}{result} = func.constant {value} : {type_}")
+                    return result
+                return value
+
+            case asm.Assign(asm.Variable(var_n, var_t), val):
+                v = self(val)
+                self.bindings[var_n] = (v, mlir_type(var_t))
+                return None
+
+            case asm.Call(op, args):
+                return mlir_function_call(op, self, *args)
+
+            case asm.Length(buffer):
+                buf_t = buffer.result_type
+                if not isinstance(buf_t, MLIRBufferFType):
+                    raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
+                return buf_t.mlir_length(self, self.resolve(buffer))
+
+            case asm.Load(buffer, index):
+                buf_t = buffer.result_type
+                if not isinstance(buf_t, MLIRBufferFType):
+                    raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
+                if self.mode.debug:
+                    index = self.cache("index", index)
+                    self(
+                        asm.Assert(
+                            asm.Call(
+                                asm.Literal(ffuncs.and_),
+                                (
+                                    asm.Call(
+                                        asm.Literal(ffuncs.ge),
+                                        (index, asm.Literal(index.result_type(0))),
+                                    ),
+                                    asm.Call(
+                                        asm.Literal(ffuncs.lt),
+                                        (index, asm.Length(buffer)),
+                                    ),
+                                ),
+                            )
+                        )
+                    )
+                return buf_t.mlir_load(self, self.resolve(buffer), index)
+
+            case asm.Store(buffer, index, value):
+                buf_t = buffer.result_type
+                if not isinstance(buf_t, MLIRBufferFType):
+                    raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
+                if self.mode.debug:
+                    index = self.cache("index", index)
+                    self(
+                        asm.Assert(
+                            asm.Call(
+                                asm.Literal(ffuncs.and_),
+                                (
+                                    asm.Call(
+                                        asm.Literal(ffuncs.ge),
+                                        (index, asm.Literal(index.result_type(0))),
+                                    ),
+                                    asm.Call(
+                                        asm.Literal(ffuncs.lt),
+                                        (index, asm.Length(buffer)),
+                                    ),
+                                ),
+                            )
+                        )
+                    )
+                return buf_t.mlir_store(self, self.resolve(buffer), index, value)
+
+            case asm.Resize(asm.Slot(var_n, _) as buffer, size):
+                buf_t = buffer.result_type
+
+                if not isinstance(buf_t, MLIRBufferFType):
+                    raise TypeError(f"Expected MLIR buffer type, got {buf_t}")
+
+                buf_t.mlir_resize(self, self.resolve(buffer), size)
+                return None
+
+            case asm.GetAttr(obj, attr):
+                attrs = [attr.val]
+                base = obj
+                while True:
+                    match base:
+                        case asm.GetAttr(inner, a):
+                            attrs.append(a.val)
+                            base = inner
+                        case _:
+                            break
+                attrs.reverse()
+                obj_t = base.result_type
+                if not isinstance(obj_t, StructFType):
+                    raise TypeError(f"Expected struct type, got: {obj_t}")
+                return mlir_getattr(obj_t, self, self(base), attrs)
+
+            case asm.SetAttr(obj, asm.Literal(attr), value):
+                match obj.result_type:
+                    case MutableStructFType() as obj_t:
+                        obj_value = self(obj)
+                        val = self(value)
+                        value_t = mlir_type(obj_t.struct_attrtype(attr))
+                        stored_t = llvm_type(value_t)
+                        if stored_t != value_t:
+                            cast = self.new_ssa()
+                            if value_t == "index":
+                                self.exec(
+                                    f"{feed}{cast} = arith.index_cast {val} "
+                                    ": index to i64"
+                                )
+                            else:
+                                self.exec(
+                                    f"{feed}{cast} = "
+                                    "builtin.unrealized_conversion_cast "
+                                    f"{val} : {value_t} to {stored_t}"
+                                )
+                            val = cast
+                        ptr = self.new_ssa()
+                        self.exec(
+                            f"{feed}{ptr} = llvm.getelementptr {obj_value}"
+                            f"[0, {obj_t.struct_fieldnames.index(attr)}] "
+                            f": (!llvm.ptr) -> !llvm.ptr, {mlir_struct_type(obj_t)}"
+                        )
+                        self.exec(
+                            f"{feed}llvm.store {val}, {ptr} : {stored_t}, !llvm.ptr"
+                        )
+                        return None
+                attrs = [attr]
+                base = obj
+                while isinstance(base, asm.GetAttr):
+                    attrs.append(base.attr.val)
+                    base = base.obj
+                attrs.reverse()
+
+                if not isinstance(base, asm.Variable):
+                    raise TypeError(f"Expected variable-backed struct, got: {base}")
+
+                name = base.name
+                obj_t = base.result_type
+                if not isinstance(obj_t, StructFType):
+                    raise TypeError(f"Expected struct type, got: {obj_t}")
+
+                indices = []
+                field_t = obj_t
+                for field in attrs:
+                    if not isinstance(field_t, StructFType):
+                        raise TypeError(f"Expected struct type, got: {field_t}")
+                    indices.append(field_t.struct_fieldnames.index(field))
+                    field_t = field_t.struct_attrtype(field)
+
+                obj = self.bindings[name][0]
+                val = self(value)
+                value_t = mlir_type(field_t)
+                stored_t = llvm_type(value_t)
+                if stored_t != value_t:
+                    cast = self.new_ssa()
+                    if value_t == "index":
+                        self.exec(
+                            f"{feed}{cast} = arith.index_cast {val} : index to i64"
+                        )
+                    else:
+                        self.exec(
+                            f"{feed}{cast} = builtin.unrealized_conversion_cast "
+                            f"{val} : {value_t} to {stored_t}"
+                        )
+                    val = cast
+
+                result = self.new_ssa()
+
+                self.exec(
+                    f"{feed}{result} = llvm.insertvalue {val}, {obj}"
+                    f"[{', '.join(map(str, indices))}] "
+                    f": {mlir_type(obj_t)}"
+                )
+
+                self.bindings[name] = (result, mlir_type(obj_t))
+                return None
+
+            case asm.Unpack(asm.Slot(var_n, var_t), val):
+                if val.result_type != var_t:
+                    raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
+                self.slots[var_n] = (var_t.mlir_unpack(self, var_n, val), var_t)
+                return None
+
+            case asm.Repack(asm.Slot(var_n, var_t)):
+                obj, _ = self.slots[var_n]
+                var_t.mlir_repack(self, var_n, obj)
+                return None
+
+            case asm.Block(bodies):
+                ctx_2 = self.block()
+                for body in bodies:
+                    ctx_2(body)
+
+                block = ctx_2.emit()
+                if block:
+                    self.exec(block)
+                return None
+
+            case asm.ForLoop(asm.Variable(var_n, var_t), start, end, body):
+                lo, hi = self(start), self(end)
+                for bound_t, name in (
+                    (start.result_type, "lo"),
+                    (end.result_type, "hi"),
+                ):
+                    if mlir_type(bound_t) != "index":
+                        cast = self.new_ssa()
+                        old = lo if name == "lo" else hi
+                        self.exec(
+                            f"{feed}{cast} = arith.index_cast {old} "
+                            f": {mlir_type(bound_t)} to index"
+                        )
+                        if name == "lo":
+                            lo = cast
+                        else:
+                            hi = cast
+                step = self.constant(1, "index")
+                iv = self.new_ssa()
+                ctx_2 = self.subblock()
+                loop_names = self.loop_carried_names(body)
+                initial = [self.bindings[name] for name in loop_names]
+                iter_args = [self.new_ssa() for _ in loop_names]
+                for name, arg, (_, type_) in zip(
+                    loop_names, iter_args, initial, strict=True
+                ):
+                    ctx_2.bindings[name] = (arg, type_)
+                if mlir_type(var_t) == "index":
+                    ctx_2.bindings[var_n] = (iv, "index")
+                else:
+                    iv_cast = ctx_2.new_ssa()
+                    ctx_2.exec(
+                        f"{ctx_2.feed}{iv_cast} = arith.index_cast {iv} "
+                        f": index to {mlir_type(var_t)}"
+                    )
+                    ctx_2.bindings[var_n] = (iv_cast, mlir_type(var_t))
+                ctx_2(body)
+
+                if loop_names:
+                    yield_val = [ctx_2.bindings[name][0] for name in loop_names]
+                    yield_t = [type_ for _, type_ in initial]
+                    ctx_2.exec(
+                        f"{ctx_2.feed}scf.yield {', '.join(yield_val)} "
+                        f": {', '.join(yield_t)}"
+                    )
+                    results = [self.new_ssa() for _ in loop_names]
+                    result_sp = (
+                        results[0]
+                        if len(results) == 1
+                        else f"{results[0]}:{len(results)}"
+                    )
+                    result_val = (
+                        results
+                        if len(results) == 1
+                        else [f"{results[0]}#{i}" for i in range(len(results))]
+                    )
+                    iter_sp = [
+                        f"{arg} = {value}"
+                        for arg, (value, _) in zip(iter_args, initial, strict=True)
+                    ]
+                    self.exec(
+                        f"{feed}{result_sp} = scf.for {iv} = {lo} to {hi} "
+                        f"step {step} iter_args({', '.join(iter_sp)}) "
+                        f"-> ({', '.join(yield_t)}) "
+                        f"{{\n{ctx_2.emit()}\n{feed}}}"
+                    )
+                    for name, result, type_ in zip(
+                        loop_names, result_val, yield_t, strict=True
+                    ):
+                        self.bindings[name] = (result, type_)
+                    return None
+
+                self.exec(
+                    f"{feed}scf.for {iv} = {lo} to {hi} step {step} {{\n"
+                    f"{ctx_2.emit()}\n"
+                    f"{feed}}}"
+                )
+                return None
+
+            case asm.BufferLoop(buffer, asm.Variable(var_n, var_t), body):
+                buf_t = buffer.result_type
+                if not isinstance(buf_t, MLIRBufferFType):
+                    raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
+                buf = self.resolve(buffer)
+                length = buf_t.mlir_length(self, buf)
+
+                zero = self.constant(0, "index")
+                step = self.constant(1, "index")
+
+                iv = self.new_ssa()
+                ctx_2 = self.subblock()
+                loop_names = self.loop_carried_names(body)
+                initial = [self.bindings[name] for name in loop_names]
+                iter_args = [self.new_ssa() for _ in loop_names]
+                for name, arg, (_, type_) in zip(
+                    loop_names, iter_args, initial, strict=True
+                ):
+                    ctx_2.bindings[name] = (arg, type_)
+
+                idx_name = ctx_2.freshen(".buffer_index")
+                ctx_2.bindings[idx_name] = (iv, "index")
+
+                elem = buf_t.mlir_load(ctx_2, buf, asm.Variable(idx_name, algebra.intp))
+                ctx_2.bindings[var_n] = (elem, mlir_type(var_t))
+                ctx_2(body)
+
+                if loop_names:
+                    yield_val = [ctx_2.bindings[name][0] for name in loop_names]
+                    yield_t = [type_ for _, type_ in initial]
+                    ctx_2.exec(
+                        f"{ctx_2.feed}scf.yield {', '.join(yield_val)} "
+                        f": {', '.join(yield_t)}"
+                    )
+                    results = [self.new_ssa() for _ in loop_names]
+                    result_sp = (
+                        results[0]
+                        if len(results) == 1
+                        else f"{results[0]}:{len(results)}"
+                    )
+                    result_val = (
+                        results
+                        if len(results) == 1
+                        else [f"{results[0]}#{i}" for i in range(len(results))]
+                    )
+                    iter_sp = [
+                        f"{arg} = {value}"
+                        for arg, (value, _) in zip(iter_args, initial, strict=True)
+                    ]
+                    self.exec(
+                        f"{feed}{result_sp} = scf.for {iv} = {zero} to {length} "
+                        f"step {step} iter_args({', '.join(iter_sp)}) "
+                        f"-> ({', '.join(yield_t)}) "
+                        f"{{\n{ctx_2.emit()}\n{feed}}}"
+                    )
+                    for name, result, type_ in zip(
+                        loop_names, result_val, yield_t, strict=True
+                    ):
+                        self.bindings[name] = (result, type_)
+                    return None
+
+                self.exec(
+                    f"{feed}scf.for {iv} = {zero} to {length} step {step} {{\n"
+                    f"{ctx_2.emit()}\n"
+                    f"{feed}}}"
+                )
+                return None
+
+            case asm.If(condition, body):
+                cond = self(condition)
+
+                before = {}
+                vars = self.bindings
+
+                while vars is not None:
+                    for i, j in vars.bindings.items():
+                        if i not in before:
+                            before[i] = j
+                    vars = vars.parent
+
+                new_ctx = self.subblock()
+                new_ctx.bindings = ScopedDict(before.copy())
+                new_ctx(body)
+                body_bindings = new_ctx.bindings.bindings
+
+                changed = {
+                    name: body_bindings[name]
+                    for name, old_binding in before.items()
+                    if not name.startswith(".")
+                    and body_bindings.get(name) != old_binding
+                }
+                if not changed:
+                    self.exec(f"{feed}scf.if {cond} {{\n{new_ctx.emit()}\n{feed}}}")
+                else:
+                    names = list(changed)
+                    new_result = [self.new_ssa() for _ in names]
+
+                    new_vals = [changed[i][0] for i in names]
+                    new_type = [changed[i][1] for i in names]
+                    old_vals = [before[i][0] for i in names]
+
+                    new_ctx.exec(
+                        f"{new_ctx.feed}scf.yield "
+                        f"{', '.join(new_vals)} : {', '.join(new_type)}"
+                    )
+
+                    self.exec(
+                        f"{feed}{', '.join(new_result)} = scf.if {cond} "
+                        f"-> ({', '.join(new_type)}) {{\n"
+                        f"{new_ctx.emit()}\n"
+                        f"{feed}}} else {{\n"
+                        f"{new_ctx.feed}scf.yield {', '.join(old_vals)} : "
+                        f"{', '.join(new_type)}\n"
+                        f"{feed}}}"
+                    )
+
+                    for i, j, k in zip(
+                        names,
+                        new_result,
+                        new_type,
+                        strict=True,
+                    ):
+                        self.bindings[i] = (j, k)
+
+                return None
+
+            case asm.IfElse(condition, body, else_body):
+                cond = self(condition)
+
+                before = {}
+                vars = self.bindings
+
+                while vars is not None:
+                    for i, j in vars.bindings.items():
+                        if i not in before:
+                            before[i] = j
+                    vars = vars.parent
+
+                new_ctx = self.subblock()
+                new_ctx.bindings = ScopedDict(before.copy())
+                new_ctx(body)
+                body_bindings = new_ctx.bindings.bindings
+
+                else_ctx = self.subblock()
+                else_ctx.bindings = ScopedDict(before.copy())
+                else_ctx(else_body)
+                else_bindings = else_ctx.bindings.bindings
+
+                names = sorted(
+                    i
+                    for i in set(body_bindings) & set(else_bindings)
+                    if not i.startswith(".")
+                    and (
+                        body_bindings[i] != before.get(i)
+                        or else_bindings[i] != before.get(i)
+                    )
+                )
+                if not names:
+                    self.exec(
+                        f"{feed}scf.if {cond} {{\n"
+                        f"{new_ctx.emit()}\n"
+                        f"{feed}}} else {{\n"
+                        f"{else_ctx.emit()}\n"
+                        f"{feed}}}"
+                    )
+                else:
+                    new_result = [self.new_ssa() for _ in names]
+
+                    new_vals = [body_bindings[i][0] for i in names]
+                    else_vals = [else_bindings[i][0] for i in names]
+                    new_type = [body_bindings[i][1] for i in names]
+
+                    new_ctx.exec(
+                        f"{new_ctx.feed}scf.yield {', '.join(new_vals)} "
+                        f": {', '.join(new_type)}"
+                    )
+                    else_ctx.exec(
+                        f"{else_ctx.feed}scf.yield {', '.join(else_vals)} "
+                        f": {', '.join(new_type)}"
+                    )
+
+                    self.exec(
+                        f"{feed}{', '.join(new_result)} = "
+                        f"scf.if {cond} -> ({', '.join(new_type)}) {{\n"
+                        f"{new_ctx.emit()}\n"
+                        f"{feed}}} else {{\n"
+                        f"{else_ctx.emit()}\n"
+                        f"{feed}}}"
+                    )
+
+                    for i, j, k in zip(
+                        names,
+                        new_result,
+                        new_type,
+                        strict=True,
+                    ):
+                        self.bindings[i] = (j, k)
+
+                return None
+
+            case asm.WhileLoop(condition, loop_body):
+                loop_names = self.loop_carried_names(loop_body)
+
+                if not loop_names:
+                    condition_ctx = self.subblock()
+                    cond = condition_ctx(condition)
+                    condition_ctx.exec(f"{condition_ctx.feed}scf.condition({cond})")
+
+                    body_ctx = self.subblock()
+                    body_ctx(loop_body)
+                    body_ctx.exec(f"{body_ctx.feed}scf.yield")
+
+                    self.exec(
+                        f"{feed}scf.while : () -> () {{\n"
+                        f"{condition_ctx.emit()}\n"
+                        f"{feed}}} do {{\n"
+                        f"{body_ctx.emit()}\n"
+                        f"{feed}}}"
+                    )
+                    return None
+
+                before = {i: self.bindings[i] for i in loop_names}
+                before_vals = [before[i][0] for i in loop_names]
+                before_type = [before[i][1] for i in loop_names]
+                loop_args = [self.new_ssa() for _ in loop_names]
+
+                condition_ctx = self.subblock()
+                for i, j, k in zip(
+                    loop_names,
+                    loop_args,
+                    before_type,
+                    strict=True,
+                ):
+                    condition_ctx.bindings.bindings[i] = (j, k)
+                cond = condition_ctx(condition)
+                condition_ctx.exec(
+                    f"{condition_ctx.feed}scf.condition({cond}) "
+                    f"{', '.join(loop_args)} : {', '.join(before_type)}"
+                )
+
+                body_ctx = self.subblock()
+                for i, j, k in zip(
+                    loop_names,
+                    loop_args,
+                    before_type,
+                    strict=True,
+                ):
+                    body_ctx.bindings.bindings[i] = (j, k)
+                body_ctx(loop_body)
+
+                new_vals = [body_ctx.bindings[i][0] for i in loop_names]
+                body_ctx.exec(
+                    f"{body_ctx.feed}scf.yield "
+                    f"{', '.join(new_vals)} : {', '.join(before_type)}"
+                )
+
+                arg_bindings = {
+                    arg: (initial, type_)
+                    for arg, initial, type_ in zip(
+                        loop_args,
+                        before_vals,
+                        before_type,
+                        strict=True,
+                    )
+                }
+
+                new_ssa = ", ".join(
+                    f"{arg} = {initial}" for arg, (initial, _) in arg_bindings.items()
+                )
+                body_args = ", ".join(
+                    f"{arg}: {type_}" for arg, (_, type_) in arg_bindings.items()
+                )
+                result_types = ", ".join(type_ for _, type_ in arg_bindings.values())
+
+                result = self.new_ssa()
+                if len(arg_bindings) == 1:
+                    result_name = result
+                    result_vals = [result]
+                else:
+                    result_name = f"{result}:{len(arg_bindings)}"
+                    result_vals = [f"{result}#{i}" for i in range(len(arg_bindings))]
+
+                block = self.freshen("bb")
+                self.exec(
+                    f"{feed}{result_name} = scf.while ({new_ssa}) "
+                    f": ({result_types}) -> ({result_types}) {{\n"
+                    f"{condition_ctx.emit()}\n"
+                    f"{feed}}} do {{\n"
+                    f"{body_ctx.feed}^{block}({body_args}):\n"
+                    f"{body_ctx.emit()}\n"
+                    f"{feed}}}"
+                )
+
+                for i, j, (_, k) in zip(
+                    loop_names,
+                    result_vals[: len(loop_names)],
+                    list(arg_bindings.values())[: len(loop_names)],
+                    strict=True,
+                ):
+                    self.bindings[i] = (j, k)
+
+                return None
+
+            case asm.Function(
+                asm.Variable(func_name, asm.AssemblyKernelFType(result_type=return_t)),
+                args,
+                body,
+            ):
+                ctx_2 = self.subblock()
+                statement = []
+                for arg in args:
+                    match arg:
+                        case asm.Variable(name, t):
+                            ssa = "%" + name.replace("#", "_")
+                            statement.append(f"{ssa}: {mlir_type(t)}")
+                            ctx_2.bindings[name] = (ssa, mlir_type(t))
+                        case _:
+                            raise NotImplementedError(
+                                f"Unrecognized argument type: {arg}"
+                            )
+                if isinstance(return_t, StructFType):
+                    statement.append("%_ret: !llvm.ptr")
+                    ctx_2.bindings[".ret_ptr"] = ("%_ret", "!llvm.ptr")
+                    ret = ""
+                else:
+                    ret = (
+                        ""
+                        if return_t == algebra.none_
+                        else f" -> {mlir_type(return_t)}"
+                    )
+                ctx_2(body)
+                body_code = ctx_2.emit()
+                feed = self.feed
+
+                self.exec(
+                    f"{feed}func.func @{func_name}({', '.join(statement)}){ret} "
+                    f"attributes {{llvm.emit_c_interface}} {{\n"
+                    f"{body_code}\n"
+                    f"{feed}}}"
+                )
+                return None
+
+            case asm.Return(value):
+                if value.result_type == algebra.none_:
+                    if not isinstance(value, asm.Literal):
+                        self(value)
+                    self.exec(f"{feed}func.return")
+                elif isinstance(value.result_type, StructFType):
+                    v = self(value)
+                    ptr = self.bindings[".ret_ptr"][0]
+                    self.exec(
+                        f"{feed}llvm.store {v}, {ptr} "
+                        f": {mlir_type(value.result_type)}, !llvm.ptr"
+                    )
+                    self.exec(f"{feed}func.return")
+                else:
+                    v = self(value)
+                    self.exec(f"{feed}func.return {v} : {mlir_type(value.result_type)}")
+                return None
+
+            case asm.Module(funcs):
+                for func in funcs:
+                    self.bindings[func.name.name] = (
+                        f"@{func.name.name}",
+                        mlir_type(func.name.result_type),
+                    )
+                for func in funcs:
+                    if not isinstance(func, asm.Function):
+                        raise NotImplementedError(
+                            f"Unrecognized function type: {type(func)}"
+                        )
+                    self(func)
+                return None
+
+            case node:
+                raise NotImplementedError(f"Unrecognized node: {node}")

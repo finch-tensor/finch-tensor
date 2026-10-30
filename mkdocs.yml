@@ -1,14 +1,16 @@
 site_name: Finch Tensor
 theme:
   name: material
-repo_url: https://github.com/finch-tensor/finch-tensor-lite
+repo_url: https://github.com/finch-tensor/finch-tensor
 edit_uri: blob/main/docs/
 nav:
   - Introduction: 'index.md'
-  - 'Issue Tracker': 'https://github.com/finch-tensor/finch-tensor-lite/issues'
+  - 'Issue Tracker': 'https://github.com/finch-tensor/finch-tensor/issues'
 plugins:
   - mkdocs-autoapi:
       autoapi_dir: ./src
+      autoapi_ignore:
+        - "finch/tests/**/*"
   - mkdocstrings:
       default_handler: python
       handlers:
@@ -17,4 +19,3 @@ plugins:
           inventories:
             - https://docs.python.org/3/objects.inv
             - https://numpy.org/doc/stable/objects.inv
-            - http://docs.scipy.org/doc/scipy/reference/objects.inv

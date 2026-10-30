@@ -1,0 +1,1913 @@
+import ctypes
+import logging
+import re
+import sys
+from collections import namedtuple
+from typing import Any
+
+import pytest
+
+import numpy as np
+import scipy.sparse as sps
+
+import finch
+import finch.finch_assembly as asm
+from finch import (
+    DenseLevelFType,
+    FiberTensorFType,
+    dense,
+    element,
+    ffuncs,
+    fiber_tensor,
+    ftype,
+    sparse_list,
+)
+from finch.algebra import DynamicFill, TupleFType, ftypes, np_dtype
+from finch.codegen import (
+    CCompiler,
+    CGenerator,
+    MLIRCompiler,
+    MLIRGenerator,
+    NumbaCompiler,
+    NumbaGenerator,
+    NumpyBuffer,
+    NumpyBufferFType,
+)
+from finch.codegen.buffers import MallocBuffer, MallocBufferFType
+from finch.codegen.buffers.memref_buffer import MemrefBufferFType
+from finch.codegen.c_codegen import (
+    construct_from_c,
+    deserialize_from_c,
+    serialize_to_c,
+)
+from finch.codegen.mlir_codegen import (
+    construct_from_mlir,
+    deserialize_from_mlir,
+    serialize_to_mlir,
+)
+from finch.codegen.numba_codegen import (
+    construct_from_numba,
+    deserialize_from_numba,
+    serialize_to_numba,
+)
+from finch.compile import CompilerMode
+
+from .conftest import finch_assert_equal
+from .utils import mlir_backend
+
+
+@pytest.mark.c_backend
+def test_add_function():
+    c_code = """
+    #include <stdio.h>
+
+    #ifdef _WIN32
+        #define FINCH_EXPORT __declspec( dllexport )
+    #else
+        #define FINCH_EXPORT
+    #endif
+
+    FINCH_EXPORT int add(int a, int b) {
+        return a + b;
+    }
+    """
+    f = finch.codegen.c_codegen.load_shared_lib(c_code).add
+    result = f(3, 4)
+    assert result == 7, f"Expected 7, got {result}"
+
+
+@pytest.mark.c_backend
+def test_buffer_function():
+    c_code = """
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <stdint.h>
+    #include <string.h>
+
+    #ifdef _WIN32
+        #define FINCH_EXPORT __declspec( dllexport )
+    #else
+        #define FINCH_EXPORT
+    #endif
+
+    typedef struct CNumpyBuffer {
+        void* arr;
+        void* data;
+        size_t length;
+        void* (*resize)(void**, size_t);
+    } CNumpyBuffer;
+
+    FINCH_EXPORT void concat_buffer_with_self(struct CNumpyBuffer* buffer) {
+        // Get the original data pointer and length
+        double* data = (double*)(buffer->data);
+        size_t length = buffer->length;
+
+        // Resize the buffer to double its length
+        buffer->data = buffer->resize(&(buffer->arr), length * 2);
+        buffer->length *= 2;
+
+        // Update the data pointer after resizing
+        data = (double*)(buffer->data);
+
+        // Copy the original data to the second half of the new buffer
+        for (size_t i = 0; i < length; ++i) {
+            data[length + i] = data[i] + 1;
+        }
+    }
+    """
+    a = np.array([1, 2, 3], dtype=np.float64)
+    b = NumpyBuffer(a)
+    f = finch.codegen.c_codegen.load_shared_lib(c_code).concat_buffer_with_self
+    k = finch.codegen.c_codegen.CKernel(
+        f,
+        asm.AssemblyKernelFType(
+            "concat_buffer_with_self", (NumpyBufferFType(ftypes.float64),), finch.none_
+        ),
+    )
+    k(b)
+    result = b.arr
+    expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
+    finch_assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        pytest.param(CCompiler(), NumpyBuffer, marks=pytest.mark.c_backend),
+        (NumbaCompiler(), NumpyBuffer),
+    ],
+)
+def test_codegen(compiler, buffer):
+    a = np.array([1, 2, 3], dtype=np.float64)
+    buf = buffer(a)
+
+    a_var = asm.Variable("a", buf.ftype)
+    i_var = asm.Variable("i", finch.intp)
+    length_var = asm.Variable("l", finch.intp)
+    a_slt = asm.Slot("a_", buf.ftype)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "test_function",
+                    asm.AssemblyKernelFType(
+                        "test_function", (a_var.result_type,), finch.intp
+                    ),
+                ),
+                (a_var,),
+                asm.Block(
+                    (
+                        asm.Unpack(a_slt, a_var),
+                        asm.Assign(length_var, asm.Length(a_slt)),
+                        asm.Resize(
+                            a_slt,
+                            asm.Call(
+                                asm.Literal(ffuncs.mul),
+                                (asm.Length(a_slt), asm.Literal(2)),
+                            ),
+                        ),
+                        asm.ForLoop(
+                            i_var,
+                            asm.Literal(0),
+                            length_var,
+                            asm.Store(
+                                a_slt,
+                                asm.Call(asm.Literal(ffuncs.add), (i_var, length_var)),
+                                asm.Call(
+                                    asm.Literal(ffuncs.add),
+                                    (asm.Load(a_slt, i_var), asm.Literal(1)),
+                                ),
+                            ),
+                        ),
+                        asm.Repack(a_slt),
+                        asm.Return(asm.Literal(0)),
+                    )
+                ),
+            ),
+        )
+    )
+    mod = compiler(prgm)
+    f = mod.test_function
+    f(buf)
+    result = buf.arr
+    expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
+    finch_assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        asm.AssemblyInterpreter(),
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
+        NumbaCompiler(),
+        pytest.param(MLIRCompiler(), marks=pytest.mark.mlir_backend),
+    ],
+)
+def test_kernels_write_tensor_fields_back(compiler):
+    # A kernel which changes a dimension or a dynamic fill of a tensor it was
+    # given updates the tensor, so that kernels can redefine shapes and fills.
+    fill = DynamicFill(np.float64(0.0))
+    fiber = fiber_tensor(dense(element(fill.ftype))).from_numpy(np.zeros(3), fill)
+    array = finch.BufferizedNDArray.from_numpy(np.zeros(3), fill_value=fill)
+    formats = (fiber.ftype, array.ftype)
+    t, a = asm.Variable("t", fiber.ftype), asm.Variable("a", array.ftype)
+    alias = asm.Variable("alias", array.ftype)
+    dense_lvl = asm.GetAttr(t, asm.Literal("lvl"))
+    element_lvl = asm.GetAttr(dense_lvl, asm.Literal("lvl"))
+    body = asm.Block(
+        (
+            asm.Assign(alias, a),
+            asm.SetAttr(dense_lvl, asm.Literal("dimension"), asm.Literal(np.intp(5))),
+            asm.SetAttr(element_lvl, asm.Literal("fill"), asm.Literal(np.float64(7))),
+            asm.SetAttr(alias, asm.Literal("fill"), asm.Literal(np.float64(8))),
+            asm.Return(asm.Literal(np.intp(0))),
+        )
+    )
+    kernel_t = asm.AssemblyKernelFType("f", (fiber.ftype, array.ftype), finch.intp)
+    prgm = asm.Module((asm.Function(asm.Variable("f", kernel_t), (t, a), body),))
+    compiler(prgm).f(fiber, array)
+    assert fiber.shape == (5,)
+    assert fiber.fill_value == 7.0
+    assert array.fill_value == 8.0
+    # The tensors keep their formats, so later calls reuse the same kernels.
+    assert (fiber.ftype, array.ftype) == formats
+
+
+@pytest.mark.parametrize(
+    ["generator", "compiler", "prefix"],
+    [
+        pytest.param(CGenerator(), CCompiler(), "C", marks=pytest.mark.c_backend),
+        (NumbaGenerator(), NumbaCompiler(), "Numba"),
+    ],
+)
+def test_struct_names_are_numbered_per_module(generator, compiler, prefix):
+    # Generated code numbers structs in the order the module uses them, whichever
+    # structs other modules made first.
+    a = finch.BufferizedNDArray.from_numpy(np.zeros(3))
+    b = finch.BufferizedNDArray.from_numpy(np.zeros((2, 2), dtype=np.int64))
+
+    def module(*arrays):
+        args = tuple(asm.Variable(f"a{i}", arr.ftype) for i, arr in enumerate(arrays))
+        kernel_t = asm.AssemblyKernelFType(
+            "f", tuple(arr.ftype for arr in arrays), finch.intp
+        )
+        body = asm.Return(asm.Literal(np.intp(0)))
+        return asm.Module((asm.Function(asm.Variable("f", kernel_t), args, body),))
+
+    compiler(module(b)).f(b)
+    names = re.findall(
+        rf"\b{prefix}_BufferizedNDArray\w*", str(generator(module(a, b)))
+    )
+    assert list(dict.fromkeys(names)) == [
+        f"{prefix}_BufferizedNDArray",
+        f"{prefix}_BufferizedNDArray_2",
+    ]
+    assert compiler(module(a, b)).f(a, b) == 0
+
+
+@pytest.mark.c_backend
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        (CCompiler(), MallocBuffer),
+        (asm.AssemblyInterpreter(), MallocBuffer),
+    ],
+)
+def test_dot_product_malloc(compiler, buffer):
+    a = [1.0, 2.0, 3.0]
+    b = [4.0, 5.0, 6.0]
+
+    a_buf = buffer(len(a), ftypes.float64, a)
+    b_buf = buffer(len(b), ftypes.float64, b)
+    ab = buffer(len(a), ftypes.float64, a)
+    bb = buffer(len(b), ftypes.float64, b)
+
+    c = asm.Variable("c", finch.float64)
+    i = asm.Variable("i", finch.int64)
+
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    bb_v = asm.Variable("b", bb.ftype)
+    bb_slt = asm.Slot("b_", bb.ftype)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "dot_product",
+                    asm.AssemblyKernelFType(
+                        "dot_product",
+                        (ab_v.result_type, bb_v.result_type),
+                        finch.float64,
+                    ),
+                ),
+                (
+                    ab_v,
+                    bb_v,
+                ),
+                asm.Block(
+                    (
+                        asm.Assign(c, asm.Literal(np.float64(0.0))),
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Unpack(bb_slt, bb_v),
+                        asm.ForLoop(
+                            i,
+                            asm.Literal(np.int64(0)),
+                            asm.Length(ab_slt),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        c,
+                                        asm.Call(
+                                            asm.Literal(ffuncs.add),
+                                            (
+                                                c,
+                                                asm.Call(
+                                                    asm.Literal(ffuncs.mul),
+                                                    (
+                                                        asm.Load(ab_slt, i),
+                                                        asm.Load(bb_slt, i),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Repack(ab_slt),
+                        asm.Repack(bb_slt),
+                        asm.Return(c),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm)
+
+    result = mod.dot_product(a_buf, b_buf)
+
+    interp = asm.AssemblyInterpreter()(prgm)
+
+    expected = interp.dot_product(a_buf, b_buf)
+
+    assert np.isclose(result, expected), f"Expected {expected}, got {result}"
+
+
+@pytest.mark.c_backend
+@pytest.mark.parametrize(
+    ["compiler", "new_size"],
+    [
+        [compiler, size]
+        for compiler in (asm.AssemblyInterpreter(), CCompiler())
+        for size in [1, 5, 10]
+    ],
+)
+def test_malloc_resize(compiler, new_size):
+    a = [1.0, 4.0, 3.0, 4.0]
+
+    ab = MallocBuffer(len(a), ftypes.float64, a)
+
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("b_", ab.ftype)
+    size = asm.Variable("size", finch.intp)
+
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "length",
+                    asm.AssemblyKernelFType("length", (ab_v.result_type,), finch.intp),
+                ),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Resize(ab_slt, asm.Literal(new_size)),
+                        asm.Repack(ab_slt),
+                        asm.Assign(size, asm.Length(ab_slt)),
+                        asm.Return(size),
+                    )
+                ),
+            ),
+        )
+    )
+    mod = compiler(prgm)
+    assert mod.length(ab) == new_size
+    assert ab.length() == new_size
+    for i in range(new_size):
+        assert ab.load(i) == 0 if i >= len(a) else a[i]
+
+
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        pytest.param(CCompiler(), NumpyBuffer, marks=pytest.mark.c_backend),
+        (NumbaCompiler(), NumpyBuffer),
+        (asm.AssemblyInterpreter(), NumpyBuffer),
+    ],
+)
+def test_dot_product(compiler, buffer):
+    a = np.array([1, 2, 3], dtype=np.float64)
+    b = np.array([4, 5, 6], dtype=np.float64)
+
+    a_buf = buffer(a)
+    b_buf = buffer(b)
+    ab = buffer(a)
+    bb = buffer(b)
+
+    c = asm.Variable("c", finch.float64)
+    i = asm.Variable("i", finch.int64)
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    bb_v = asm.Variable("b", bb.ftype)
+    bb_slt = asm.Slot("b_", bb.ftype)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "dot_product",
+                    asm.AssemblyKernelFType(
+                        "dot_product",
+                        (ab_v.result_type, bb_v.result_type),
+                        finch.float64,
+                    ),
+                ),
+                (
+                    ab_v,
+                    bb_v,
+                ),
+                asm.Block(
+                    (
+                        asm.Assign(c, asm.L(np.float64(0.0))),
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Unpack(bb_slt, bb_v),
+                        asm.ForLoop(
+                            i,
+                            asm.L(np.int64(0)),
+                            asm.Length(ab_slt),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        c,
+                                        asm.Call(
+                                            asm.L(ffuncs.add),
+                                            (
+                                                c,
+                                                asm.Call(
+                                                    asm.L(ffuncs.mul),
+                                                    (
+                                                        asm.Load(ab_slt, i),
+                                                        asm.Load(bb_slt, i),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Repack(ab_slt),
+                        asm.Repack(bb_slt),
+                        asm.Return(c),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm)
+
+    result = mod.dot_product(a_buf, b_buf)
+
+    interp = asm.AssemblyInterpreter()(prgm)
+
+    expected = interp.dot_product(a_buf, b_buf)
+
+    assert np.isclose(result, expected), f"Expected {expected}, got {result}"
+
+
+@pytest.mark.c_backend
+@pytest.mark.parametrize(
+    ["compiler", "extension", "buffer"],
+    [
+        (CGenerator(), ".c", MallocBuffer),
+    ],
+)
+def test_dot_product_regression_malloc(compiler, extension, buffer, file_regression):
+    a = np.array([1, 2, 3], dtype=np.float64)
+    b = np.array([4, 5, 6], dtype=np.float64)
+
+    c = asm.Variable("c", finch.float64)
+    i = asm.Variable("i", finch.int64)
+    ab = buffer(len(a), ftypes.float64, a)
+    bb = buffer(len(b), ftypes.float64, b)
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    bb_v = asm.Variable("b", bb.ftype)
+    bb_slt = asm.Slot("b_", bb.ftype)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "dot_product",
+                    asm.AssemblyKernelFType(
+                        "dot_product",
+                        (ab_v.result_type, bb_v.result_type),
+                        finch.float64,
+                    ),
+                ),
+                (
+                    ab_v,
+                    bb_v,
+                ),
+                asm.Block(
+                    (
+                        asm.Assign(c, asm.Literal(np.float64(0.0))),
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Unpack(bb_slt, bb_v),
+                        asm.ForLoop(
+                            i,
+                            asm.Literal(np.int64(0)),
+                            asm.Length(ab_slt),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        c,
+                                        asm.Call(
+                                            asm.Literal(ffuncs.add),
+                                            (
+                                                c,
+                                                asm.Call(
+                                                    asm.Literal(ffuncs.mul),
+                                                    (
+                                                        asm.Load(ab_slt, i),
+                                                        asm.Load(bb_slt, i),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Repack(ab_slt),
+                        asm.Repack(bb_slt),
+                        asm.Return(c),
+                    )
+                ),
+            ),
+        )
+    )
+
+    file_regression.check(str(compiler(prgm)), extension=extension)
+
+
+@pytest.mark.parametrize(
+    ["compiler", "extension", "buffer"],
+    [
+        (CGenerator(), ".c", NumpyBuffer),
+        (NumbaGenerator(), ".py", NumpyBuffer),
+    ],
+)
+def test_dot_product_regression(compiler, extension, buffer, file_regression):
+    a = np.array([1, 2, 3], dtype=np.float64)
+    b = np.array([4, 5, 6], dtype=np.float64)
+
+    c = asm.Variable("c", finch.float64)
+    i = asm.Variable("i", finch.int64)
+    ab = buffer(a)
+    bb = buffer(b)
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    bb_v = asm.Variable("b", bb.ftype)
+    bb_slt = asm.Slot("b_", bb.ftype)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "dot_product",
+                    asm.AssemblyKernelFType(
+                        "dot_product",
+                        (ab_v.result_type, bb_v.result_type),
+                        finch.float64,
+                    ),
+                ),
+                (
+                    ab_v,
+                    bb_v,
+                ),
+                asm.Block(
+                    (
+                        asm.Assign(c, asm.Literal(np.float64(0.0))),
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Unpack(bb_slt, bb_v),
+                        asm.ForLoop(
+                            i,
+                            asm.Literal(np.int64(0)),
+                            asm.Length(ab_slt),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        c,
+                                        asm.Call(
+                                            asm.Literal(ffuncs.add),
+                                            (
+                                                c,
+                                                asm.Call(
+                                                    asm.Literal(ffuncs.mul),
+                                                    (
+                                                        asm.Load(ab_slt, i),
+                                                        asm.Load(bb_slt, i),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Repack(ab_slt),
+                        asm.Repack(bb_slt),
+                        asm.Return(c),
+                    )
+                ),
+            ),
+        )
+    )
+
+    file_regression.check(str(compiler(prgm)), extension=extension)
+
+
+@pytest.mark.parametrize(
+    ["compiler"],
+    [
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
+        (NumbaCompiler(),),
+        (asm.AssemblyInterpreter(),),
+    ],
+)
+def test_if_statement(compiler):
+    var = asm.Variable("a", finch.int64)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "if_else", asm.AssemblyKernelFType("if_else", (), finch.int64)
+                ),
+                (),
+                asm.Block(
+                    (
+                        asm.Assign(var, asm.Literal(np.int64(5))),
+                        asm.If(
+                            asm.Call(
+                                asm.Literal(ffuncs.eq),
+                                (var, asm.Literal(np.int64(5))),
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Literal(ffuncs.add),
+                                            (var, asm.Literal(np.int64(10))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.IfElse(
+                            asm.Call(
+                                asm.Literal(ffuncs.lt),
+                                (var, asm.Literal(np.int64(15))),
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Literal(ffuncs.sub),
+                                            (var, asm.Literal(np.int64(3))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                            asm.Block(
+                                (
+                                    asm.Assign(
+                                        var,
+                                        asm.Call(
+                                            asm.Literal(ffuncs.mul),
+                                            (var, asm.Literal(np.int64(2))),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Return(var),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm)
+
+    result = mod.if_else()
+
+    interp = asm.AssemblyInterpreter()(prgm)
+
+    expected = interp.if_else()
+
+    assert np.isclose(result, expected), f"Expected {expected}, got {result}"
+
+
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
+        NumbaCompiler(),
+    ],
+)
+def test_simple_struct(compiler):
+    Point = namedtuple("Point", ["x", "y"])
+    p = Point(np.float64(1.0), np.float64(2.0))
+    x = (np.int64(1), np.int64(4))
+
+    p_var = asm.Variable("p", ftype(p))
+    x_var = asm.Variable("x", ftype(x))
+    res_var = asm.Variable("res", finch.float64)
+    mod = compiler(
+        asm.Module(
+            (
+                asm.Function(
+                    asm.Variable(
+                        "simple_struct",
+                        asm.AssemblyKernelFType(
+                            "simple_struct",
+                            (p_var.result_type, x_var.result_type),
+                            finch.float64,
+                        ),
+                    ),
+                    (p_var, x_var),
+                    asm.Block(
+                        (
+                            asm.Assign(
+                                res_var,
+                                asm.Call(
+                                    asm.Literal(ffuncs.mul),
+                                    (
+                                        asm.GetAttr(p_var, asm.Literal("x")),
+                                        asm.GetAttr(x_var, asm.Literal("element_0")),
+                                    ),
+                                ),
+                            ),
+                            asm.Assign(
+                                res_var,
+                                asm.Call(
+                                    asm.Literal(ffuncs.add),
+                                    (
+                                        res_var,
+                                        asm.Call(
+                                            asm.Literal(ffuncs.mul),
+                                            (
+                                                asm.GetAttr(p_var, asm.Literal("y")),
+                                                asm.GetAttr(
+                                                    x_var, asm.Literal("element_1")
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            asm.Return(res_var),
+                        )
+                    ),
+                ),
+            ),
+        )
+    )
+
+    result = mod.simple_struct(p, x)
+    assert result == np.float64(9.0)
+
+
+@pytest.mark.parametrize(
+    ["compiler", "extension", "platform"],
+    [
+        (CGenerator(), ".c", "any"),
+        (NumbaGenerator(), ".py", "win" if sys.platform == "win32" else "any"),
+    ],
+)
+def test_debug_loadstore_regression(compiler, extension, platform, file_regression):
+    a = np.array(range(3), dtype=ctypes.c_int64)
+    ab = NumpyBuffer(a)
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    idx = asm.Variable("idx", ftype(np.intp))
+    val = asm.Variable("val", ftype(np.int64))
+
+    res_var = asm.Variable("val", ab.ftype.element_type)
+    res_var2 = asm.Variable("val2", ab.ftype.element_type)
+    mod = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "finch_access",
+                    asm.AssemblyKernelFType(
+                        "finch_access",
+                        (ab_v.result_type, idx.result_type),
+                        ab.ftype.element_type,
+                    ),
+                ),
+                (ab_v, idx),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        # we assign twice like this; this is intentional and
+                        # designed to check correct refreshing.
+                        asm.Assign(
+                            res_var,
+                            asm.Load(ab_slt, idx),
+                        ),
+                        asm.Assign(
+                            res_var2,
+                            asm.Load(ab_slt, idx),
+                        ),
+                        asm.Return(res_var),
+                    )
+                ),
+            ),
+            asm.Function(
+                asm.Variable(
+                    "finch_change",
+                    asm.AssemblyKernelFType(
+                        "finch_change",
+                        (ab_v.result_type, idx.result_type, val.result_type),
+                        ab.ftype.element_type,
+                    ),
+                ),
+                (ab_v, idx, val),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Store(
+                            ab_slt,
+                            idx,
+                            val,
+                        ),
+                        asm.Return(asm.Literal(np.int64(0))),
+                    )
+                ),
+            ),
+        )
+    )
+    output = compiler(mod, mode=CompilerMode(debug=True))
+    file_regression.check(str(output), extension=extension)
+
+
+@pytest.mark.parametrize(
+    "value,np_type,c_type",
+    [
+        (3, np.int64, ctypes.c_int64),
+        (1, np.float32, ctypes.c_float),
+        (1.2, np.float64, ctypes.c_double),
+    ],
+)
+def test_np_c_serialization(value, np_type, c_type):
+    fmt = ftype(np_type)
+    serialized = serialize_to_c(fmt, np_type(value))
+    assert serialized.value == c_type(value).value
+    assert isinstance(serialized, c_type)
+    constructed = construct_from_c(fmt, serialized)
+    assert constructed == np_type(value)
+    assert deserialize_from_c(fmt, constructed, serialized) is None
+
+
+@pytest.mark.parametrize(
+    "value,fmt,c_type",
+    [
+        (3, ftype(np.int64), ctypes.c_int64),
+        (1, ftype(np.float32), ctypes.c_float),
+        (1.2, ftype(np.float64), ctypes.c_double),
+    ],
+)
+def test_ctypes_c_serialization(value, fmt, c_type):
+    cvalue = c_type(value)
+    serialized = serialize_to_c(fmt, cvalue.value)
+    assert serialized.value == c_type(value).value
+    assert isinstance(serialized, c_type)
+    constructed = construct_from_c(fmt, serialized)
+    assert constructed == fmt(value)
+    assert deserialize_from_c(fmt, constructed, serialized) is None
+
+
+@pytest.mark.parametrize(
+    "value,np_type",
+    [
+        (3, np.int64),
+        (1, np.float32),
+        (1.2, np.float64),
+    ],
+)
+def test_np_numba_serialization(value, np_type):
+    cvalue = np_type(value)
+    fmt = ftype(np_type)
+    serialized = serialize_to_numba(fmt, cvalue)
+    assert serialized == np_type(value)
+    assert isinstance(serialized, np_type)
+    constructed = construct_from_numba(fmt, serialized)
+    assert constructed == np_type(value)
+    assert deserialize_from_numba(fmt, constructed, serialized) is None
+
+
+@pytest.mark.usefixtures("numba_compiler")
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+def test_e2e_numba(fmt_fn, dtype):
+    a = np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]], dtype=dtype)
+    b = np.array([[4, 1, 9], [2, 2, 4], [4, 4, -5]], dtype=dtype)
+
+    fmt = fmt_fn(dtype)
+    aa = finch.asarray(a, format=fmt)
+    bb = finch.asarray(b, format=fmt)
+
+    wa = finch.defer(aa)
+    wb = finch.defer(bb)
+
+    plan = finch.matmul(wa, wb)
+    result = finch.compute(plan)
+
+    finch_assert_equal(result, a @ b)
+
+
+@pytest.mark.usefixtures("numba_compiler")
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+@pytest.mark.parametrize(
+    "a",
+    [
+        np.array([[1, 2, 3], [4, 5, 6]]),
+        np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]]),
+    ],
+)
+def test_e2e_transpose_numba(a, dtype):
+    """Transposing through the compiled (assembly/numba) backend must produce
+    the actual transpose, not zeros.
+
+    Regression: a transpose lowers to a guarded diagonal write
+    (``if eq(i_, i): out[..., i_] = in[..., i]``). The notation->assembly
+    lowering dropped that ``If`` body (it was emitted into a throwaway block),
+    so ``compute(permute_dims(x))`` returned an all-zero array on every
+    compiled backend while the notation interpreter stayed correct. See the
+    lower-level reproduction in
+    ``test_notation_compiler.test_if_in_loop_is_lowered``.
+    """
+    a = a.astype(dtype)
+    wa = finch.defer(finch.asarray(a))
+    result = finch.compute(finch.permute_dims(wa, axes=(1, 0)))
+    finch_assert_equal(result, a.T)
+
+
+@mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+def test_e2e_mlir_dense_matmul(fmt_fn, dtype):
+    a = np.array(
+        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+        dtype=dtype,
+    )
+
+    b = np.array(
+        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+        dtype=dtype,
+    )
+
+    fmt = fmt_fn(dtype)
+    wa = finch.defer(finch.asarray(a, format=fmt))
+    wb = finch.defer(finch.asarray(b, format=fmt))
+
+    plan = finch.matmul(wa, wb)
+    result = finch.compute(plan)
+    finch_assert_equal(result, a @ b)
+
+
+@mlir_backend
+def test_matmul_mlir_regression(file_regression):
+    m, k, n = 2, 3, 4
+    ab = NumpyBuffer(np.zeros(m * k, dtype=np.float64))
+    bb = NumpyBuffer(np.zeros(k * n, dtype=np.float64))
+    cb = NumpyBuffer(np.zeros(m * n, dtype=np.float64))
+
+    i = asm.Variable("i", ftypes.intp)
+    j = asm.Variable("j", ftypes.intp)
+    p = asm.Variable("p", ftypes.intp)
+
+    a_v, a_slt = asm.Variable("a", ab.ftype), asm.Slot("a_", ab.ftype)
+    b_v, b_slt = asm.Variable("b", bb.ftype), asm.Slot("b_", bb.ftype)
+    c_v, c_slt = asm.Variable("c", cb.ftype), asm.Slot("c_", cb.ftype)
+
+    c_idx = asm.Call(
+        asm.Literal(ffuncs.add),
+        (
+            asm.Call(
+                asm.Literal(ffuncs.mul),
+                (i, asm.Literal(np.intp(n))),
+            ),
+            j,
+        ),
+    )
+
+    a_idx = asm.Call(
+        asm.Literal(ffuncs.add),
+        (
+            asm.Call(
+                asm.Literal(ffuncs.mul),
+                (i, asm.Literal(np.intp(k))),
+            ),
+            p,
+        ),
+    )
+
+    b_idx = asm.Call(
+        asm.Literal(ffuncs.add),
+        (
+            asm.Call(
+                asm.Literal(ffuncs.mul),
+                (p, asm.Literal(np.intp(n))),
+            ),
+            j,
+        ),
+    )
+
+    body = asm.Store(
+        c_slt,
+        c_idx,
+        asm.Call(
+            asm.Literal(ffuncs.add),
+            (
+                asm.Load(c_slt, c_idx),
+                asm.Call(
+                    asm.Literal(ffuncs.mul),
+                    (
+                        asm.Load(a_slt, a_idx),
+                        asm.Load(b_slt, b_idx),
+                    ),
+                ),
+            ),
+        ),
+    )
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "matmul",
+                    asm.AssemblyKernelFType(
+                        "matmul",
+                        (a_v.result_type, b_v.result_type, c_v.result_type),
+                        ftypes.none_,
+                    ),
+                ),
+                (a_v, b_v, c_v),
+                asm.Block(
+                    (
+                        asm.Unpack(a_slt, a_v),
+                        asm.Unpack(b_slt, b_v),
+                        asm.Unpack(c_slt, c_v),
+                        asm.ForLoop(
+                            i,
+                            asm.Literal(np.intp(0)),
+                            asm.Literal(np.intp(m)),
+                            asm.Block(
+                                (
+                                    asm.ForLoop(
+                                        j,
+                                        asm.Literal(np.intp(0)),
+                                        asm.Literal(np.intp(n)),
+                                        asm.Block(
+                                            (
+                                                asm.ForLoop(
+                                                    p,
+                                                    asm.Literal(np.intp(0)),
+                                                    asm.Literal(np.intp(k)),
+                                                    asm.Block((body,)),
+                                                ),
+                                            )
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Repack(a_slt),
+                        asm.Repack(b_slt),
+                        asm.Repack(c_slt),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+    file_regression.check(str(MLIRGenerator()(prgm)), extension=".mlir")
+
+
+def mlir_kernel_under_test(caplog) -> str:
+    """
+    The MLIR source for the kernel a test compiled, normalized for comparison.
+
+    One `finch.compute` can compile several kernels: a sparse output is preceded
+    by a mask-initialization kernel per level, and the kernel under test is the
+    last one. Taking the first instead silently pins a ~1.5KB boolean fill loop
+    in place of the computation.
+
+    Fresh-name suffixes are stripped because they carry counters that depend on
+    how much lowering ran earlier in the session, so they differ between running
+    a test alone and running it with the rest of the file.
+    """
+    kernels = [
+        record.message
+        for record in caplog.records
+        if record.name == "finch.codegen.mlir_codegen.mlir"
+        and record.message.startswith("Compiling MLIR code:\n")
+    ]
+    assert kernels, "no MLIR kernel was compiled"
+    return re.sub(r"%(_A_\d+|__A|_eye|__eye)(?:_\d+)+", r"%\1", kernels[-1])
+
+
+@mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+def test_dense_matmul_mlir_regression(file_regression, caplog):
+    dtype = np.float64
+    a = np.array(
+        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+        dtype=dtype,
+    )
+    b = np.array(
+        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+        dtype=dtype,
+    )
+
+    fmt = fiber_tensor(
+        dense(dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)))
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        result = finch.compute(
+            finch.matmul(
+                finch.defer(finch.asarray(a, format=fmt)),
+                finch.defer(finch.asarray(b, format=fmt)),
+            )
+        )
+
+    finch_assert_equal(result, a @ b)
+    file_regression.check(mlir_kernel_under_test(caplog), extension=".mlir")
+
+
+@mlir_backend
+def test_mlir_resize_same_length():
+    buf = NumpyBuffer(np.array([1.0, 2.0, 3.0], dtype=np.float64))
+    b_v, b_slt = asm.Variable("b", buf.ftype), asm.Slot("b_", buf.ftype)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "grow",
+                    asm.AssemblyKernelFType("grow", (b_v.result_type,), ftypes.none_),
+                ),
+                (b_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(b_slt, b_v),
+                        asm.Resize(b_slt, asm.Literal(np.intp(3))),
+                        asm.Repack(b_slt),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+    MLIRCompiler()(prgm).grow(buf)
+    np.testing.assert_array_equal(buf.arr, [1.0, 2.0, 3.0])
+
+
+@mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+def test_sparse_matmul_mlir_regression(file_regression, caplog):
+    dtype = np.float64
+    a = np.array(
+        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+        dtype=dtype,
+    )
+    b = np.array(
+        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+        dtype=dtype,
+    )
+
+    fmt = fiber_tensor(
+        dense(
+            sparse_list(
+                element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType),
+                ftype(np.intp),
+            )
+        )
+    )
+
+    assert isinstance(fmt, FiberTensorFType)
+    assert isinstance(fmt.lvl_t, DenseLevelFType)
+
+    sparse_mat = []
+    for arr in (a, b):
+        csr = sps.csr_array(arr)
+        sparse_mat.append(
+            fmt.from_fields(
+                fmt.lvl_t.from_fields(
+                    fmt.lvl_t.lvl_t.from_fields(
+                        fmt.lvl_t.lvl_t.lvl_t.from_fields(csr.data),
+                        np.intp(arr.shape[1]),
+                        NumpyBuffer(csr.indptr.astype(np.intp)),
+                        NumpyBuffer(csr.indices.astype(np.intp)),
+                    ),
+                    np.intp(arr.shape[0]),
+                    np.intp(arr.shape[1]),
+                ),
+                arr.shape,
+                np.intp(0),
+            )
+        )
+
+    with caplog.at_level(logging.DEBUG):
+        result = finch.compute(
+            finch.matmul(
+                finch.defer(sparse_mat[0]),
+                finch.defer(sparse_mat[1]),
+            )
+        )
+
+    finch_assert_equal(result, a @ b)
+
+    file_regression.check(mlir_kernel_under_test(caplog), extension=".mlir")
+
+
+@mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+def test_sddmm_mlir_regression(file_regression, caplog):
+    dtype = np.float64
+    a = np.array(
+        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+        dtype=dtype,
+    )
+    b = np.array(
+        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+        dtype=dtype,
+    )
+    s = np.array(
+        [[1, 0, 1], [0, 1, 0], [1, 0, 1]],
+        dtype=dtype,
+    )
+
+    dense_fmt = fiber_tensor(
+        dense(dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)))
+    )
+    sparse_fmt = fiber_tensor(
+        dense(
+            sparse_list(
+                element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType),
+                ftype(np.intp),
+            )
+        )
+    )
+
+    assert isinstance(sparse_fmt, FiberTensorFType)
+    assert isinstance(sparse_fmt.lvl_t, DenseLevelFType)
+
+    csr = sps.csr_array(s)
+    sparse_s = sparse_fmt.from_fields(
+        sparse_fmt.lvl_t.from_fields(
+            sparse_fmt.lvl_t.lvl_t.from_fields(
+                sparse_fmt.lvl_t.lvl_t.lvl_t.from_fields(csr.data),
+                np.intp(s.shape[1]),
+                NumpyBuffer(csr.indptr.astype(np.intp)),
+                NumpyBuffer(csr.indices.astype(np.intp)),
+            ),
+            np.intp(s.shape[0]),
+            np.intp(s.shape[1]),
+        ),
+        s.shape,
+        np.intp(0),
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        result = finch.compute(
+            finch.multiply(
+                finch.defer(sparse_s),
+                finch.matmul(
+                    finch.defer(finch.asarray(a, format=dense_fmt)),
+                    finch.defer(finch.asarray(b, format=dense_fmt)),
+                ),
+            )
+        )
+
+    finch_assert_equal(result, s * (a @ b))
+
+    file_regression.check(mlir_kernel_under_test(caplog), extension=".mlir")
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "value,np_type,c_type",
+    [
+        (3, np.int64, ctypes.c_int64),
+        (1, np.float32, ctypes.c_float),
+        (1.2, np.float64, ctypes.c_double),
+    ],
+)
+def test_np_mlir_serialization(value, np_type, c_type):
+    fmt = ftype(np_type)
+    serialized = serialize_to_mlir(fmt, np_type(value))
+    assert serialized.value == c_type(value).value
+    assert isinstance(serialized, c_type)
+    constructed = construct_from_mlir(fmt, serialized)
+    assert constructed == np_type(value)
+    assert deserialize_from_mlir(fmt, constructed, serialized) is None
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "value,fmt,c_type",
+    [
+        (3, ftype(np.int64), ctypes.c_int64),
+        (1, ftype(np.float32), ctypes.c_float),
+        (1.2, ftype(np.float64), ctypes.c_double),
+    ],
+)
+def test_ctypes_mlir_serialization(value, fmt, c_type):
+    cvalue = c_type(value)
+    serialized = serialize_to_mlir(fmt, cvalue.value)
+    assert serialized.value == c_type(value).value
+    assert isinstance(serialized, c_type)
+    constructed = construct_from_mlir(fmt, serialized)
+    assert constructed == fmt(value)
+    assert deserialize_from_mlir(fmt, constructed, serialized) is None
+
+
+@mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+@pytest.mark.parametrize(
+    "a",
+    [
+        np.array([[1, 2, 3], [4, 5, 6]]),
+        np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]]),
+    ],
+)
+def test_e2e_transpose_mlir(a, dtype):
+    a = a.astype(dtype)
+    wa = finch.defer(finch.asarray(a))
+    result = finch.compute(finch.permute_dims(wa, axes=(1, 0)))
+    finch_assert_equal(result, a.T)
+
+
+@mlir_backend
+def test_mlir_ifelse_branch_local_var():
+    buf = NumpyBuffer(np.array([1.0, 2.0, 3.0], dtype=np.float64))
+    b_v, b_slt = asm.Variable("b", buf.ftype), asm.Slot("b_", buf.ftype)
+    c_v = asm.Variable("c", ftypes.bool_)
+    x_v = asm.Variable("x", ftype(np.float64))
+    t_v = asm.Variable("t", ftype(np.float64))
+
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "kern",
+                    asm.AssemblyKernelFType(
+                        "kern",
+                        (b_v.result_type, c_v.result_type, x_v.result_type),
+                        ftypes.none_,
+                    ),
+                ),
+                (b_v, c_v, x_v),
+                asm.Block(
+                    (
+                        asm.Unpack(b_slt, b_v),
+                        asm.IfElse(
+                            c_v,
+                            asm.Block(
+                                (
+                                    # `t` exists only in this branch and must
+                                    # not be merged out of the scf.if
+                                    asm.Assign(
+                                        t_v,
+                                        asm.Call(
+                                            asm.Literal(ffuncs.add),
+                                            (x_v, asm.Literal(np.float64(1.0))),
+                                        ),
+                                    ),
+                                    asm.Store(b_slt, asm.Literal(np.intp(0)), t_v),
+                                )
+                            ),
+                            asm.Block(
+                                (asm.Store(b_slt, asm.Literal(np.intp(0)), x_v),)
+                            ),
+                        ),
+                        asm.Repack(b_slt),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = MLIRCompiler()(prgm)
+    mod.kern(buf, True, np.float64(41.0))
+    assert buf.arr[0] == 42.0
+    mod.kern(buf, False, np.float64(7.0))
+    assert buf.arr[0] == 7.0
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "fill,values,expected",
+    [
+        (np.int8(0), (np.int8(0), np.int16(5), np.int32(7)), np.int32(5)),
+        (np.int8(0), (np.int8(0), np.float32(5), np.float64(7)), np.float64(5)),
+    ],
+)
+def test_mlir_choose(fill, values, expected):
+    operator = ffuncs.choose(DynamicFill(fill))
+    op = asm.Variable("op", ftype(operator))
+    args = tuple(
+        asm.Variable(name, ftype(value))
+        for name, value in zip(("x", "y", "z"), values, strict=True)
+    )
+    call = asm.Call(op, args)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "choose_mixed",
+                    asm.AssemblyKernelFType(
+                        "choose_mixed",
+                        (op.result_type, *(arg.result_type for arg in args)),
+                        call.result_type,
+                    ),
+                ),
+                (op, *args),
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+    result = MLIRCompiler()(program).choose_mixed(operator, *values)
+    assert result == expected
+
+
+@pytest.mark.c_backend
+@pytest.mark.parametrize("operator", [ffuncs.min, ffuncs.max])
+@pytest.mark.parametrize(
+    "values",
+    [
+        (np.int8(3), np.int32(-2)),
+        (np.int64(4), np.int64(9), np.int64(1)),
+        (np.float64(1.5), np.float64(-0.5), np.float64(2.0)),
+        (np.float64(1.0), np.float64(np.nan)),
+        (np.float64(np.nan), np.float64(1.0)),
+    ],
+)
+def test_c_min_max(operator, values):
+    args = tuple(asm.Variable(f"x{i}", ftype(value)) for i, value in enumerate(values))
+    call = asm.Call(asm.Literal(operator), args)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "extremum",
+                    asm.AssemblyKernelFType(
+                        "extremum",
+                        tuple(arg.result_type for arg in args),
+                        call.result_type,
+                    ),
+                ),
+                args,
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+    result = CCompiler()(program).extremum(*values)
+    expected = operator(*values)
+    assert type(result) is type(expected)
+    np.testing.assert_equal(result, expected)
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "condition,expected",
+    [
+        (True, np.int32(1)),
+        (False, np.int32(2)),
+    ],
+)
+def test_mlir_where(condition, expected):
+    cond = asm.Variable("cond", ftype(np.bool_))
+    x = asm.Variable("x", ftype(np.int8))
+    y = asm.Variable("y", ftype(np.int32))
+    call = asm.Call(asm.Literal(ffuncs.where), (cond, x, y))
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "where_mixed",
+                    asm.AssemblyKernelFType(
+                        "where_mixed",
+                        (cond.result_type, x.result_type, y.result_type),
+                        call.result_type,
+                    ),
+                ),
+                (cond, x, y),
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+    result = MLIRCompiler()(program).where_mixed(
+        np.bool_(condition), np.int8(1), np.int32(2)
+    )
+    assert result == expected
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "operator,values,expected",
+    [
+        (ffuncs.add, (np.int8(1), np.int16(2), np.int32(3)), np.int32(6)),
+        (ffuncs.mul, (np.int8(1), np.float32(2.5)), np.float32(2.5)),
+        (ffuncs.lt, (np.int8(1), np.int32(2)), np.bool_(True)),
+    ],
+)
+def test_mlir_operator_promote_mixed_argument_types(operator, values, expected):
+    args = tuple(
+        asm.Variable(f"arg{i}", ftype(value)) for i, value in enumerate(values)
+    )
+    call = asm.Call(asm.Literal(operator), args)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "apply_mixed",
+                    asm.AssemblyKernelFType(
+                        "apply_mixed",
+                        tuple(arg.result_type for arg in args),
+                        call.result_type,
+                    ),
+                ),
+                args,
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+    assert MLIRCompiler()(program).apply_mixed(*values) == expected
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "values",
+    [
+        (np.intp(2), np.intp(3)),
+        (2, 3.5, True),
+        ((np.intp(2), np.intp(3)), np.intp(4)),
+    ],
+)
+def test_mlir_make_tuple_with_indices(values):
+    args = tuple(asm.Variable(f"x{i}", ftype(value)) for i, value in enumerate(values))
+    result = asm.Call(asm.Literal(ffuncs.make_tuple), args)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "make_tuple",
+                    asm.AssemblyKernelFType(
+                        "make_tuple",
+                        tuple(arg.result_type for arg in args),
+                        result.result_type,
+                    ),
+                ),
+                args,
+                asm.Block((asm.Return(result),)),
+            ),
+        )
+    )
+    actual = MLIRCompiler()(program).make_tuple(*values)
+    assert actual == values
+    assert ftype(actual) == ftype(values)
+
+
+@mlir_backend
+def test_mlir_setattr_in_while():
+    Point = namedtuple("Point", ["x", "y"])
+    p = Point(np.float64(1.0), np.float64(2.0))
+
+    p_var = asm.Variable("p", ftype(p))
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "advance",
+                    asm.AssemblyKernelFType(
+                        "advance", (p_var.result_type,), ftype(np.float64)
+                    ),
+                ),
+                (p_var,),
+                asm.Block(
+                    (
+                        asm.WhileLoop(
+                            asm.Call(
+                                asm.Literal(ffuncs.lt),
+                                (
+                                    asm.GetAttr(p_var, asm.Literal("x")),
+                                    asm.Literal(np.float64(10.0)),
+                                ),
+                            ),
+                            asm.Block(
+                                (
+                                    asm.SetAttr(
+                                        p_var,
+                                        asm.Literal("x"),
+                                        asm.Call(
+                                            asm.Literal(ffuncs.add),
+                                            (
+                                                asm.GetAttr(p_var, asm.Literal("x")),
+                                                asm.GetAttr(p_var, asm.Literal("y")),
+                                            ),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Return(asm.GetAttr(p_var, asm.Literal("x"))),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = MLIRCompiler()(prgm)
+    assert mod.advance(p) == np.float64(11.0)
+
+
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        asm.AssemblyInterpreter(),
+        NumbaCompiler(),
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
+        pytest.param(MLIRCompiler(), marks=pytest.mark.mlir_backend),
+    ],
+)
+def test_init_write_returns_rhs(compiler):
+    x = asm.Variable("x", finch.int64)
+    y = asm.Variable("y", finch.int64)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "write",
+                    asm.AssemblyKernelFType(
+                        "write",
+                        (x.result_type, y.result_type),
+                        finch.int64,
+                    ),
+                ),
+                (x, y),
+                asm.Block(
+                    (
+                        asm.Return(
+                            asm.Call(
+                                asm.Literal(ffuncs.init_write(np.int64(0))),
+                                (x, y),
+                            )
+                        ),
+                    )
+                ),
+            ),
+        )
+    )
+    module = compiler(program)
+    assert module.write(np.int64(0), np.int64(0)) == 0
+    assert module.write(np.int64(0), np.int64(3)) == 3
+
+
+# Test resizing the buffer with NumpyBuffer
+@mlir_backend
+def test_resize_mlir_regression(file_regression):
+    idx_buf = NumpyBuffer(np.empty(0, dtype=np.intp))
+    val_buf = NumpyBuffer(np.empty(0, dtype=np.float64))
+
+    idx_var = asm.Variable("idx", idx_buf.ftype)
+    val_var = asm.Variable("val", val_buf.ftype)
+    idx_slot = asm.Slot("idx_", idx_buf.ftype)
+    val_slot = asm.Slot("val_", val_buf.ftype)
+    new_length = asm.Literal(np.intp(1))
+    zero = asm.Literal(np.intp(0))
+
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "sparse_output",
+                    asm.AssemblyKernelFType(
+                        "sparse_output",
+                        (idx_var.result_type, val_var.result_type),
+                        ftypes.none_,
+                    ),
+                ),
+                (idx_var, val_var),
+                asm.Block(
+                    (
+                        asm.Unpack(idx_slot, idx_var),
+                        asm.Unpack(val_slot, val_var),
+                        asm.Resize(idx_slot, new_length),
+                        asm.Resize(val_slot, new_length),
+                        asm.Store(idx_slot, zero, asm.Literal(np.intp(2))),
+                        asm.Store(val_slot, zero, asm.Literal(np.float64(3.5))),
+                        asm.Repack(idx_slot),
+                        asm.Repack(val_slot),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+
+    file_regression.check(str(MLIRGenerator()(prgm)), extension=".mlir")
+    MLIRCompiler()(prgm).sparse_output(idx_buf, val_buf)
+    np.testing.assert_array_equal(idx_buf.arr, np.array([2], dtype=np.intp))
+    np.testing.assert_array_equal(val_buf.arr, np.array([3.5], dtype=np.float64))
+
+
+@pytest.mark.parametrize(
+    "buffer_factory",
+    [
+        pytest.param(MallocBufferFType, marks=pytest.mark.c_backend),
+        pytest.param(MemrefBufferFType, marks=pytest.mark.mlir_backend),
+    ],
+)
+@pytest.mark.parametrize("copy", [None, False, True])
+@pytest.mark.parametrize("length", [0, 4])
+def test_native_buffer_to_numpy(buffer_factory, copy, length):
+    buffer = buffer_factory(ftypes.float64)(length)
+    expected = np.arange(length, dtype=np.float64)
+    for i, value in enumerate(expected):
+        buffer.store(i, value)
+    if copy is False:
+        with pytest.raises(ValueError, match="Unable to avoid copy"):
+            buffer.to_numpy(copy=False)
+        return
+    result = buffer.to_numpy(copy=copy)
+    assert result.dtype == expected.dtype
+    np.testing.assert_array_equal(result, expected)
+    if length:
+        buffer.store(0, 99.0)
+        buffer.resize(length + 2)
+    del buffer
+    np.testing.assert_array_equal(result, expected)
+
+
+# Test for resize with MemrefBuffer
+@pytest.mark.mlir_backend
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        (MLIRCompiler(), MemrefBufferFType),
+        (asm.AssemblyInterpreter(), MemrefBufferFType),
+    ],
+)
+@pytest.mark.parametrize("new_size", [1, 5, 10])
+def test_memref_resize(compiler, buffer, new_size):
+    values = [1.0, 4.0, 3.0, 4.0]
+    ab = buffer(ftypes.float64)(len(values))
+    for i, value in enumerate(values):
+        ab.store(i, value)
+
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    size = asm.Variable("size", finch.intp)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "length",
+                    asm.AssemblyKernelFType("length", (ab_v.result_type,), finch.intp),
+                ),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Resize(ab_slt, asm.Literal(new_size)),
+                        asm.Repack(ab_slt),
+                        asm.Assign(size, asm.Length(ab_slt)),
+                        asm.Return(size),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm)
+    assert mod.length(ab) == new_size
+    assert ab.length() == new_size
+    for i in range(min(len(values), new_size)):
+        assert ab.load(i) == values[i]
+
+
+# Test for zero copy construction of MLIR Numpy buffer
+def test_numpy_buffer_construct_from_mlir_is_zero_copy():
+    arr = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+    buf = NumpyBuffer(arr)
+    serialized = serialize_to_mlir(buf.ftype, buf)
+
+    constructed = construct_from_mlir(buf.ftype, serialized)
+
+    assert constructed is buf
+    assert constructed.arr is arr
+    assert constructed.arr.ctypes.data == arr.ctypes.data
+
+
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        asm.AssemblyInterpreter(),
+        NumbaCompiler(),
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
+        pytest.param(MLIRCompiler(), marks=pytest.mark.mlir_backend),
+    ],
+)
+@pytest.mark.parametrize("aligned", [False, True])
+def test_tuple_buffer(compiler, aligned):
+    key_t = TupleFType.from_tuple((ftypes.intp, ftypes.int32, ftypes.uint8))
+    buf_t = NumpyBufferFType(key_t)
+    out_t = NumpyBufferFType(ftypes.uint64)
+    buf, out = asm.Variable("buf", buf_t), asm.Variable("out", out_t)
+    buf_s, out_s = asm.Slot("buf_s", buf_t), asm.Slot("out_s", out_t)
+    i, n = asm.Variable("i", ftypes.intp), asm.Variable("n", ftypes.intp)
+    k = asm.Variable("k", key_t)
+    names: dict[str, Any] = {
+        "buf": buf_s,
+        "out": out_s,
+        "length_buf": asm.Length(buf_s),
+        "make_tuple": asm.Literal(ffuncs.make_tuple),
+        "to_u64": asm.Literal(ffuncs.astype(ftypes.uint64)),
+        "bnot": asm.Literal(ffuncs.invert),
+        "shl": asm.Literal(ffuncs.lshift),
+        "two": asm.Literal(np.int32(2)),
+        "one_u8": asm.Literal(np.uint8(1)),
+        "nine_u8": asm.Literal(np.uint8(9)),
+        "eight": asm.Literal(np.int32(8)),
+        "u21": asm.Literal(np.uint64(21)),
+        "i": i,
+        "n": n,
+        "k": k,
+    }
+    # Tuple fields are copied by offset, so C and MLIR keep NumPy's layout, and
+    # `~a + (a << 21)` must keep its grouping in C.
+    body = asm.parse_assembly(
+        """finch
+        n = length_buf
+        for (i in 0:n)
+            k = buf[i]
+            buf[i] = make_tuple(add(k.element_0, 10), mul(k.element_1, two), add(k.element_2, one_u8))
+            out[i] = add(bnot(to_u64(k.element_0)), shl(to_u64(k.element_0), u21))
+        end
+        resize(buf, add(n, 1))
+        buf[n] = make_tuple(7, eight, nine_u8)
+        """,  # noqa: E501
+        names,
+    )
+    kernel_t = asm.AssemblyKernelFType("tuples", (buf_t, out_t), ftypes.intp)
+    mod = compiler(
+        asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("tuples", kernel_t),
+                    (buf, out),
+                    asm.Block(
+                        (
+                            asm.Unpack(buf_s, buf),
+                            asm.Unpack(out_s, out),
+                            *body.bodies,
+                            asm.Repack(buf_s),
+                            asm.Repack(out_s),
+                            asm.Return(n),
+                        )
+                    ),
+                ),
+            )
+        )
+    )
+    dtype = np.dtype(
+        [(name, np_dtype(t)) for name, t in key_t.struct_fields], align=aligned
+    )
+    keys = NumpyBuffer(np.array([(1, 4, 0), (2, 5, 1), (3, 6, 254)], dtype=dtype))
+    hashes = NumpyBuffer(np.zeros(3, dtype=np.uint64))
+    assert mod.tuples(keys, hashes) == 3
+    assert keys.arr.tolist() == [(11, 8, 1), (12, 10, 2), (13, 12, 255), (7, 8, 9)]
+    a = np.arange(1, 4, dtype=np.uint64)
+    np.testing.assert_array_equal(hashes.arr, ~a + (a << np.uint64(21)))

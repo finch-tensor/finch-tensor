@@ -1,0 +1,297 @@
+import itertools
+from functools import cache
+from typing import overload
+
+from finch.algebra import init_value
+from finch.algebra.tensor import TensorFType
+from finch.algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
+from finch.finch_logic import (
+    Aggregate,
+    Alias,
+    Field,
+    FillTable,
+    Fuse,
+    Literal,
+    LogicExpression,
+    LogicNode,
+    LogicStatement,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    QueryInto,
+    Relabel,
+    Reorder,
+    Table,
+)
+from finch.symbolic import Chain, Fixpoint, PostOrderDFS, PostWalk, PreWalk, Rewrite
+
+
+def reorder_to(ex: LogicExpression, idxs: tuple[Field, ...]) -> LogicExpression:
+    """`ex` with its fields in the order `idxs`."""
+    return ex if ex.fields() == idxs else Reorder(ex, idxs)
+
+
+def fuse_loop_order(
+    stmt: LogicStatement, loop_order: tuple[Field, ...]
+) -> LogicStatement:
+    for idx in reversed(loop_order):
+        stmt = Fuse(idx, stmt)
+    return stmt
+
+
+@overload
+def push_relabels(root: LogicExpression) -> LogicExpression: ...
+@overload
+def push_relabels(root: LogicStatement) -> LogicStatement: ...
+@overload
+def push_relabels(root: LogicNode) -> LogicNode: ...
+def push_relabels(root):
+    """Push each Relabel down to the Tables and scalars it relabels."""
+
+    def rule_1(ex):
+        match ex:
+            case Relabel(MapJoin(op, args) as mj, idxs):
+                reidx = dict(zip(mj.fields(), idxs, strict=True))
+                return MapJoin(
+                    op,
+                    tuple(
+                        Relabel(arg, tuple(reidx[f] for f in arg.fields()))
+                        for arg in args
+                    ),
+                )
+            case Relabel(Aggregate(op, init, arg, agg_idxs) as agg, relabel_idxs):
+                reidx_dict = dict(zip(agg.fields(), relabel_idxs, strict=True))
+                relabeled_idxs = tuple(reidx_dict.get(idx, idx) for idx in arg.fields())
+                init_idxs = tuple(reidx_dict[idx] for idx in init.fields())
+                return Aggregate(
+                    op,
+                    Relabel(init, init_idxs),
+                    Relabel(arg, relabeled_idxs),
+                    agg_idxs,
+                )
+            case Relabel(Relabel(arg, _), idxs):
+                return Relabel(arg, idxs)
+            case Relabel(Reorder(arg, idxs_1), idxs_2):
+                idxs_3 = arg.fields()
+                reidx_dict = dict(zip(idxs_1, idxs_2, strict=True))
+                idxs_4 = tuple(reidx_dict.get(idx, idx) for idx in idxs_3)
+                return Reorder(Relabel(arg, idxs_4), idxs_2)
+            case Relabel(Table(arg, _), idxs):
+                return Table(arg, idxs)
+            case Relabel(Literal() | FillTable() as scalar, _):
+                return scalar
+
+    return Rewrite(PreWalk(Fixpoint(rule_1)))(root)  # ignore[type-arg]
+
+
+@overload
+def push_fields(root: LogicExpression) -> LogicExpression: ...
+@overload
+def push_fields(root: LogicStatement) -> LogicStatement: ...
+@overload
+def push_fields(root: LogicNode) -> LogicNode: ...
+def push_fields(root):
+    root = push_relabels(root)
+
+    def rule_2(ex):
+        match ex:
+            case Reorder(Reorder(arg, _), idxs):
+                return Reorder(arg, idxs)
+            case Reorder(MapJoin(op, args), idxs) if not all(
+                isinstance(arg, Reorder) and is_subsequence(arg.fields(), idxs)
+                for arg in args
+            ):
+                return Reorder(
+                    MapJoin(
+                        op,
+                        tuple(
+                            Reorder(arg, intersect(idxs, arg.fields())) for arg in args
+                        ),
+                    ),
+                    idxs,
+                )
+            case Reorder(Aggregate(op, init, arg, idxs_1), idxs_2) if (
+                not is_subsequence(intersect(arg.fields(), idxs_2), idxs_2)
+            ):
+                return Reorder(
+                    Aggregate(
+                        op,
+                        init,
+                        Reorder(arg, with_subsequence(idxs_2, arg.fields())),
+                        idxs_1,
+                    ),
+                    idxs_2,
+                )
+
+    # A query stores its result in the order of its left-hand table, so we
+    # expose that order to `rule_2` as a Reorder and strip it afterwards. The
+    # Reorder at the root of an in-place update visits the fields of the table
+    # it updates in order, so that one is kept.
+    def wrap_query(stmt):
+        match stmt:
+            case Query(Table(_, idxs) as lhs, rhs) if rhs.fields() != idxs:
+                return Query(lhs, Reorder(rhs, idxs))
+            case QueryInto(Table(_, idxs) as lhs, op, rhs) if not is_subsequence(
+                intersect(idxs, rhs.fields()), rhs.fields()
+            ):
+                loop_order = with_subsequence(
+                    intersect(idxs, rhs.fields()), rhs.fields()
+                )
+                return QueryInto(lhs, op, Reorder(rhs, loop_order))
+
+    root = Rewrite(PostWalk(wrap_query))(root)
+    root = Rewrite(PreWalk(Fixpoint(rule_2)))(root)
+    return drop_query_reorders(root)
+
+
+@overload
+def drop_query_reorders(root: LogicStatement) -> LogicStatement: ...
+@overload
+def drop_query_reorders(root: LogicNode) -> LogicNode: ...
+def drop_query_reorders(root):
+    """
+    Remove a Reorder at the root of each query's right-hand side. The table on
+    the left-hand side of a query already fixes the order of its result.
+    """
+
+    def rule(stmt):
+        match stmt:
+            case Query(lhs, Reorder(arg, _)):
+                return Query(lhs, arg)
+            case QueryInto(lhs, op, Reorder(Aggregate() as arg, _)):
+                return QueryInto(lhs, op, arg)
+
+    return Rewrite(PostWalk(rule))(root)
+
+
+def desugar_query_into(root: LogicStatement) -> LogicStatement:
+    """
+    Replace each in-place `QueryInto` with the equivalent `Query`, which reads
+    the previous value of its left-hand side explicitly.
+    """
+
+    def rule(stmt):
+        match stmt:
+            case QueryInto() as q:
+                return q.as_query()
+
+    return Rewrite(PostWalk(rule))(root)
+
+
+def resugar_query_into(root: LogicStatement) -> LogicStatement:
+    """
+    Replace each query of an aggregate which starts from a tensor with an
+    in-place `QueryInto`. The aggregate folds its argument into a copy of its
+    init, so the copy is skipped when the init is the table being written.
+    Inits which are broadcast over the output can't be copied into it, so they
+    are left as they are.
+    """
+
+    def rule(stmt):
+        match stmt:
+            case Query(
+                Table(Alias() as lhs, idxs) as tbl,
+                Aggregate(op, init, arg, agg_idxs),
+            ) if (
+                not isinstance(init, Literal)
+                and lhs not in PostOrderDFS(arg)
+                and set(setdiff(arg.fields(), agg_idxs)) == set(idxs)
+                and set(init.fields()) == set(idxs)
+                and (init == tbl or lhs not in PostOrderDFS(init))
+            ):
+                update = QueryInto(tbl, op, arg)
+                return update if init == tbl else Plan((Query(tbl, init), update))
+
+    return Rewrite(PostWalk(rule))(root)
+
+
+def split_aggregate_inits(
+    root: LogicStatement,
+    bindings: dict[Alias, TensorFType],
+    broadcast_only: bool = False,
+) -> LogicStatement:
+    """
+    Replace each aggregate which starts from a tensor with a map of that tensor
+    and a reduction which starts from the identity of the aggregate's operator.
+    With `broadcast_only`, only the inits which are broadcast over some fields
+    of the aggregate are split.
+    """
+
+    # Element types are only needed to find identities, so they are inferred
+    # lazily.
+    @cache
+    def element_types():
+        return root.infer_element_type(
+            {var: tns.element_type for var, tns in bindings.items()}
+        )
+
+    def rule(node):
+        match node:
+            case Aggregate(Literal(op) as op_lit, init, arg, idxs) if not (
+                isinstance(init, Literal)
+                or (broadcast_only and set(init.fields()) == set(node.fields()))
+            ):
+                if idxs:
+                    z = init_value(op.ftype, init.element_type(element_types()))
+                    arg = Aggregate(op_lit, Literal(z), arg, idxs)
+                return MapJoin(op_lit, (init, arg))
+
+    return Rewrite(PostWalk(rule))(root)
+
+
+def flatten_plans(root: Plan) -> Plan:
+    def rule_0(ex: Plan) -> Plan:
+        match ex:
+            case Plan(bodies):
+                new_bodies = [
+                    tuple(body.bodies) if isinstance(body, Plan) else (body,)
+                    for body in bodies
+                ]
+                flatten_bodies = tuple(itertools.chain(*new_bodies))
+                return Plan(flatten_bodies)
+
+    def rule_1(ex: Plan) -> Plan:
+        match ex:
+            case Plan(bodies):
+                body_iter = iter(bodies)
+                new_bodies = []
+                while (body := next(body_iter, None)) is not None:
+                    new_bodies.append(body)
+                    if isinstance(body, Produces):
+                        break
+                return Plan(tuple(new_bodies))
+
+    flat = PostWalk(Fixpoint(Chain([rule_0, rule_1])))(root)
+    assert flat is not None
+    return flat
+
+
+def propagate_copy_queries(root, bindings):
+    copies = {}
+    # A copy can't share storage with its source if either is updated in place.
+    updated = {
+        node.lhs.tns for node in PostOrderDFS(root) if isinstance(node, QueryInto)
+    }
+
+    def rule_1(node):
+        match node:
+            case Query(
+                Table(Alias() as lhs, idxs_1), Table(Alias(_) as rhs, idxs_2)
+            ) if (
+                idxs_1 == idxs_2
+                and lhs not in bindings
+                and lhs not in updated
+                and rhs not in updated
+            ):
+                copies[lhs] = copies.get(rhs, rhs)
+                return Plan()
+
+    root = Rewrite(PostWalk(rule_1))(root)
+
+    def rule_2(ex):
+        match ex:
+            case Alias() as a if a in copies:
+                return copies[a]
+
+    return Rewrite(PostWalk(rule_2))(root)

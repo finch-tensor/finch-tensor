@@ -1,0 +1,18 @@
+def matmul(C: BufferizedNDArray, A: BufferizedNDArray, B: BufferizedNDArray) -> BufferizedNDArray:
+    A_: BufferizedNDArray = unpack(A)
+    B_: BufferizedNDArray = unpack(B)
+    C_: BufferizedNDArray = unpack(C)
+    m: finch.int64 = A_.shape[0]
+    n: finch.int64 = B_.shape[1]
+    p: finch.int64 = A_.shape[1]
+    declare(C_, 0.0, add, ['m', 'n'])
+    loop(i, make_extent(0, m)):
+        loop(k, make_extent(0, p)):
+            loop(j, make_extent(0, n)):
+                a_ik: finch.float64 = unwrap(read(A_, ['i', 'k']))
+                b_kj: finch.float64 = unwrap(read(B_, ['k', 'j']))
+                c_ij: finch.float64 = mul(a_ik, b_kj)
+                increment(update(C_, ['i', 'j'], add), c_ij)
+    freeze(C_, add)
+    repack(C_, C)
+    return C

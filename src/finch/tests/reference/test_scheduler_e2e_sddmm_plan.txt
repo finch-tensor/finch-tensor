@@ -1,0 +1,8 @@
+fuse(i_1):
+    fuse(i_0):
+        S_2[i_1, i_0] = S[i_0, i_1]
+fuse(i):
+    fuse(j):
+        fuse(k):
+            RES[i, j] = Aggregate(add, 0, MapJoin(mul, MapJoin(mul, A[i, k], B[j, k]), S_2[i, j]), k)
+return RES

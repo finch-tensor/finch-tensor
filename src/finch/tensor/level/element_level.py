@@ -1,0 +1,360 @@
+from dataclasses import dataclass, field, replace
+from typing import Any
+
+import numpy as np
+
+from finch import finch_assembly as asm
+from finch import finch_notation as ntn
+from finch.algebra import (
+    AbstractFill,
+    AbstractFillFType,
+    FType,
+    MutableStructFType,
+    StaticFillFType,
+    ffuncs,
+    ftype,
+    is_dynamic,
+    is_static,
+    np_dtype,
+    resolve_fill,
+)
+from finch.codegen import NumpyBufferFType
+from finch.compile.lower import AssemblyContext
+from finch.finch_assembly import parse_assembly
+
+from .level import Level, LevelFType
+
+
+@dataclass(unsafe_hash=True)
+class ElementLevelFType(LevelFType, MutableStructFType):
+    # None only as constructor input, __post_init__ always resolves these.
+    fill_type: AbstractFillFType | None = None  # ty: ignore[invalid-property-type-override]
+    element_type: FType | None = None  # ty: ignore[invalid-property-type-override]
+    position_type: FType | None = None
+    buffer_factory: Any = NumpyBufferFType
+    buffer_type: Any = None
+
+    @property
+    def struct_name(self):
+        return "ElementLevelFType"
+
+    @property
+    def struct_fields(self):
+        fields = [
+            ("val", self.buffer_type),
+        ]
+        if is_dynamic(self.fill_type):
+            # The fill value is bound at call time through a struct field.
+            fields.append(("fill", self.element_type))
+        return fields
+
+    def struct_getattr(self, obj, attr):
+        # A dynamic fill is bound at call time through the "fill" field.
+        if attr == "fill":
+            return obj.fill_value
+        return getattr(obj, attr)
+
+    def struct_setattr(self, obj, attr, value):
+        match attr:
+            case "val":
+                obj._val = value
+            case "fill":
+                obj._fill = value
+
+    def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
+        # no inner level
+        # cost = num_pos * bytes per value
+        assert self.element_type is not None
+        val_size = np_dtype(self.element_type).itemsize
+        return num_pos * val_size
+
+    def __post_init__(self):
+        # Ensure element_type is an FType
+        if self.element_type is None:
+            assert self.fill_type is not None, (
+                "Must provide either element_type or fill_type."
+            )
+            self.element_type = self.fill_type.element_type
+        assert isinstance(self.element_type, FType), (
+            "element_type must be an instance of FType"
+        )
+        if self.buffer_type is None:
+            self.buffer_type = self.buffer_factory(self.element_type)
+        if self.position_type is None:
+            self.position_type = ftype(np.intp)
+        self.position_type = ftype(self.position_type)
+        self.element_type = self.buffer_type.element_type
+        # The fill defaults to a static zero, and takes the buffer's element type.
+        fill_type = self.fill_type
+        if fill_type is None:
+            fill_type = StaticFillFType(self.element_type(0))
+        self.fill_type = fill_type.astype(self.element_type)
+
+    def construct(self, shape: tuple[Any, ...], *, pos: int) -> "ElementLevel":
+        """
+        Creates an instance of ElementLevel with the given ftype.
+
+        Args:
+            shape: Should be always `()`, used for validation.
+        Returns:
+            An instance of ElementLevel.
+        """
+        if len(shape) != 0:
+            raise ValueError("ElementLevelFType must be called with an empty shape.")
+        val = self.buffer_type(len=pos)
+        return ElementLevel(self, val)
+
+    def __call__(self, val: Any) -> "ElementLevel":
+        """
+        Convert a level to this element level type.
+
+        Args:
+            val: A value to convert to this type.
+        Returns:
+            An ElementLevel instance of this type.
+        """
+        raise NotImplementedError(
+            f"Level conversion not yet implemented for {type(self).__name__}"
+        )
+
+    def __str__(self):
+        match self.fill_type:
+            case StaticFillFType() as fill_type:
+                return f"ElementLevelFType(fv={fill_type.value})"
+            case fill_type:
+                return f"ElementLevelFType(fv={fill_type})"
+
+    @property
+    def ndim(self):
+        return 0
+
+    @property
+    def shape_type(self):
+        return ()
+
+    @property
+    def lvl_t(self):
+        raise Exception("ElementLevelFType is the leaf level.")
+
+    def level_format_properties(self, n):
+        return []
+
+    def with_fill(self, fill_type: Any) -> "ElementLevelFType":
+        return ElementLevelFType(
+            fill_type=fill_type,
+            element_type=self.element_type,
+            position_type=self.position_type,
+            buffer_factory=self.buffer_factory,
+            buffer_type=self.buffer_type,
+        )
+
+    def lower_fill(self, lvl_expr):
+        return asm.GetAttr(lvl_expr, asm.Literal("fill"))
+
+    def from_fields(self, val=None, fill=None) -> "ElementLevel":
+        # Wrap numpy arrays in NumpyBuffer and flatten, similar to BufferizedNDArray
+        if val is not None and isinstance(val, np.ndarray):
+            from finch.codegen import NumpyBuffer
+
+            val = NumpyBuffer(np.asarray(val).reshape(-1, copy=False))
+        return ElementLevel(_format=self, _val=val, _fill=fill)
+
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        if is_dynamic(self.fill_type):
+            # The init becomes the fill of the tensor.
+            elem_t = self.fill_type.element_type
+            if init.result_type != elem_t:
+                init = asm.Call(asm.Literal(ffuncs.astype(elem_t)), (init,))
+            ctx.exec(asm.SetAttr(tns, asm.Literal("fill"), init))
+            init = asm.GetAttr(tns, asm.Literal("fill"))
+        buf = asm.GetAttr(tns, asm.Literal("val"))
+        if pos.result_type != self.buffer_type.length_type:
+            pos = asm.Call(
+                asm.Literal(ffuncs.astype(self.buffer_type.length_type)), (pos,)
+            )
+        ctx.exec(asm.Resize(buf, pos))
+        i_var = asm.Variable("i", self.buffer_type.length_type)
+        body = asm.Store(buf, i_var, init)
+        ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))
+
+    def level_lower_unwrap(self, ctx, obj, pos):
+        buf = asm.GetAttr(ctx(obj.lvl), asm.Literal("val"))
+        if pos.result_type != self.buffer_type.length_type:
+            pos = asm.Call(
+                asm.Literal(ffuncs.astype(self.buffer_type.length_type)), (pos,)
+            )
+        return asm.Load(buf, pos)
+
+    def level_lower_increment(
+        self,
+        ctx: AssemblyContext,
+        obj,
+        op: ntn.Literal,
+        val: ntn.NotationExpression,
+        pos: asm.AssemblyExpression,
+    ):
+        buf = asm.GetAttr(ctx(obj.lvl), asm.Literal("val"))
+        if pos.result_type != self.buffer_type.length_type:
+            pos = asm.Call(
+                asm.Literal(ffuncs.astype(self.buffer_type.length_type)), (pos,)
+            )
+        pos_e, op_e, val_e = pos, ctx(op), ctx(val)
+        ctx.exec(
+            asm.Store(
+                buf,
+                pos_e,
+                asm.Call(op_e, (asm.Load(buf, pos_e), val_e)),
+            )
+        )
+        match obj:
+            case ntn.HollowFiber(dirty=dirty):
+                fill = (
+                    asm.Literal(self.fill_type.value)
+                    if is_static(self.fill_type)
+                    else self.lower_fill(ctx(obj.lvl))
+                )
+                ctx.exec(
+                    asm.If(
+                        asm.Call(
+                            asm.Literal(ffuncs.not_),
+                            (
+                                asm.Call(
+                                    asm.Literal(ffuncs.same),
+                                    (asm.Load(buf, pos_e), fill),
+                                ),
+                            ),
+                        ),
+                        asm.Assign(ctx(dirty), asm.Literal(True)),
+                    )
+                )
+
+    def level_lower_assemble(self, ctx, lvl, start, stop):
+        buf = asm.GetAttr(lvl, asm.Literal("val"))
+        p_t = self.buffer_type.length_type
+        to_size = asm.Literal(ffuncs.astype(p_t))
+        p = asm.Variable(ctx.freshen("p"), p_t)
+        p_start = asm.Variable(ctx.freshen("p_start"), p_t)
+        p_stop = asm.Variable(ctx.freshen("p_stop"), p_t)
+        length = asm.Length(buf)
+        fill = (
+            asm.Literal(self.fill_type.value)
+            if is_static(self.fill_type)
+            else self.lower_fill(lvl)
+        )
+        expr = """finch
+        p_start = to_size(start)
+        p_stop = to_size(stop)
+        if (length < p_stop)
+            resize(buf, p_stop)
+        end
+        for (p in p_start:p_stop)
+            buf[p] = fill
+        end
+        """
+        ctx.exec(parse_assembly(expr, locals(), position_type=p_t))
+
+    def level_lower_freeze(self, ctx, lvl, op, pos):
+        buf = asm.GetAttr(lvl, asm.Literal("val"))
+        size = asm.Call(
+            asm.Literal(ffuncs.astype(self.buffer_type.length_type)), (pos,)
+        )
+        length = asm.Length(buf)
+        expr = """finch
+        if (length != size)
+            resize(buf, size)
+        end
+        """
+        ctx.exec(parse_assembly(expr, locals()))
+
+    def level_lower_thaw(self, ctx, lvl, op, pos):
+        pass
+
+    def level_lower_dim(self, ctx, obj, r):
+        raise NotImplementedError("ElementLevelFType does not support level_lower_dim.")
+
+    def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):
+        raise NotImplementedError("ElementLevelFType does not support level_unfurl.")
+
+
+def element(
+    fill_type: Any = None,
+    element_type: FType | None = None,
+    position_type: FType | None = None,
+    buffer_factory: Any = NumpyBufferFType,
+    buffer_type: Any = None,
+) -> ElementLevelFType:
+    """
+    Creates an ElementLevelFType with the given parameters.
+
+    Args:
+        fill_type: The fill of the level's format, or the value of a static
+            fill.
+        element_type: The type of elements stored in the level.
+        position_type: The type of positions within the level.
+        buffer_factory: The factory used to create buffers for the level.
+        buffer_type: Format of the value stored in the level.
+
+    Returns:
+        An instance of ElementLevelFType.
+    """
+    match fill_type:
+        case AbstractFillFType() | None:
+            pass
+        case AbstractFill():
+            raise TypeError(f"element takes the fill of a format, not {fill_type}")
+        case _:
+            fill_type = StaticFillFType(fill_type)
+    return ElementLevelFType(
+        fill_type=fill_type,
+        element_type=element_type,
+        position_type=position_type,
+        buffer_factory=buffer_factory,
+        buffer_type=buffer_type,
+    )
+
+
+@dataclass
+class ElementLevel(Level):
+    """
+    A class representing the leaf level of Finch tensors.
+    """
+
+    _format: ElementLevelFType = field(repr=False)
+    _val: Any | None = None
+    # The fill belongs to the level, so that a dynamic fill may change without
+    # changing the format. Only a static fill can default to that of the format.
+    _fill: Any = None
+
+    def __post_init__(self):
+        if self._val is None:
+            self._val = self._format.buffer_type(len=0)
+        if self._fill is None:
+            fill_type = self._format.fill_type
+            assert fill_type is not None
+            self._fill = resolve_fill(fill_type).value
+
+    @property
+    def shape(self) -> tuple:
+        return ()
+
+    @property
+    def ftype(self) -> ElementLevelFType:
+        return self._format
+
+    def with_fill(self, fill_value: AbstractFill) -> "ElementLevel":
+        return replace(
+            self,
+            _format=self._format.with_fill(fill_value.ftype),
+            _fill=fill_value.value,
+        )
+
+    @property
+    def val(self) -> Any:
+        return self._val
+
+    @property
+    def fill_value(self) -> Any:
+        return self._fill
+
+    def __str__(self):
+        return f"ElementLevel(val={self._val})"

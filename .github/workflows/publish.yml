@@ -3,22 +3,21 @@ on:
   workflow_dispatch:
 jobs:
   build:
-    #if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v7
         with:
           python-version: '3.x'
       - name: Install dependencies
-        run: pip install build toml
-      - uses: prefix-dev/setup-pixi@v0.9.4
+        run: pip install build
+      - uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.71.3
+          pixi-version: v0.72.0
       - name: Get version
         run: |
-            VERSION=$(python -c 'import toml; print("v" + toml.load("pyproject.toml")["project"]["version"])')
+            VERSION=$(python -c 'import tomllib; print("v" + tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
             if [ $? -ne 0 ]; then exit 1; fi
             echo "VERSION=$VERSION" >> $GITHUB_ENV
       - name: Build PyPI package
@@ -27,17 +26,16 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}
+          skip-existing: true
       - name: Authenticate with Prefix.dev
         run: pixi auth login --token ${{ secrets.PREFIX_API_KEY }} https://prefix.dev
       - name: Build and publish to Prefix.dev
-        run: pixi publish --target-channel https://prefix.dev/${{ secrets.PREFIX_CHANNEL_NAME }}
-      - name: Create Release
-        uses: actions/create-release@v1
-        if: success()
+        run: pixi publish --target-channel https://prefix.dev/finch-tensor
+      - name: Create a Release
+        uses: softprops/action-gh-release@v3
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          name: Release ${{ env.VERSION }}
+          make_latest: true
           tag_name: ${{ env.VERSION }}
-          release_name: Release ${{ env.VERSION }}
-          draft: false
-          prerelease: false

@@ -1,0 +1,84 @@
+import functools
+import os
+import shutil
+import sys
+import sysconfig
+from importlib.metadata import version
+from pathlib import Path
+
+import donfig
+
+"""
+Finch Configuration Module
+
+This module manages configuration settings for the Finch application.
+Finch stores its settings and data in the `FINCH_PATH` directory, which
+defaults to `~/.finch` but can be customized using the `FINCH_PATH`
+environment variable.
+
+Configuration details:
+- Settings are stored in a `config.json` file within the `FINCH_PATH` directory.
+- Values can be set via environment variables, the `config.json` file,
+    or the `set_config` function.
+- Configuration values are loaded automatically when the module is imported
+    and can be accessed using the `get_config` function.
+
+Use this module to easily manage and retrieve Finch-specific settings.
+"""
+
+is_windows = os.name == "nt"
+is_apple = sys.platform == "darwin"
+
+COMPILERS = ["cc", "clang", "gcc"]
+if is_windows:
+    COMPILERS = ["clang-cl", "cl"] + COMPILERS
+
+
+@functools.lru_cache(maxsize=1)
+def get_cc() -> str | None:
+    cc = os.environ.get("CC")
+    if cc is not None and (ccpath := shutil.which(cc)) is not None:
+        return ccpath
+    for cc in COMPILERS:
+        ccpath = shutil.which(cc)
+        if ccpath is not None and Path(ccpath).exists():
+            return ccpath
+    return None
+
+
+@functools.lru_cache(maxsize=1)
+def is_cl_or_wrapper() -> bool | None:
+    cc = get_cc()
+    if cc is None:
+        return cc
+
+    return Path(cc).stem in {"clang-cl", "cl"}
+
+
+default = {
+    "data_path": str(Path(sysconfig.get_path("data")) / "finch"),
+    "cache_size": 10_000,
+    "cache_enable": True,
+    "cc": get_cc(),
+    "cflags": os.getenv("CFLAGS") or "-Og" if not is_cl_or_wrapper() else "/Og",
+    "shared_cflags": os.getenv(
+        "SHARED_CFLAGS",
+        "-shared -fPIC" if not is_cl_or_wrapper() else "/LD /TC",
+    ),
+    "shared_library_suffix": (
+        os.getenv(
+            "SHARED_LIBRARY_SUFFIX",
+            (".dll" if is_windows else ".dylib" if is_apple else ".so"),
+        )
+    ),
+}
+
+config = donfig.Config("finch", defaults=[default])
+
+
+def get_version():
+    """
+    Get the version of finch.
+    """
+
+    return version("finch-tensor")

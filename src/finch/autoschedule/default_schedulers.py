@@ -1,0 +1,249 @@
+import threading
+from contextlib import contextmanager
+
+from finch.autoschedule.tensor_stats.bound_stats import DCStatsFactory
+from finch.autoschedule.tensor_stats.fd_stats import FDStatsFactory
+from finch.codegen import MLIRCompiler, NumbaCompiler
+from finch.compile import NotationCompiler
+from finch.compile_jl.compiler import FinchJLCompiler
+from finch.compile_jl.julia import julia_available
+from finch.finch_assembly import (
+    AssemblyInterpreter,
+    AssemblySimplify,
+    LowerPackedStructSlots,
+)
+from finch.finch_logic import (
+    LogicInterpreter,
+    LogicSimplify,
+    MockLogicLoader,
+)
+from finch.finch_logic.stages import LogicEvaluator
+from finch.finch_notation.interpreter import NotationInterpreter
+
+from .compiler import CompilerFormLowerer, LogicCompiler
+from .executor import LogicExecutor
+from .factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
+from .factorizer.optimize import DefaultLogicFactorizer
+from .formatter import DefaultLogicFormatter, FDFormatter, GalleyFormatter
+from .loop_orderer import BFSLoopOrderer, DefaultLoopOrderer
+from .normalize import LogicNormalizer
+
+INTERPRET_LOGIC = LogicInterpreter()
+OPTIMIZE_LOGIC = LogicNormalizer(
+    LogicExecutor(
+        DefaultLogicFactorizer(
+            LogicSimplify(DefaultLoopOrderer(DefaultLogicFormatter(MockLogicLoader())))
+        )
+    )
+)
+INTERPRET_NOTATION = LogicNormalizer(
+    LogicExecutor(
+        DefaultLogicFactorizer(
+            LogicSimplify(
+                DefaultLoopOrderer(
+                    DefaultLogicFormatter(
+                        CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+                    )
+                )
+            )
+        )
+    )
+)
+INTERPRET_ASSEMBLY = LogicNormalizer(
+    LogicExecutor(
+        DefaultLogicFactorizer(
+            LogicSimplify(
+                DefaultLoopOrderer(
+                    DefaultLogicFormatter(
+                        CompilerFormLowerer(
+                            LogicCompiler(NotationCompiler(AssemblyInterpreter()))
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+COMPILE_NUMBA = LogicNormalizer(
+    LogicExecutor(
+        DefaultLogicFactorizer(
+            LogicSimplify(
+                DefaultLoopOrderer(
+                    DefaultLogicFormatter(
+                        CompilerFormLowerer(
+                            LogicCompiler(
+                                NotationCompiler(
+                                    NumbaCompiler(),
+                                    ctx_transforms=(
+                                        LowerPackedStructSlots(),
+                                        AssemblySimplify(),
+                                    ),
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+
+COMPILE_NUMBA_GALLEY = LogicNormalizer(
+    LogicExecutor(
+        GalleyLogicFactorizer(
+            LogicSimplify(
+                DefaultLoopOrderer(
+                    DefaultLogicFormatter(
+                        CompilerFormLowerer(
+                            LogicCompiler(
+                                NotationCompiler(
+                                    NumbaCompiler(),
+                                    ctx_transforms=(
+                                        LowerPackedStructSlots(),
+                                        AssemblySimplify(),
+                                    ),
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+
+INTERPRET_NOTATION_GALLEY = LogicNormalizer(
+    LogicExecutor(
+        GalleyLogicFactorizer(
+            LogicSimplify(
+                DefaultLoopOrderer(
+                    DefaultLogicFormatter(
+                        CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+                    )
+                )
+            )
+        )
+    )
+)
+
+COMPILE_MLIR = LogicNormalizer(
+    LogicExecutor(
+        DefaultLogicFactorizer(
+            LogicSimplify(
+                DefaultLoopOrderer(
+                    DefaultLogicFormatter(
+                        CompilerFormLowerer(
+                            LogicCompiler(
+                                NotationCompiler(
+                                    MLIRCompiler(),
+                                    ctx_transforms=(
+                                        LowerPackedStructSlots(),
+                                        AssemblySimplify(),
+                                    ),
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+
+COMPILE_JULIA = LogicNormalizer(
+    LogicExecutor(
+        DefaultLogicFactorizer(
+            LogicSimplify(
+                DefaultLoopOrderer(
+                    FDFormatter(CompilerFormLowerer(LogicCompiler(FinchJLCompiler())))
+                )
+            )
+        ),
+        stats_factory=FDStatsFactory(),
+        cache=True,
+    )
+)
+
+COMPILE_JULIA_GALLEY = LogicNormalizer(
+    LogicExecutor(
+        GalleyLogicFactorizer(
+            LogicSimplify(
+                BFSLoopOrderer(
+                    GalleyFormatter(
+                        CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
+                    )
+                )
+            )
+        ),
+        stats_factory=DCStatsFactory(),
+        cache=True,
+    )
+)
+
+# This scheduler is used for computing tensor statistics.
+# Crucially, in order to avoid a circular dependency, this scheduler does not
+# cannot rely on a stats factory that itself calls the interface.
+_NON_RECURSIVE_BACKEND = (
+    FDFormatter(CompilerFormLowerer(LogicCompiler(FinchJLCompiler())))
+    if julia_available()
+    else DefaultLogicFormatter(
+        CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+    )
+)
+
+NON_RECURSIVE_SCHEDULER = LogicNormalizer(
+    LogicExecutor(
+        DefaultLogicFactorizer(
+            LogicSimplify(DefaultLoopOrderer(_NON_RECURSIVE_BACKEND))
+        ),
+        stats_factory=FDStatsFactory(),
+        cache=True,
+    )
+)
+
+# Accept already ordered, concordant statistics plans and use dense outputs.
+NON_RECURSIVE_STANDARD_SCHEDULER = LogicNormalizer(
+    LogicExecutor(
+        LogicSimplify(
+            DefaultLogicFormatter(
+                CompilerFormLowerer(
+                    LogicCompiler(
+                        FinchJLCompiler()
+                        if julia_available()
+                        else NotationInterpreter()
+                    )
+                )
+            )
+        ),
+        stats_factory=FDStatsFactory(),
+        cache=True,
+    )
+)
+
+_DEFAULT_SCHEDULER = threading.local()
+
+
+def set_default_scheduler(ctx: LogicEvaluator):
+    if ctx is not None:
+        _DEFAULT_SCHEDULER.value = ctx
+
+
+def get_default_scheduler() -> LogicEvaluator:
+    try:
+        return _DEFAULT_SCHEDULER.value
+    except AttributeError:
+        return INTERPRET_NOTATION
+
+
+@contextmanager
+def with_default_scheduler(ctx: LogicEvaluator):
+    old_value = getattr(_DEFAULT_SCHEDULER, "value", None)
+    _DEFAULT_SCHEDULER.value = ctx
+    try:
+        yield
+    finally:
+        if old_value is None:
+            if hasattr(_DEFAULT_SCHEDULER, "value"):
+                delattr(_DEFAULT_SCHEDULER, "value")
+        else:
+            _DEFAULT_SCHEDULER.value = old_value

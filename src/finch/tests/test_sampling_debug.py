@@ -1,0 +1,196 @@
+from collections import OrderedDict
+
+import pytest
+
+import numpy as np
+
+import finch as fl
+import finch.algebra.ffuncs as ffuncs
+from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
+from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
+from finch.autoschedule.tensor_stats.sampling_stats import (
+    SamplingStatsFactory,
+    _dgood1,
+    _dsh,
+    _dsh2,
+    _dsh3,
+    _dsj1,
+    _duj1,
+    _duj2,
+)
+from finch.finch_logic import (
+    Aggregate,
+    Field,
+    HardAlias,
+    Literal,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    Table,
+)
+
+i, j, k = Field("i"), Field("j"), Field("k")
+rng = np.random.default_rng(0)
+
+
+def materialize(sketch):
+    out = HardAlias("sketch_out")
+    prgm = Plan((Query(Table(out, sketch.fields()), sketch), Produces((out,))))
+    result = NON_RECURSIVE_SCHEDULER(prgm)[0]
+    if isinstance(result, fl.FiberTensor):
+        from finch.compile_jl.interop import tensor_to_jl
+        from finch.compile_jl.julia import jl
+
+        return jl.Array(tensor_to_jl(result)).to_numpy().transpose()
+    return result.to_numpy() if hasattr(result, "to_numpy") else np.asarray(result)
+
+
+def test_verify_sketch_computation(n=20, density=0.4, sample_prob=0.5, seed=0):
+
+    rs = np.random.default_rng(seed)
+    A = (rs.random((n, n)) < density).astype(float)
+    B = (rs.random((n, n)) < density).astype(float)
+
+    # SamplingStats
+    factory = SamplingStatsFactory(sample_nnz=10000, estimator="uj1")
+    factory._rng = rs
+
+    s_a = factory(fl.asarray(A), (i, k), [sample_prob] * 2)
+    s_b = factory(fl.asarray(B), (k, j), [sample_prob] * 2)
+    mm = factory.mapjoin(ffuncs.mul, s_a, s_b)
+    factory_sketch = materialize(factory.aggregate(ffuncs.add, 0.0, (k,), mm).sketch)
+
+    # manually calculating
+    mask_i, mask_k, mask_j = (
+        np.array(
+            [factory._get_mask(field, n, sample_prob)[idx].item() for idx in range(n)]
+        )
+        for field in (i, k, j)
+    )
+    pat_a = (A != 0).astype(float)
+    pat_b = (B != 0).astype(float)
+    triple = (
+        pat_a[:, :, None]
+        * mask_i[:, None, None]
+        * mask_k[None, :, None]
+        * pat_b[None, :, :]
+        * mask_k[None, :, None]
+        * mask_j[None, None, :]
+    )
+    manual_sketch = triple.sum(axis=1)
+
+    same = np.allclose(factory_sketch, manual_sketch)
+    print(
+        f"factory_sketch.sum()={factory_sketch.sum()}\n"
+        f"manual_sketch.sum()={manual_sketch.sum()}\n"
+        f"identical={same}"
+    )
+    assert same
+    print("Manual computation of sketch matches with factory sketch")
+
+
+def test_estimators_isolated(D_true=100, N_true=1000000, q=0.125, trials=50, seed=0):
+    rs = np.random.default_rng(seed)
+    multiplicities = rs.geometric(p=0.5, size=D_true)
+    ests = {
+        name: [] for name in ["uj1", "sj1", "uj2", "schlosser", "sh2", "sh3", "good1"]
+    }
+    for _ in range(trials):
+        counts = rs.binomial(
+            multiplicities, q
+        )  # sampled entries out of available multiplicities
+        d_n = float(np.sum(counts > 0))  # how many did we get in the sample
+        n = float(np.sum(counts))  # how many contributed in the sample
+        f_1 = float(np.sum(counts == 1))
+        nz = counts[counts > 0]
+        vals, cts = np.unique(nz, return_counts=True)
+        frequencies = {int(v): float(c) for v, c in zip(vals, cts, strict=True)}
+
+        ests["uj1"].append(_duj1(d_n, f_1, q, n))
+        ests["sj1"].append(_dsj1(d_n, q, N_true))
+        ests["uj2"].append(_duj2(d_n, f_1, frequencies, q, n, N_true))
+        ests["schlosser"].append(_dsh(d_n, f_1, frequencies, q, n))
+        ests["sh2"].append(_dsh2(d_n, f_1, frequencies, q, n, N_true))
+        ests["sh3"].append(_dsh3(d_n, f_1, frequencies, q, n))
+        ests["good1"].append(_dgood1(d_n, frequencies, n, N_true))
+
+    for name, vals in ests.items():
+        vals = np.array(vals)
+        log2_ratio = np.mean(np.log2(vals / D_true))
+        print(f"{name} mean log2(estimate/true) = {log2_ratio:+.3f}")
+
+
+def test_mapjoin():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    data_a = np.zeros((10, 10))
+    data_b = np.zeros((10, 10))
+
+    data_a[:20, :] = 1.0
+    data_b[:20, :] = 1.0
+
+    ta = Table(Literal(fl.asarray(data_a)), (i, j))
+    tb = Table(Literal(fl.asarray(data_b)), (j, k))
+
+    cache = {}
+    stats_factory = SamplingStatsFactory()
+    insert_statistics(
+        stats_factory=stats_factory,
+        node=ta,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    insert_statistics(
+        stats_factory=stats_factory,
+        node=tb,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+    node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
+    stats = insert_statistics(
+        stats_factory=stats_factory,
+        node=node_mul,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+
+    true_nnz = float(np.count_nonzero(data_a[:, :, None] * data_b[None, :, :]))
+    assert stats.estimate_non_fill_values() == pytest.approx(true_nnz, abs=1.0)
+
+
+@pytest.mark.skip(reason="sampling estimators are heavily dependent on f1")
+def test_aggregate():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    data_a = np.zeros((10, 10))
+    data_b = np.zeros((10, 10))
+
+    data_a[:2, :] = 1.0
+    data_b[:2, :] = 1.0
+
+    ta = Table(Literal(fl.asarray(data_a)), (i, j))
+    tb = Table(Literal(fl.asarray(data_b)), (j, k))
+
+    cache = {}
+    stats_factory = SamplingStatsFactory(estimator="schlosser")
+    node = Aggregate(
+        op=Literal(ffuncs.add),
+        init=Literal(0.0),
+        arg=MapJoin(Literal(ffuncs.mul), (ta, tb)),
+        idxs=(j,),
+    )
+    stats = insert_statistics(
+        stats_factory=stats_factory,
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache=cache,
+    )
+
+    print(materialize(stats.sketch))
+    true_nnz = float(
+        np.count_nonzero(np.sum((data_a[:, :, None] * data_b[None, :, :]), axis=1))
+    )
+    assert stats.estimate_non_fill_values() == pytest.approx(true_nnz, abs=1.0)

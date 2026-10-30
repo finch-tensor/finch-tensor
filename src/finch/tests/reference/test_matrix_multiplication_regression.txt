@@ -1,0 +1,47 @@
+def matmul(C: BufferizedNDArray, A: BufferizedNDArray, B: BufferizedNDArray) -> BufferizedNDArray:
+    A_: BufferizedNDArray = A
+    A__val_slot: np_buf_t(float64) = unpack(A_.val)
+    A__shape_element_0: finch.int64 = A_.shape.element_0
+    A__shape_element_1: finch.int64 = A_.shape.element_1
+    A__strides_element_0: finch.int64 = A_.strides.element_0
+    A__strides_element_1: finch.int64 = A_.strides.element_1
+    B_: BufferizedNDArray = B
+    B__val_slot: np_buf_t(float64) = unpack(B_.val)
+    B__shape_element_0: finch.int64 = B_.shape.element_0
+    B__shape_element_1: finch.int64 = B_.shape.element_1
+    B__strides_element_0: finch.int64 = B_.strides.element_0
+    B__strides_element_1: finch.int64 = B_.strides.element_1
+    C_: BufferizedNDArray = C
+    C__val_slot: np_buf_t(float64) = unpack(C_.val)
+    C__shape_element_0: finch.int64 = C_.shape.element_0
+    C__shape_element_1: finch.int64 = C_.shape.element_1
+    C__strides_element_0: finch.int64 = C_.strides.element_0
+    C__strides_element_1: finch.int64 = C_.strides.element_1
+    m: finch.int64 = A__shape_element_0
+    n: finch.int64 = B__shape_element_1
+    p: finch.int64 = A__shape_element_1
+    setattr(C_, shape, make_tuple(m, n))
+    C__shape_element_0: finch.int64 = C_.shape.element_0
+    C__shape_element_1: finch.int64 = C_.shape.element_1
+    setattr(C_, strides, make_tuple(mul(n, 1), 1))
+    C__strides_element_0: finch.int64 = C_.strides.element_0
+    C__strides_element_1: finch.int64 = C_.strides.element_1
+    resize(slot(C__val_slot, np_buf_t(float64)), mul(m, mul(n, 1)))
+    for i in range(0, length(slot(C__val_slot, np_buf_t(float64)))):
+        store(slot(C__val_slot, np_buf_t(float64)), i, 0.0)
+    for i in range(0, m):
+        i__pos: finch.int64 = add(0, mul(A__strides_element_0, i))
+        i__pos_2: finch.int64 = add(0, mul(C__strides_element_0, i))
+        for k in range(0, p):
+            k__pos: finch.int64 = add(i__pos, mul(A__strides_element_1, k))
+            k__pos_2: finch.int64 = add(0, mul(B__strides_element_0, k))
+            for j in range(0, n):
+                j__pos: finch.int64 = add(k__pos_2, mul(B__strides_element_1, j))
+                j__pos_2: finch.int64 = add(i__pos_2, mul(C__strides_element_1, j))
+                a_ik: finch.float64 = load(slot(A__val_slot, np_buf_t(float64)), k__pos)
+                b_kj: finch.float64 = load(slot(B__val_slot, np_buf_t(float64)), j__pos)
+                c_ij: finch.float64 = mul(a_ik, b_kj)
+                store(slot(C__val_slot, np_buf_t(float64)), j__pos_2, add(load(slot(C__val_slot, np_buf_t(float64)), j__pos_2), c_ij))
+    repack(C__val_slot)
+    matmul_return: BufferizedNDArray = C
+    return matmul_return

@@ -1,0 +1,2 @@
+C[i, j] = Aggregate(add, 0, Reorder(MapJoin(mul, Reorder(A[i, k], i, k), Reorder(B[k, j], k, j)), i, k, j), k)
+return C

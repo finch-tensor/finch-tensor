@@ -1,9 +1,0 @@
-def if_else() -> finchlite.int64:
-    a: finchlite.int64 = 5
-    if eq(a, 5):
-        a: finchlite.int64 = add(a, 10)
-    if lt(a, 15):
-        a: finchlite.int64 = sub(a, 3)
-    else:
-        a: finchlite.int64 = mul(a, 2)
-    return a

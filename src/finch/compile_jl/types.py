@@ -1,0 +1,437 @@
+import math
+import warnings
+from functools import lru_cache
+from typing import Any
+
+import numpy as np
+
+import finch as ft
+from finch.algebra import np_dtype
+from finch.algebra.fill import (
+    DynamicFill,
+    DynamicFillFType,
+    StaticFill,
+    StaticFillFType,
+)
+from finch.algebra.ftypes import FDTypeNumpy, FType, TupleFType
+from finch.tensor import DenseLevelFType, ElementLevelFType, LevelFType
+from finch.tensor.bufferized_ndarray import BufferizedNDArrayFType
+from finch.tensor.fiber_tensor import FiberTensorFType
+from finch.tensor.level.sparse_bytemap_level import SparseByteMapLevelFType
+from finch.tensor.level.sparse_coo_level import SparseCOOLevelFType
+from finch.tensor.level.sparse_hash_level import SparseHashLevelFType
+from finch.tensor.level.sparse_list_level import SparseListLevelFType
+from finch.tensor.patterns import (
+    ChunkMaskTensor,
+    EyeTensor,
+    FillTensorFType,
+    LowerTriangleTensor,
+    OddEvenMergeSortLowerMaskTensor,
+    OddEvenMergeSortPartnerMaskTensor,
+    OneHotMaskTensor,
+    PairCarryTensor,
+    PairSumTensor,
+    ParityMaskTensor,
+    PatternTensorFType,
+    RandomMaskTensor,
+    RepeatTensor,
+    ReshapeMaskTensor,
+    ReverseTensor,
+    RollTensor,
+    SplitMaskTensor,
+    UpperTriangleTensor,
+)
+from finch.tensor.scalar import ScalarFType
+
+from .julia import get_jl
+
+_py_bool = bool
+
+int8: FDTypeNumpy = ft.int8
+int16: FDTypeNumpy = ft.int16
+int32: FDTypeNumpy = ft.int32
+int64: FDTypeNumpy = ft.int64
+int_: FDTypeNumpy = ft.intp
+uint8: FDTypeNumpy = ft.uint8
+uint16: FDTypeNumpy = ft.uint16
+uint32: FDTypeNumpy = ft.uint32
+uint64: FDTypeNumpy = ft.uint64
+uint: FDTypeNumpy = uint32 if np.uintp == np.uint32 else uint64
+float16: FDTypeNumpy = ft.float16
+float32: FDTypeNumpy = ft.float32
+float64: FDTypeNumpy = ft.float64
+complex64: FDTypeNumpy = ft.complex64
+complex128: FDTypeNumpy = ft.complex128
+bool: FDTypeNumpy = ft.bool
+
+finfo = ft.finfo
+iinfo = ft.iinfo
+
+
+@lru_cache
+def _jl_dtype_to_fl() -> dict[Any, FType]:
+    jl = get_jl()
+    return {
+        jl.Int8: int8,
+        jl.Int16: int16,
+        jl.Int32: int32,
+        jl.Int64: int64,
+        jl.UInt8: uint8,
+        jl.UInt16: uint16,
+        jl.UInt32: uint32,
+        jl.UInt64: uint64,
+        jl.Float16: float16,
+        jl.Float32: float32,
+        jl.Float64: float64,
+        jl.ComplexF32: complex64,
+        jl.ComplexF64: complex128,
+        jl.Bool: bool,
+    }
+
+
+@lru_cache
+def _fl_dtype_to_jl() -> dict[FType, Any]:
+    jl = get_jl()
+    return {
+        **{v: k for k, v in _jl_dtype_to_fl().items()},
+        ft.bool_: jl.Bool,
+        ft.int_: jl.Int,
+        ft.float_: jl.Float64,
+        ft.complex_: jl.ComplexF64,
+    }
+
+
+def to_fl_dtype(x) -> FType:
+    """Normalize a Julia DataType, numpy dtype/scalar type, Python builtin
+    type, or finch FType into the corresponding finch FType."""
+    if isinstance(x, FType):
+        return x
+    try:
+        return ft.ftype(x)
+    except NotImplementedError:
+        pass
+    try:
+        return _jl_dtype_to_fl()[x]
+    except (KeyError, TypeError):
+        raise NotImplementedError(f"Cannot convert {x!r} to a Finch dtype") from None
+
+
+def to_jl_type(T):
+    T = to_fl_dtype(T)
+    if isinstance(T, TupleFType):
+        jl = get_jl()
+        return jl.Tuple[tuple(to_jl_type(field) for field in T.struct_fieldtypes)]
+    try:
+        return _fl_dtype_to_jl()[T]
+    except KeyError:
+        raise NotImplementedError(f"Cannot convert {T!r} to a Julia dtype") from None
+
+
+def _as_julia_scalar(value):
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+def _tuple_field(value, index: int, name: str):
+    if isinstance(value, np.void) and value.dtype.fields is not None:
+        return value[name]
+    return value[index]
+
+
+def to_jl_value(
+    T, value, *, offset: int = 0, index_fields: tuple[int, ...] | None = None
+):
+    T = to_fl_dtype(T)
+    if isinstance(T, TupleFType):
+        return tuple(
+            to_jl_value(
+                field_type,
+                _tuple_field(value, index, field_name),
+                offset=offset if index_fields is None or index in index_fields else 0,
+            )
+            for index, (field_name, field_type) in enumerate(T.struct_fields)
+        )
+    if offset:
+        value = value + offset
+    return _as_julia_scalar(T(value))
+
+
+def to_jl_buffer(
+    T, values, *, offset: int = 0, index_fields: tuple[int, ...] | None = None
+):
+    T = to_fl_dtype(T)
+    if offset not in (0, 1):
+        raise ValueError("Julia index conversion only supports offsets 0 and 1")
+    jl_type = to_jl_type(T)
+    jl_dtype = _jl_numpy_dtype(jl_type)
+    if not isinstance(values, np.ndarray):
+        values = np.asarray(values, dtype=jl_dtype)
+    if ft.ftype(values.dtype.newbyteorder("=")) != ft.ftype(np_dtype(T)):
+        values = values.astype(jl_dtype)
+    elif not (
+        values.dtype.isnative
+        and values.flags.aligned
+        and _buffer_layout(values.dtype) == _buffer_layout(jl_dtype)
+    ):
+        # Empty buffers detach on their first resize, so copying them is free.
+        if values.size:
+            warnings.warn(
+                f"Copying a {values.dtype} buffer into Julia's {jl_type} layout; "
+                "its storage cannot be shared with Julia.",
+                stacklevel=2,
+            )
+        values = values.astype(jl_dtype)
+    values = np.ascontiguousarray(values)
+    jl = get_jl()
+    buffer = jl.FinchInterop.borrow(
+        jl_type, values.reshape(-1).view(np.uint8), values.flags.writeable
+    )
+    if not offset:
+        return buffer
+    if index_fields is None:
+        return jl.Finch.PlusOneVector(buffer)
+    return jl.Finch.PlusOneVector(buffer, tuple(i + 1 for i in index_fields))
+
+
+@lru_cache
+def _jl_numpy_dtype(type_):
+    return get_jl().Vector[type_]().to_numpy(copy=False).dtype
+
+
+def _buffer_layout(dtype):
+    return (
+        dtype.itemsize,
+        tuple(
+            (dtype.fields[name][1], _buffer_layout(dtype.fields[name][0]))
+            for name in dtype.names or ()
+        ),
+    )
+
+
+def _zero_value(type_: FType):
+    match type_:
+        case TupleFType():
+            return tuple(_zero_value(field) for field in type_.struct_fieldtypes)
+        case _:
+            return type_(0)
+
+
+def _julia_literal(value: Any) -> str:
+    match value:
+        case DynamicFill() | DynamicFillFType() as fill:
+            # A dynamic fill is bound at call time, so a zero stands in for it.
+            value = _zero_value(fill.element_type)
+        case StaticFill() | StaticFillFType() as fill:
+            value = fill.value
+    # NOTE: this module shadows the builtin `bool` (see `bool: FDTypeNumpy`
+    # above), so `isinstance` must use `_py_bool` (captured before shadowing).
+    if isinstance(value, (_py_bool, np.bool_)):
+        return "true" if value else "false"
+    if isinstance(value, tuple):
+        elts = [_julia_literal(elt) for elt in value]
+        return f"({', '.join(elts)}{',' if len(elts) == 1 else ''})"
+    literal = str(value)
+    if isinstance(value, (float, np.floating)):
+        if math.isinf(value):
+            literal = "-Inf" if value < 0 else "Inf"
+        elif math.isnan(value):
+            literal = "NaN"
+    # Julia reads untyped literals as Float64 or Int64. Fills are type
+    # parameters of Julia levels, so other widths (e.g. Float32) must be
+    # constructed explicitly for prototypes to match the real arguments.
+    if isinstance(value, np.number) and value.dtype not in (np.float64, np.int64):
+        return f"{_leaf_type_str(type(value))}({literal})"
+    return literal
+
+
+def scalar_type_str(fill: Any, element_type: Any) -> str:
+    """The Julia type of a Finch scalar with the given fill and element type."""
+    return f"Finch.Scalar{{{_julia_literal(fill)}, {_leaf_type_str(element_type)}}}"
+
+
+def _leaf_type_str(T: Any) -> str:
+    return str(get_jl().string(to_jl_type(T)))
+
+
+def _buffer_ctor_str(
+    elem_type_str: str, *, offset: int = 0, index_fields: tuple[int, ...] | None = None
+) -> str:
+    buffer = f"FinchInterop.Buffer({elem_type_str}[])"
+    if not offset:
+        return buffer
+    if index_fields is None:
+        return f"Finch.PlusOneVector({buffer})"
+    return f"Finch.PlusOneVector({buffer}, {tuple(i + 1 for i in index_fields)})"
+
+
+def _level_constructor_str(level_ftype: LevelFType) -> str:
+    """
+    Julia source text that constructs a minimal (empty-buffer, but real --
+    Finch's virtualize() needs an actual value, not just a type) instance of
+    `level_ftype`. Matches interop.py's level_to_jl buffer wrapping exactly
+    (e.g. index buffers carry their 0-based/1-based indexing
+    conversion), so the type this produces at eval time is identical to
+    what a real argument would have at call time.
+    """
+    if isinstance(level_ftype, ElementLevelFType):
+        elem_t = _leaf_type_str(level_ftype.element_type)
+        fill = _julia_literal(level_ftype.fill_type)
+        return f"Finch.ElementLevel({fill}, {_buffer_ctor_str(elem_t)})"
+    if isinstance(level_ftype, DenseLevelFType):
+        # interop.py's level_to_jl does `int(dimension)`, so the "shape"
+        # scalar (level type param Ti) is always plain Julia Int (Int64),
+        # regardless of the declared dimension_type -- only index/pointer
+        # *buffers* actually preserve dimension_type/position_type.
+        return f"Finch.DenseLevel({_level_constructor_str(level_ftype.lvl_t)}, 1)"
+    if isinstance(level_ftype, SparseListLevelFType):
+        pos_t = _leaf_type_str(level_ftype.position_type)
+        dim_t = _leaf_type_str(level_ftype.dimension_type)
+        return (
+            f"Finch.SparseListLevel({_level_constructor_str(level_ftype.lvl_t)}, "
+            f"1, {_buffer_ctor_str(pos_t, offset=1)}, "
+            f"{_buffer_ctor_str(dim_t, offset=1)})"
+        )
+    if isinstance(level_ftype, SparseByteMapLevelFType):
+        pos_t = _leaf_type_str(level_ftype.position_type)
+        dim_t = _leaf_type_str(level_ftype.dimension_type)
+        return (
+            f"Finch.SparseByteMapLevel{{{dim_t}}}("
+            f"{_level_constructor_str(level_ftype.lvl_t)}, "
+            f"1, {_buffer_ctor_str(pos_t, offset=1)}, {_buffer_ctor_str('Bool')}, "
+            f"{_buffer_ctor_str(pos_t, offset=1)})"
+        )
+    if isinstance(level_ftype, SparseCOOLevelFType):
+        pos_t = _leaf_type_str(level_ftype.position_type)
+        dim_ts = [
+            _leaf_type_str(t)
+            for t in level_ftype.coo_shape_tuple_type.struct_fieldtypes
+        ]
+        dims = ",".join("1" for _ in dim_ts)
+        idxs = ",".join(_buffer_ctor_str(t, offset=1) for t in dim_ts)
+        return (
+            f"Finch.SparseCOOLevel{{{level_ftype.coo_ndim}}}("
+            f"{_level_constructor_str(level_ftype.lvl_t)}, ({dims},), "
+            f"{_buffer_ctor_str(pos_t, offset=1)}, ({idxs},))"
+        )
+    if isinstance(level_ftype, SparseHashLevelFType):
+        pos_t = _leaf_type_str(level_ftype.position_type)
+        dim_t = _leaf_type_str(level_ftype.dimension_type)
+        key_entry_t = f"Tuple{{{pos_t},{dim_t},UInt8}}"
+        return (
+            f"Finch.SparseHashLevel{{{dim_t}}}("
+            f"{_level_constructor_str(level_ftype.lvl_t)}, 1, 1, "
+            f"Finch.SPARSE_HASH_POS_MULTIPLIER, "
+            f"{_buffer_ctor_str(pos_t, offset=1)}, {_buffer_ctor_str('UInt8')}, "
+            f"{_buffer_ctor_str(pos_t, offset=1)}, "
+            f"{_buffer_ctor_str(key_entry_t, offset=1, index_fields=(0, 1))}, "
+            f"{_buffer_ctor_str(pos_t, offset=1)}, FinchInterop.Buffer(Int[0]))"
+        )
+    raise NotImplementedError(
+        f"ftype_to_jl_constructor_str: unsupported level ftype "
+        f"{type(level_ftype).__name__}"
+    )
+
+
+def ftype_to_jl_constructor_str(ftype: FType) -> str:
+    """Julia source text constructing a minimal instance of `ftype`, for
+    embedding directly in generated kernel source (see compiler.py)."""
+    if isinstance(ftype, ScalarFType):
+        elem_t = _leaf_type_str(ftype.element_type)
+        fill = _julia_literal(ftype.fill_type)
+        return f"Finch.Tensor(Finch.ElementLevel({fill}, {_buffer_ctor_str(elem_t)}))"
+    if isinstance(ftype, FiberTensorFType):
+        return f"Finch.Tensor({_level_constructor_str(ftype.lvl_t)})"
+    if isinstance(ftype, BufferizedNDArrayFType):
+        # Matches interop.py's _ndarray_to_jl_tensor: a plain dense buffer
+        # wrapped in `ndim` nested DenseLevels, each with plain Int64 shape
+        # (regardless of the ftype's own dimension_type).
+        elem_t = _leaf_type_str(ftype.element_type)
+        fill = _julia_literal(ftype.fill_type)
+        ctor = f"Finch.ElementLevel({fill}, {_buffer_ctor_str(elem_t)})"
+        for _ in range(ftype.ndim):
+            ctor = f"Finch.DenseLevel({ctor}, 1)"
+        return f"Finch.Tensor({ctor})"
+    if isinstance(ftype, FillTensorFType):
+        # Matches interop.py, which passes a fill tensor as a Finch scalar.
+        return f"{scalar_type_str(ftype.fill_type, ftype.element_type)}()"
+    match ftype:
+        case PatternTensorFType():
+            shape = (1,) * ftype.ndim
+            obj = ftype.construct(shape)
+            # This matches the masks built by `_pattern_tensor_to_jl`.
+            swizzle = False
+            match obj:
+                case EyeTensor():
+                    ctor = "Finch.diagmask"
+                    if obj._k:
+                        ctor = f"Finch.offset({ctor}, 0, {int(obj._k)})"
+                case UpperTriangleTensor():
+                    ctor = f"Finch.offset(Finch.lotrimask, 0, {int(obj._k)})"
+                case LowerTriangleTensor():
+                    ctor = f"Finch.offset(Finch.uptrimask, 0, {int(obj._k)})"
+                case PairSumTensor():
+                    ctor = "Finch.repeatmask(2)"
+                case PairCarryTensor():
+                    ctor = "Finch.offset(Finch.pairsummask, 0, -1)"
+                case ReverseTensor():
+                    ctor = f"Finch.reversemask({int(obj.shape[1])})"
+                case RollTensor():
+                    ctor = f"Finch.rollmask({int(obj.shape[1])}, {-int(obj._k)})"
+                case RepeatTensor():
+                    ctor = f"Finch.repeatmask({int(obj._k)})"
+                case ChunkMaskTensor():
+                    ctor = f"Finch.chunkmask({int(obj.shape[1])}, {int(obj._b)})"
+                case SplitMaskTensor():
+                    ctor = f"Finch.splitmask({int(obj.shape[1])}, {int(obj.shape[0])})"
+                case RandomMaskTensor():
+                    ctor = (
+                        f"Finch.randommask({shape}, {obj._p}; seed=UInt64({obj._seed}))"
+                    )
+                case OddEvenMergeSortPartnerMaskTensor():
+                    ctor = (
+                        "Finch.oddevenmergesortpartnermask("
+                        f"{int(obj.shape[1])}, {int(obj._p)}, {int(obj._k)})"
+                    )
+                case OddEvenMergeSortLowerMaskTensor():
+                    ctor = (
+                        "Finch.oddevenmergesortlowermask("
+                        f"{int(obj.shape[0])}, {int(obj._p)}, {int(obj._k)})"
+                    )
+                case OneHotMaskTensor():
+                    ctor = f"Finch.onehotmask({int(obj._index) + 1})"
+                case ParityMaskTensor():
+                    ctor = f"Finch.paritymask({int(obj._parity)})"
+                case ReshapeMaskTensor():
+                    old_shape = tuple(int(dim) for dim in obj._old_shape)
+                    new_shape = tuple(int(dim) for dim in obj._new_shape)
+                    ctor = f"Finch.reshapemask({old_shape}, {new_shape})"
+                    swizzle = True
+                case _:
+                    raise ValueError(
+                        f"Unsupported Julia pattern tensor type: {type(obj)}"
+                    )
+            dims = ", ".join("Finch.Extent(1, 1)" for _ in shape)
+            ctor = f"Finch.window({ctor}{', ' if dims else ''}{dims})"
+            if swizzle and ftype.ndim > 1:
+                axes = ", ".join(map(str, reversed(range(1, ftype.ndim + 1))))
+                ctor = f"Finch.swizzle({ctor}, {axes})"
+            return ctor
+    raise NotImplementedError(
+        f"ftype_to_jl_constructor_str: unsupported ftype kind {type(ftype).__name__}"
+    )
+
+
+_TYPE_STR_CACHE: dict[FType, str] = {}
+
+
+def ftype_to_jl_type_str(ftype: FType) -> str:
+    """Julia type as source text (e.g. for a cache key). Cached per ftype."""
+    cached = _TYPE_STR_CACHE.get(ftype)
+    if cached is not None:
+        return cached
+    jl = get_jl()
+    ctor = ftype_to_jl_constructor_str(ftype)
+    type_str = str(jl.string(jl.typeof(jl.seval(ctor))))
+    _TYPE_STR_CACHE[ftype] = type_str
+    return type_str

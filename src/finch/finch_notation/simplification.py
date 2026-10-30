@@ -1,0 +1,47 @@
+from finch import finch_notation as ntn
+from finch.algebra import FinchOperatorFType, is_annihilator
+from finch.compile import looplets
+from finch.symbolic import simplify_rules
+from finch.symbolic.rewriters import Chain, Fixpoint, PostWalk, Rewrite
+from finch.symbolic.stage import UnvalidatedForm
+
+from .stages import NotationTransform
+
+
+class LoopletSimplify(UnvalidatedForm, NotationTransform):
+    def lower(self, term: ntn.Module) -> ntn.Module:
+        rules = [*simplify_rules(), self.simplify]
+        return Rewrite(Fixpoint(PostWalk(Chain(rules))))(term)
+
+    @staticmethod
+    def simplify(term: ntn.NotationNode):
+        match term:
+            case ntn.Call(
+                ntn.NotationExpression(result_type=FinchOperatorFType() as op_type),
+                args,
+            ):
+                for arg in args:
+                    match arg:
+                        case ntn.Unwrap(
+                            ntn.Access(
+                                ntn.Looplet(
+                                    looplets.Run(ntn.Full(ntn.Literal(val))), _
+                                ) as tns,
+                                ntn.Read(),
+                                idxs,
+                            )
+                        ):
+                            if is_annihilator(op_type, val):
+                                return ntn.Unwrap(ntn.Access(tns, ntn.Read(), idxs))
+            case ntn.If(
+                ntn.Unwrap(
+                    ntn.Access(
+                        ntn.Looplet(looplets.Run(ntn.Full(ntn.Literal(val))), _),
+                        ntn.Read(),
+                        _,
+                    )
+                ),
+                body,
+            ):
+                return body if val else ntn.Block(())
+        return None

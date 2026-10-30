@@ -21,31 +21,31 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v4
-      - uses: prefix-dev/setup-pixi@v0.9.4
+        uses: actions/checkout@v7
+      - uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.71.3
+          pixi-version: v0.72.0
           environments: >-
             default
             ${{ matrix.suite.environment }}
       - name: Run tests
-        run: pixi run -e ${{ matrix.suite.environment }} ${{ matrix.suite.task }} --junit-xml=test-${{ matrix.os }}-Env-${{ matrix.suite.environment }}.xml
-      - uses: codecov/codecov-action@v5
+        run: pixi run -e ${{ matrix.suite.environment }} ${{ matrix.suite.task }} ${{ matrix.suite.task == 'test' && 'no-commit-to-branch' || '' }} -- --junit-xml=test-${{ matrix.os }}-Env-${{ matrix.suite.environment }}.xml
+      - uses: codecov/codecov-action@v7
 
   test-julia:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v4
-      - uses: prefix-dev/setup-pixi@v0.9.4
+        uses: actions/checkout@v7
+      - uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.71.3
+          pixi-version: v0.72.0
           environments: >-
             default
             test-julia
       - name: Run Julia backend tests
-        run: pixi run test-julia --junit-xml=test-ubuntu-latest-Env-test-julia.xml
-      - uses: codecov/codecov-action@v5
+        run: pixi run test-julia -- -x -v --junit-xml=test-ubuntu-latest-Env-test-julia.xml
+      - uses: codecov/codecov-action@v7
 
 on:
   # Trigger the workflow on push or pull request,
@@ -56,3 +56,7 @@ on:
   pull_request:
     branches:
       - main
+concurrency:
+  # Cancel superseded runs on PR branches; pushes to main get a unique group
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true

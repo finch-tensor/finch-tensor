@@ -1,0 +1,378 @@
+import logging
+from itertools import product
+
+import numpy as np
+
+from finch.algebra import (
+    DynamicFillFType,
+    TupleFType,
+    as_fill,
+    ffuncs,
+    fisinstance,
+    fixpoint_type,
+    ftype,
+    is_dynamic,
+    np_dtype,
+    return_type,
+)
+from finch.algebra.ftypes import FDTypeBuiltin, FDTypeNumpy
+from finch.algebra.tensor import TensorFType
+from finch.finch_assembly import AssemblyKernel, AssemblyKernelFType, AssemblyLibrary
+from finch.symbolic import UnvalidatedForm
+from finch.tensor.bufferized_ndarray import BufferizedNDArray
+from finch.tensor.scalar import Scalar
+from finch.util.logging import LOG_LOGIC_PRE_OPT
+
+from . import nodes as lgc
+from .nodes import (
+    Aggregate,
+    Alias,
+    Field,
+    FillTable,
+    Fuse,
+    FusedAlias,
+    HardAlias,
+    Literal,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    QueryInto,
+    Relabel,
+    Reorder,
+    Table,
+    TableValue,
+    Value,
+)
+from .stages import LogicEvaluator, LogicLoader
+from .tensor_stats import StatsFactory, TensorStats
+
+logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
+
+
+def make_tensor(shape, fill_value, *, dtype=None):
+    # The fill value may be raw, which is a static fill.
+    fill = as_fill(fill_value)
+    dtype = fill.element_type if dtype is None else ftype(dtype)
+    arr = np.empty(shape, dtype=np_dtype(dtype))
+    arr[...] = fill.value
+    return BufferizedNDArray.from_numpy(arr, fill_value=fill)
+
+
+class MockFusedTensor:
+    """Interpret fused storage with one materialized tensor per outer coordinate.
+
+    Keeping every slice lets the interpreter execute whole queries in sequence
+    while preserving the values a fused loop would pass between statements.
+    """
+
+    def __init__(self, shape, n, fill, dtype, *, make_tensor=make_tensor):
+        self.shape = tuple(shape)
+        if not 0 <= n <= len(self.shape):
+            raise ValueError("The fused dimension count exceeds the tensor rank")
+        self.n = n
+        self.outer_shape = self.shape[:n]
+        self.inner_shape = self.shape[n:]
+        self.fill = as_fill(fill)
+        self.element_type = ftype(dtype)
+        self.make_tensor = make_tensor
+        self.store_tns = {}
+
+    @property
+    def fill_value(self):
+        return self.fill.value
+
+    def slot(self, outer_crds):
+        if outer_crds not in self.store_tns:
+            self.store_tns[outer_crds] = self.make_tensor(
+                self.inner_shape, self.fill, dtype=self.element_type
+            )
+        return self.store_tns[outer_crds]
+
+    def __getitem__(self, crds):
+        if not isinstance(crds, tuple):
+            crds = (crds,)
+        return self.slot(crds[: self.n])[crds[self.n :]]
+
+    def __setitem__(self, crds, val):
+        if not isinstance(crds, tuple):
+            crds = (crds,)
+        self.slot(crds[: self.n])[crds[self.n :]] = val
+
+
+class LogicInterpreter(UnvalidatedForm, LogicEvaluator):
+    def __init__(self, *, make_tensor=make_tensor):
+        self.make_tensor = make_tensor  # Added make_tensor argument
+
+    def lower(self, term, bindings=None):
+        if bindings is None:
+            bindings = {}
+        machine = LogicMachine(make_tensor=self.make_tensor, bindings=bindings)
+        return machine(term)
+
+
+class LogicMachine:
+    def __init__(self, *, make_tensor=np.full, bindings=None):
+        if bindings is None:
+            bindings = {}
+        self.bindings = bindings
+        self.make_tensor = make_tensor
+
+    def view(self, var: Alias) -> Alias:
+        """The view of `var` which its stored value currently defines."""
+        base = var.unfused
+        match base, self.bindings[base]:
+            case HardAlias(), MockFusedTensor(n=n):
+                return FusedAlias(base, n)
+        return base
+
+    def __call__(self, node):
+        logger.debug("Evaluating: %s", node)
+        match node:
+            case Literal(val):
+                # A literal is a zero-dimensional tensor, so it evaluates to a
+                # rank-0 TableValue and every consumer below can treat it
+                # uniformly rather than special-casing raw scalars.
+                return TableValue(Scalar(val), ())
+            case Value(_):
+                raise ValueError(
+                    "The interpreter cannot evaluate a lazy node. Instead, you can "
+                    "use a compiler to generate code for it"
+                )
+            case Field(_):
+                raise ValueError("Fields cannot be used in expressions")
+            case Table(Alias() as var, idxs):
+                return TableValue(self(var), idxs)
+            case Table(Literal(val), idxs):
+                return TableValue(val, idxs)
+            case Alias() as var:
+                val = self.bindings.get(var.unfused, None)
+                if val is None:
+                    raise ValueError(f"undefined tensor alias {node}")
+                view = self.view(var)
+                if view != var:
+                    raise ValueError(
+                        f"{var} was invalidated by the definition of {view}"
+                    )
+                return val
+            case MapJoin(Literal(op), args):
+                args = tuple(self(a) for a in args)
+                dims = {}
+                idxs = []
+                for arg in args:
+                    for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
+                        if idx in dims:
+                            if dims[idx] != dim:
+                                raise ValueError("Dimensions mismatched in map")
+                        else:
+                            idxs.append(idx)
+                            dims[idx] = dim
+                fill_val = op(*[arg.tns.fill_value for arg in args])
+                dtype = return_type(op.ftype, *[arg.tns.element_type for arg in args])
+                assert isinstance(dtype, FDTypeNumpy | FDTypeBuiltin | TupleFType)
+                result = self.make_tensor(
+                    tuple(dims[idx] for idx in idxs), fill_val, dtype=dtype
+                )
+                for crds in product(*[range(dims[idx]) for idx in idxs]):
+                    idx_crds = dict(zip(idxs, crds, strict=True))
+                    vals = [
+                        arg.tns[*[idx_crds[idx] for idx in arg.idxs]].item()
+                        for arg in args
+                    ]
+                    result[*crds] = op(*vals)
+                return TableValue(result, tuple(idxs))
+            case Aggregate(Literal(op), init, arg, idxs):
+                init = self(init)
+                arg = self(arg)
+                # The init is a tensor, so its values aren't compile-time data.
+                dtype = fixpoint_type(
+                    op.ftype,
+                    DynamicFillFType(init.tns.element_type),
+                    arg.tns.element_type,
+                )
+                arg_dims = dict(zip(arg.idxs, map(int, arg.tns.shape), strict=True))
+                out_dims = {
+                    idx: dim for idx, dim in arg_dims.items() if idx not in node.idxs
+                }
+                for idx, dim in zip(init.idxs, init.tns.shape, strict=True):
+                    if out_dims.setdefault(idx, dim) != dim or idx in node.idxs:
+                        raise ValueError(
+                            f"The init of an aggregate doesn't broadcast to its "
+                            f"result, since it has field {idx} of size {dim}"
+                        )
+                # The argument is broadcast over the fields only the init has.
+                loop_dims = {**arg_dims, **out_dims}
+                new_shape = tuple(out_dims.values())
+                assert isinstance(dtype, FDTypeNumpy | FDTypeBuiltin | TupleFType)
+                result = self.make_tensor(new_shape, init.tns.fill_value, dtype=dtype)
+                for out_crds in product(*[range(dim) for dim in new_shape]):
+                    idx_crds = dict(zip(out_dims, out_crds, strict=True))
+                    init_crds = [idx_crds[idx] for idx in init.idxs]
+                    result[*out_crds] = init.tns[*init_crds].item()
+                for crds in product(*[range(dim) for dim in loop_dims.values()]):
+                    idx_crds = dict(zip(loop_dims, crds, strict=True))
+                    out_crds = [idx_crds[idx] for idx in out_dims]
+                    arg_crds = [idx_crds[idx] for idx in arg.idxs]
+                    result[*out_crds] = op(
+                        result[*out_crds].item(), arg.tns[*arg_crds].item()
+                    )
+                return TableValue(result, tuple(out_dims))
+            case FillTable(tns):
+                fill = self(tns).fill
+                return TableValue(Scalar(fill.value, fill), ())
+            case Relabel(arg, idxs):
+                arg = self(arg)
+                if len(arg.idxs) != len(idxs):
+                    raise ValueError("The number of indices in the relabel must match")
+                return TableValue(arg.tns, idxs)
+            case Reorder(arg, idxs):
+                arg = self(arg)
+                for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
+                    if idx not in idxs and dim != 1:
+                        raise ValueError(
+                            f"Trying to drop a dimension that is not 1 : idx "
+                            f"{idx} indices {idxs} shape {arg.tns.shape}"
+                        )
+                arg_dims = dict(zip(arg.idxs, arg.tns.shape, strict=True))
+                dims = [arg_dims.get(idx, 1) for idx in idxs]
+                result = self.make_tensor(
+                    dims, arg.tns.fill_value, dtype=arg.tns.element_type
+                )
+                for crds in product(*[range(dim) for dim in dims]):
+                    node_crds = dict(zip(idxs, crds, strict=True))
+                    in_crds = [node_crds.get(idx, 0) for idx in arg.idxs]
+                    result[*crds] = arg.tns[*in_crds].item()
+                return TableValue(result, idxs)
+            case Query(Table(Alias() as var, idxs), rhs):
+                rhs = self(Reorder(rhs, idxs))
+                key = var.unfused
+                # Defining a view of the alias invalidates its other views.
+                if (
+                    key not in self.bindings
+                    or self.view(var) != var
+                    or self.bindings[key].shape != rhs.tns.shape
+                    or not bool(
+                        ffuncs.same(self.bindings[key].fill_value, rhs.tns.fill_value)
+                    )
+                ):
+                    # Whether the fill is dynamic belongs to the stored tensor,
+                    # so every view of it keeps a dynamic fill.
+                    fill = rhs.tns.fill
+                    if key in self.bindings and is_dynamic(self.bindings[key].fill):
+                        fill = fill.as_dynamic()
+                    match var:
+                        case FusedAlias(_, n):
+                            self.bindings[key] = MockFusedTensor(
+                                rhs.tns.shape,
+                                n,
+                                fill,
+                                rhs.tns.element_type,
+                                make_tensor=self.make_tensor,
+                            )
+                        case Alias():
+                            self.bindings[key] = self.make_tensor(
+                                rhs.tns.shape,
+                                fill,
+                                dtype=rhs.tns.element_type,
+                            )
+                tns = self.bindings[key]
+                for crds in product(*[range(dim) for dim in rhs.tns.shape]):
+                    tns[*crds] = rhs.tns[*crds].item()
+                return (rhs,)
+            case QueryInto() as stmt:
+                tns = self(stmt.lhs.tns)
+                rhs = self(Reorder(stmt.as_query().rhs, stmt.lhs.idxs))
+                if tns.shape != rhs.tns.shape:
+                    raise ValueError("QueryInto cannot change the tensor shape.")
+                for crds in product(*[range(dim) for dim in tns.shape]):
+                    tns[*crds] = rhs.tns[*crds].item()
+                return (TableValue(tns, stmt.lhs.idxs),)
+            case Fuse(_, body):
+                return self(body)
+            case Plan(bodies):
+                res = ()
+                for body in bodies:
+                    res = self(body)
+                return res
+            case Produces(args):
+                return tuple(self(arg) for arg in args)
+            case _:
+                raise ValueError(f"Unknown expression type: {type(node)}")
+
+
+class MockLogicKernel(AssemblyKernel):
+    def __init__(self, prgm, bindings: dict[lgc.Alias, TensorFType]):
+        element_types = prgm.infer_element_type(
+            {var: type_.element_type for var, type_ in bindings.items()}
+        )
+        shape_types = prgm.infer_shape_type(
+            {var: type_.shape_type for var, type_ in bindings.items()}
+        )
+        result_types = dict(bindings)
+        for var, element_type in element_types.items():
+            if var not in result_types:
+                result_types[var] = BufferizedNDArray.from_numpy(
+                    np.empty((0,) * len(shape_types[var]), dtype=np_dtype(element_type))
+                ).ftype
+        outputs = []
+        for arg in prgm.bodies[-1].args:
+            match arg:
+                case lgc.Table(lgc.Alias() as var, _) | (lgc.Alias() as var):
+                    outputs.append(result_types[var.unfused])
+                case _:
+                    raise TypeError(f"Expected an output alias or table, got {arg}")
+        super().__init__(
+            AssemblyKernelFType(
+                "main",
+                tuple(bindings.values()),
+                TupleFType.from_tuple(tuple(outputs)),
+            )
+        )
+        self.prgm = prgm
+        self.bindings = bindings
+
+    def __call__(self, *args):
+        if len(args) != len(self.bindings):
+            raise ValueError(
+                f"Wrong number of arguments passed to kernel, "
+                f"have {len(args)}, expected {len(self.bindings)}"
+            )
+        bindings = dict(zip(self.bindings.keys(), args, strict=True))
+        for key in bindings:
+            assert fisinstance(bindings[key], self.bindings[key])
+        ctx = LogicInterpreter()
+        res = ctx(self.prgm, bindings)
+        if isinstance(res, tuple):
+            return tuple(tbl.tns for tbl in res)
+        return res.tns
+
+
+class MockLogicLibrary(AssemblyLibrary):
+    def __init__(self, prgm, bindings: dict[lgc.Alias, TensorFType]):
+        self.prgm = prgm
+        self.bindings = bindings
+
+    def __getattr__(self, name):
+        if name == "main":
+            self.main = MockLogicKernel(self.prgm, self.bindings)
+            return self.main
+        if name == "prgm":
+            return self.prgm
+        raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")
+
+
+class MockLogicLoader(UnvalidatedForm, LogicLoader):
+    def __init__(self):
+        pass
+
+    def lower(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> tuple[
+        MockLogicLibrary,
+        dict[lgc.Alias, TensorFType],
+    ]:
+        return MockLogicLibrary(prgm, bindings), bindings
