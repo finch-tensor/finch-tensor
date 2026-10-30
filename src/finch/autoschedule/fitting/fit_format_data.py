@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 
 from finch.autoschedule.cost_models import LinearCostModel
-from finch.autoschedule.fitting.featurize_format import BASIS
+from finch.autoschedule.fitting.featurize_format_data import BASIS
 from finch.autoschedule.fitting.generate_format import examples
 
 

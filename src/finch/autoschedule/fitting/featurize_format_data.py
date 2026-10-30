@@ -19,7 +19,7 @@ import numpy as np
 from finch.autoschedule.cost_models import ByKind, ElementLevelOption, LevelBasis
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.fitting.generate_format import examples
-from finch.autoschedule.fitting.time_format import load
+from finch.autoschedule.fitting.time_format_data import load
 from finch.autoschedule.formatter.smart_formatter import LEVEL_OPTIONS
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.finch_logic import LogicLoader

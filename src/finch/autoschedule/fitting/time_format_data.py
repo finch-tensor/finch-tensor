@@ -20,7 +20,7 @@ from finch.algebra import Tensor, ftypes
 from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
 from finch.autoschedule.cost_models import LevelOption
 from finch.autoschedule.executor import LogicExecutor
-from finch.autoschedule.fitting.generate_format import (
+from finch.autoschedule.fitting.generate_format_data import (
     OPS,
     OPTIONS,
     examples,
