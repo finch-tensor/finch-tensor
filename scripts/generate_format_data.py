@@ -2,9 +2,10 @@
 Draw programs for fitting the formatter's cost model, and their inputs. Each
 program is a random subprogram of C_lmq += A_jlpq * B_kmpq, with a drawn loop
 order and formats of C, and its inputs are R-MAT tensors which give C a drawn
-sparsity. Each program is written to DIR as JSON, with the text of its logic
-plan and the formats of C, and its inputs as binsparse, under the name of its
-chunk and its index in the chunk, so jobs of different chunks can share DIR.
+sparsity. Each program is written to DIR/data as JSON, with the text of its
+logic plan and the formats of C, and its inputs as binsparse, under the name of
+its chunk and its index in the chunk, so jobs of different chunks can share
+DIR.
 
     pixi run -e fitting python -m scripts.generate_format_data \
         DIR [--examples N] [--chunk K] [--lg-max-space N] [--lg-max-dim N] \
@@ -13,6 +14,7 @@ chunk and its index in the chunk, so jobs of different chunks can share DIR.
 
 import argparse
 import json
+import time
 from pathlib import Path
 
 import numpy as np
@@ -179,7 +181,7 @@ def inputs(rng, prgm, input_fields, output_fields, lg_dims, dtype):
             for name, nnz in nnzs.items()
         )
 
-    return min(samples, key=distance)[0]
+    return min(samples, key=distance)
 
 
 def coo(tns: np.ndarray, idx_type) -> FiberTensor:
@@ -199,12 +201,17 @@ def coo(tns: np.ndarray, idx_type) -> FiberTensor:
     )
 
 
+def path(directory: Path, example, kind) -> Path:
+    """The file of a kind, such as program.json, of an example in directory."""
+    return directory / "data" / f"{example}.{kind}"
+
+
 def examples(directory: Path, chunk=None) -> list[str]:
     """The names of the examples in directory, or of those of one chunk."""
     prefix = "*" if chunk is None else f"{chunk:04d}-*"
     return sorted(
-        path.name.removesuffix(".program.json")
-        for path in directory.glob(f"{prefix}.program.json")
+        file.name.removesuffix(".program.json")
+        for file in (directory / "data").glob(f"{prefix}.program.json")
     )
 
 
@@ -212,7 +219,7 @@ def load(
     directory: Path, example
 ) -> tuple[Plan, dict[Alias, list[LevelOption]], dict[Alias, Tensor]]:
     """The plan, formats, and inputs of an example which generate wrote."""
-    record = json.loads((directory / f"{example}.program.json").read_text())
+    record = json.loads(path(directory, example, "program.json").read_text())
     plan = parse_logic(record["program"])
     assert isinstance(plan, Plan)
     formats: dict[Alias, list[LevelOption]] = {
@@ -221,7 +228,7 @@ def load(
     }
     bindings: dict[Alias, Tensor] = {
         tns: from_binsparse(
-            bsp.load_binsparse(directory / f"{example}.{tns.name}.bsp.npz")
+            bsp.load_binsparse(path(directory, example, f"{tns.name}.bsp.npz"))
         )
         for tns in (A, B)
     }
@@ -229,15 +236,16 @@ def load(
 
 
 def generate(directory: Path, examples, chunk, lg_max_space, lg_max_dim, rng) -> None:
-    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "data").mkdir(parents=True, exist_ok=True)
     for example in range(examples):
+        start = time.perf_counter()
         name = f"{chunk:04d}-{example:05d}"
         prgm, input_fields, output_fields, lg_dims = program(
             rng, lg_max_space, lg_max_dim
         )
         dtype = choose(rng, [np.float32, np.float64])
         idx_type = choose(rng, [np.int32, np.int64])
-        tensors = inputs(rng, prgm, input_fields, output_fields, lg_dims, dtype)
+        tensors, nnzs = inputs(rng, prgm, input_fields, output_fields, lg_dims, dtype)
         query, produces = prgm.bodies
         loop_order = shuffled(rng, tuple(Field(idx) for idx in lg_dims))
         plan = Plan((fuse_loop_order(query, loop_order), produces))
@@ -246,10 +254,16 @@ def generate(directory: Path, examples, chunk, lg_max_space, lg_max_dim, rng) ->
             for tns, idxs in output_fields.items()
         }
         record = {"program": str(plan), "formats": formats}
-        (directory / f"{name}.program.json").write_text(json.dumps(record, indent=2))
+        path(directory, name, "program.json").write_text(json.dumps(record, indent=2))
         for tns, array in tensors.items():
-            path = directory / f"{name}.{tns.name}.bsp.npz"
-            bsp.save_binsparse(to_binsparse(coo(array, idx_type)), path)
+            file = path(directory, name, f"{tns.name}.bsp.npz")
+            bsp.save_binsparse(to_binsparse(coo(array, idx_type)), file)
+        lg_C = sum(lg_dims[idx.name] for idx in output_fields[C])
+        print(
+            f"[{example + 1}/{examples}] {name}: fields {''.join(lg_dims)}, "
+            f"C density {nnzs[C] / 2**lg_C:.2g}, {time.perf_counter() - start:.1f}s",
+            flush=True,
+        )
 
 
 def main() -> None:

@@ -2,7 +2,7 @@
 Time the programs which generate_format_data wrote to DIR, or those of one
 chunk. Each program is compiled by Finch.jl with its formats of w and C, and
 reads its inputs as the sparse tensors which Finch parses from binsparse. Its
-runtime is measured and written to DIR as JSON.
+runtime is measured and written to DIR/data as JSON.
 
     pixi run -e fitting python -m scripts.time_format_data \
         DIR [--chunk K] [--repeat N]
@@ -22,7 +22,7 @@ from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.finch_logic import Alias
 from finch.tensor import element, fiber_tensor
-from scripts.generate_format_data import examples, load
+from scripts.generate_format_data import examples, load, path
 
 
 class FixedFormatter(CostFormatter):
@@ -54,11 +54,12 @@ def measure(plan, formats, bindings, repeat=5) -> float:
 
 
 def time_programs(directory: Path, chunk, repeat) -> None:
-    for example in examples(directory, chunk):
+    names = examples(directory, chunk)
+    for i, example in enumerate(names, 1):
         runtime = measure(*load(directory, example), repeat)
         timing = {"runtime": runtime}
-        (directory / f"{example}.timing.json").write_text(json.dumps(timing))
-        print(f"{example}: {runtime:.2e}s", flush=True)
+        path(directory, example, "timing.json").write_text(json.dumps(timing))
+        print(f"[{i}/{len(names)}] {example}: {runtime:.2e}s", flush=True)
 
 
 def main() -> None:

@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 
 from finch.autoschedule.cost_models import LinearCostModel
 from scripts.featurize_format_data import BASIS
-from scripts.generate_format_data import examples
+from scripts.generate_format_data import examples, path
 
 
 def r_squared(predicted, actual) -> float:
@@ -74,10 +74,11 @@ def fit(directory: Path, chunk, output: Path | None, seed) -> None:
     features: list[np.ndarray] = []
     runtimes: list[float] = []
     for example in examples(directory, chunk):
-        rows = json.loads((directory / f"{example}.features.json").read_text())
+        rows = json.loads(path(directory, example, "features.json").read_text())
         features.append(np.array(rows["features"]).reshape(-1, BASIS.n_features))
-        timing = json.loads((directory / f"{example}.timing.json").read_text())
+        timing = json.loads(path(directory, example, "timing.json").read_text())
         runtimes.append(timing["runtime"])
+    print(f"fitting to {len(features)} programs", flush=True)
     model = LinearCostModel(BASIS, np.zeros(BASIS.n_features)).fit(features, runtimes)
     start = 0
     for kind, basis in BASIS.by_kind.items():

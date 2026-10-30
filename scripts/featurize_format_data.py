@@ -1,6 +1,6 @@
 """
 Extract the basis features of the programs which generate_format_data wrote
-to DIR, or of those of one chunk, and write them to DIR as JSON. The features
+to DIR, or of those of one chunk, and write them to DIR/data as JSON. The features
 come from each program, its formats of w and C, and the stats of its inputs,
 so they are extracted without compiling or running it, and a new basis needs
 no new timings.
@@ -22,7 +22,7 @@ from finch.autoschedule.formatter.smart_formatter import LEVEL_OPTIONS
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.finch_logic import LogicLoader
 from finch.symbolic import UnvalidatedForm
-from scripts.generate_format_data import examples, load
+from scripts.generate_format_data import examples, load, path
 
 BASIS = ByKind(
     {
@@ -58,12 +58,13 @@ def features(plan, formats, bindings) -> np.ndarray:
 
 
 def featurize(directory: Path, chunk) -> None:
-    for example in examples(directory, chunk):
+    names = examples(directory, chunk)
+    for i, example in enumerate(names, 1):
         rows = features(*load(directory, example))
-        (directory / f"{example}.features.json").write_text(
+        path(directory, example, "features.json").write_text(
             json.dumps({"features": rows.tolist()})
         )
-        print(example, flush=True)
+        print(f"[{i}/{len(names)}] {example}: {len(rows)} rows", flush=True)
 
 
 def main() -> None:

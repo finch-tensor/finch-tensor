@@ -198,7 +198,6 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
     try:
         result = toposort(chains)
     except CycleInFields:
-        logger.warning("Cycle in fields detected, need to permute.")
         need_fix = True
         result = root.fields()
     if need_fix or reduce(max, [len(c) for c in chains], 0) < len(
