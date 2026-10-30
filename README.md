@@ -1,6 +1,6 @@
 # finch-tensor
 
-Sparse array programming backed by [Finch.jl](https://github.com/finch-tensor/Finch.jl).
+Sparse array programming backed by Numba. [Documentation](https://finch-tensor.org/finch-tensor/)
 
 ## Source
 The source code for `finch-tensor` is available on GitHub at [https://github.com/finch-tensor/finch-tensor](https://github.com/FinchTensor/finch-tensor)

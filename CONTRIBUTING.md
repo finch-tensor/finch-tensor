@@ -125,7 +125,8 @@ To regenerate regression test outputs, run pytest with the `--regen-all` flag. T
 who are curious can consult the [`pytest-regression` docs](https://pytest-regressions.readthedocs.io/en/latest/overview.html#using-data-regression).
 
 ### Documentation
-You can generate the documentation locally by running:
+We build documentation using [Zensical](https://zensical.org/). You can generate the
+documentation locally by running:
 
 ```bash
 pixi run build-docs

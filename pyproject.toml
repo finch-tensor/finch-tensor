@@ -1,6 +1,6 @@
 [project]
 name = "finch-tensor"
-description = ""
+description = "Sparse tensor programming in pure-Python."
 version = "0.7.0"
 readme = "README.md"
 authors = [{name = "Willow Ahrens", email = "willow.marie.ahrens@gmail.com"}]
@@ -40,9 +40,8 @@ benchmark = [
     {include-group = "test"},
 ]
 docs = [
-    "mkdocs-material>=9.7.7,<10",
-    "mkdocstrings[python]>=1.0.6",
-    "mkdocs-autoapi>=0.4.1",
+    "zensical>=0.0.73",
+    "mkdocstrings-python>=2.0.10",
     "ruff>=0.6.0",
 ]
 
@@ -50,6 +49,12 @@ docs = [
 [build-system]
 requires = ["uv_build>=0.11.25"]
 build-backend = "uv_build"
+
+[project.urls]
+Homepage = "https://finch-tensor.org/"
+Documentation = "https://finch-tensor.org/finch-tensor/"
+Repository = "https://github.com/finch-tensor/finch-tensor"
+Issues = "https://github.com/finch-tensor/finch-tensor/issues"
 
 [tool.uv.build-backend]
 module-name = "finch"
@@ -187,11 +192,11 @@ depends-on = [{task = "compliance-suite", environment = "test"}]
 default-environment = "test"
 
 [tool.pixi.feature.docs.tasks.serve-docs]
-cmd = "mkdocs serve --strict"
+cmd = "zensical serve --strict"
 default-environment = "docs"
 
 [tool.pixi.feature.docs.tasks.build-docs]
-cmd = "mkdocs build --strict"
+cmd = "zensical build --strict"
 default-environment = "docs"
 
 [tool.pixi.feature.mindeps.dependencies]
