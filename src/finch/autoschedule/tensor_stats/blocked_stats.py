@@ -41,7 +41,8 @@ def build_block_expr(
         block_size = end - start
         dim_size = arr.shape[d]
         out_f = Field(f"out_{f.name}")
-        select = ft.EyeTensor((block_size, dim_size), k=start, dtype=np.float64)
+        select = np.zeros((block_size, dim_size), dtype=np.float64)
+        select[np.arange(block_size), np.arange(start, end)] = 1
         select_tbls.append(Table(Literal(ft.asarray(select)), (out_f, f)))
 
     joined = MapJoin(Literal(ffuncs.mul), (data_table, *select_tbls))

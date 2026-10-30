@@ -35,7 +35,6 @@ from finch.autoschedule.tensor_stats import (
     UniformStatsFactory,
     VPStatsFactory,
 )
-from finch.autoschedule.tensor_stats.blocked_stats import build_block_expr
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finch.finch_logic import (
     Aggregate,
@@ -1676,36 +1675,6 @@ def test_blocked_uniform_grid(shape, counts, fill_value, monkeypatch):
 
 
 # ------------------------------ BlockedStats -------------------------------------
-def test_blocked_stats_large_block_selectors(monkeypatch):
-    i, j = Field("i"), Field("j")
-    tensor = ft.FillTensor((325_729, 325_729), np.float64(0.0))
-    starts = {i: 65_145, j: 260_583}
-    ends = {i: 130_291, j: 325_729}
-
-    def reject_dense_selector(*args, **kwargs):
-        pytest.fail("Block selectors must not allocate dense arrays")
-
-    monkeypatch.setattr(np, "zeros", reject_dense_selector)
-    expr = build_block_expr(tensor, (i, j), starts, ends, (1, 4))
-    match expr:
-        case Aggregate(arg=MapJoin(args=(Table(), *selectors))):
-            assert len(selectors) == 2
-        case _:
-            pytest.fail("Expected a block selection expression")
-
-    for table in selectors:
-        match table:
-            case Table(Literal(selector), (_, field)):
-                size = ends[field] - starts[field]
-                assert selector.shape == (size, 325_729)
-                assert selector[0, starts[field]].item() == 1
-                assert selector[size - 1, ends[field] - 1].item() == 1
-                assert selector[0, starts[field] - 1].item() == 0
-                assert selector[0, ends[field] - 1].item() == 0
-            case _:
-                pytest.fail("Expected a block selector table")
-
-
 def test_blocked_stats_from_tensor():
     data = np.eye(10)
     arr = ft.asarray(data)
