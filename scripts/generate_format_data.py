@@ -1,14 +1,10 @@
 """
 Draw programs for fitting the formatter's cost model, and their inputs. Each
-program reduces a map of inputs A and B into a workspace w and copies w into
-C. Their fields cover each region of the Venn diagram of the fields of A, B,
-and C which lies in A or B, since nothing would give a field of C alone an
-extent. The layouts of all tensors follow one drawn order of the fields, and
-each query has its own drawn loop order. The formats of w and C, and the
-extents, densities, and dtype of the inputs are drawn too. Each program is
-written to DIR as JSON, with the text of its logic plan, the formats of w and
-C, and what was drawn, and its inputs as binsparse, under the name of its chunk
-and its index in the chunk, so jobs of different chunks can share DIR.
+program is a random subprogram of C_lmq += A_jlpq * B_kmpq, with a drawn loop
+order and formats of C, and its inputs are R-MAT tensors which give C a drawn
+sparsity. Each program is written to DIR as JSON, with the text of its logic
+plan and the formats of C, and its inputs as binsparse, under the name of its
+chunk and its index in the chunk, so jobs of different chunks can share DIR.
 
     pixi run -e fitting python -m scripts.generate_format_data \
         DIR [--examples N] [--chunk K] [--lg-max-space N] [--lg-max-dim N] \
@@ -23,17 +19,19 @@ import numpy as np
 
 import binsparse as bsp
 
+import finch as fl
 from finch import ffuncs
-from finch.algebra import Tensor
+from finch.algebra import Tensor, ftype, ftypes
 from finch.autoschedule.cost_models import LevelOption
+from finch.autoschedule.default_schedulers import COMPILE_NUMBA
 from finch.autoschedule.formatter.smart_formatter import LEVEL_OPTIONS
-from finch.autoschedule.util import flatten_plans, fuse_loop_order
-from finch.fileio import from_binsparse
+from finch.autoschedule.util import fuse_loop_order
+from finch.codegen import NumpyBuffer
+from finch.fileio import from_binsparse, to_binsparse
 from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
-    FusedAlias,
     HardAlias,
     Literal,
     MapJoin,
@@ -43,20 +41,16 @@ from finch.finch_logic import (
     Table,
     parse_logic,
 )
+from finch.tensor import ElementLevel, FiberTensor, SparseCOOLevel, element
 
 OPS = {"add": ffuncs.add, "mul": ffuncs.mul}
 OPTIONS = {option.kind: option for option in LEVEL_OPTIONS}
-A, B, C, w = HardAlias("A"), HardAlias("B"), HardAlias("C"), HardAlias("w")
+A, B, C = HardAlias("A"), HardAlias("B"), HardAlias("C")
 
 
 def with_subsequence(order, fields):
     """The fields of order which are in fields, in the order of order."""
     return tuple(idx for idx in order if idx in fields)
-
-
-
-def interaction_range(s_x, s_y):
-    return abs(s_x + s_y) - 1, 1 - abs(s_x - s_y)
 
 
 def choose(rng, options):
@@ -66,93 +60,145 @@ def choose(rng, options):
 def shuffled(rng, items):
     return tuple(items[p] for p in rng.permutation(len(items)))
 
-def seed(skew, sparsity):
-    S = np.outer([np.array([0.5 - s/2, 0.5 + s/2]) for s in skew])
-    S = seed * sparsity
 
-def rmat(S, lg_shape, density, rng):
+def seed(skew, sparsity):
+    S = np.ones(())
+    for s in skew:
+        S = np.multiply.outer(S, [0.5 - s / 2, 0.5 + s / 2])
+    return S * sparsity
+
+
+def rmat(S, lg_shape, rng):
     """
-    Coordinates of density * 2 ** sum(lg_shape) balls dropped into a tensor of
+    A dense array of S.sum() * 2 ** sum(lg_shape) balls dropped into a tensor of
     shape 2 ** lg_shape. At each level a ball picks an entry of the seed S, and
     each axis with bits left takes that entry's bit along it, so an axis which
     has run out of bits marginalizes S over it.
     """
+    # Values are in (0, 1], so neither a sum nor a product of them is zero.
     if not lg_shape:
-        return ()
+        return np.array(1 - rng.random())
     S = np.asarray(S)
-    nnz = round(density * 2 ** sum(lg_shape))
-    picks = rng.choice(S.size, size=(nnz, max(lg_shape)), p=S.ravel())
+    nnz = round(S.sum() * 2 ** sum(lg_shape))
+    picks = rng.choice(S.size, size=(nnz, max(lg_shape)), p=S.ravel() / S.sum())
     bits = np.unravel_index(picks, S.shape)
-    return tuple(
+    coords = tuple(
         (b[:, :lg] << np.arange(lg - 1, -1, -1)).sum(axis=1)
         for b, lg in zip(bits, lg_shape, strict=True)
     )
+    tns = np.zeros(tuple(2**lg for lg in lg_shape))
+    tns[coords] = 1 - rng.random(nnz)
+    return tns
 
 
 def program(rng, lg_max_space, lg_max_dim):
     """
-        What is drawn for a random program, as JSON, which build makes a plan of.
-        a random subprogram of C_ilmq += A_jlpq * B_kmpq
+    A random subprogram of C_lmq += A_jlpq * B_kmpq, where * is add or mul. C
+    has no fields of its own, since nothing would give them extents.
     """
     while True:
-        idxs = [idx in "ijklmnp" if rng.random() < 0.5 ]
+        idxs = [idx for idx in "jklmpq" if rng.random() < 0.5]
         lg_dims = {idx: int(rng.integers(1, lg_max_dim + 1)) for idx in idxs}
         if sum(lg_dims.values()) <= lg_max_space:
             break
     order = shuffled(rng, idxs)
-    A_idxs = [Field(idx) for idx in with_subsequence("jlpq", order)]
+    A_idxs = tuple(Field(idx) for idx in with_subsequence(order, "jlpq"))
     if rng.random() < 0.2:
-        A_idxs = shuffled(rng, idxs)
-    B_idxs = [Field(idx) for idx in with_subsequence("kmpq", order)]
+        A_idxs = shuffled(rng, A_idxs)
+    B_idxs = tuple(Field(idx) for idx in with_subsequence(order, "kmpq"))
     if rng.random() < 0.2:
-        B_idxs = shuffled(rng, idxs)
-    C_idxs = [Field(idx) for idx in with_subsequence("ilmq", order)]
+        B_idxs = shuffled(rng, B_idxs)
+    C_idxs = tuple(Field(idx) for idx in with_subsequence(order, "lmq"))
     if rng.random() < 0.2:
-        C_idxs = shuffled(rng, idxs)
-    r_idxs = [Field(idx) for idx in with_subsequence("jkp", order)]
+        C_idxs = shuffled(rng, C_idxs)
+    r_idxs = tuple(Field(idx) for idx in with_subsequence(order, "jkp"))
     op = rng.choice([ffuncs.add, ffuncs.mul])
-    prgm = Plan(
+    prgm = Plan.from_children(
         Query(
             Table(HardAlias("C"), C_idxs),
             Aggregate(
-                Literal(op),
+                Literal(ffuncs.add),
                 Literal(0.0),
-                MapJoin(
+                MapJoin.from_children(
+                    Literal(op),
                     Table(HardAlias("A"), A_idxs),
                     Table(HardAlias("B"), B_idxs),
                 ),
-                r_idxs
-            )
+                r_idxs,
+            ),
         ),
-        Produces((C,))
+        Produces((C,)),
     )
     input_fields = {
-        HardAlias("A"):A_idxs,
-        HardAlias("B"):B_idxs,
+        HardAlias("A"): A_idxs,
+        HardAlias("B"): B_idxs,
     }
     output_fields = {
-        HardAlias("C"):C_idxs,
+        HardAlias("C"): C_idxs,
     }
     return prgm, input_fields, output_fields, lg_dims
 
-def choose_seed(idxs, lg_dims):
-    skews = [rng.choice([-1, 1])*rng.random() for _ in idxs]
-    sparsity = 2^(-1 * rng.random(sum(lg_dims[idxs])))
-    return seed(skew, sparsity)
+
+def choose_seed(rng, idxs, lg_dims):
+    skews = [rng.choice([-1, 1]) * rng.random() for _ in idxs]
+    sparsity = 2 ** -rng.uniform(0, sum(lg_dims[idx.name] for idx in idxs))
+    return seed(skews, sparsity)
+
 
 def inputs(rng, prgm, input_fields, output_fields, lg_dims):
     samples = []
-    for i in range(100):
-        seeds = {name: choose_seed(idxs) for name, idxs in input_fields}
-        inputs = dict(map(rmat, seeds))
-        outputs = DEFAULT_SCHEDULER(prgm, inputs)
-        push!(samples, {name:output.count_nonfill_values() for name:output in outputs})
-    output_sparsities = {name:sum(choose_seed(idxs, lg_dims)) for name, idxs in output_fields}
-    #select sample with closest output sparsity.
-    
+    for _ in range(100):
+        seeds = {
+            name: choose_seed(rng, idxs, lg_dims) for name, idxs in input_fields.items()
+        }
+        inputs = {
+            name: rmat(S, [lg_dims[idx.name] for idx in input_fields[name]], rng)
+            for name, S in seeds.items()
+        }
+        # The default scheduler interprets, which is too slow to run this often.
+        outputs = COMPILE_NUMBA(
+            prgm, {name: fl.asarray(tns) for name, tns in inputs.items()}
+        )
+        nnzs = {
+            name: np.count_nonzero(np.asarray(output))
+            for name, output in zip(output_fields, outputs, strict=True)
+        }
+        samples.append((inputs, nnzs))
+    output_sparsities = {
+        name: choose_seed(rng, idxs, lg_dims).sum()
+        for name, idxs in output_fields.items()
+    }
 
-        
+    # Select the sample with the closest output sparsity, in log. An empty
+    # output counts as one nonzero.
+    def distance(sample):
+        _, nnzs = sample
+        return sum(
+            abs(
+                np.log2(max(nnz, 1) / output_sparsities[name])
+                - sum(lg_dims[idx.name] for idx in output_fields[name])
+            )
+            for name, nnz in nnzs.items()
+        )
 
+    return min(samples, key=distance)[0]
+
+
+def coo(tns: np.ndarray) -> FiberTensor:
+    """A Finch COO tensor of the nonzeros of tns."""
+    fmt = element(tns.dtype.type(0), ftype(tns.dtype), ftypes.intp)
+    if not tns.ndim:
+        return FiberTensor(ElementLevel(fmt, NumpyBuffer(tns.reshape(1))))
+    indices = np.nonzero(tns)
+    ptr = NumpyBuffer(np.array([0, indices[0].size], dtype=np.intp))
+    return FiberTensor(
+        SparseCOOLevel(
+            ElementLevel(fmt, NumpyBuffer(tns[indices])),
+            tuple(np.intp(n) for n in tns.shape),
+            ptr,
+            tuple(NumpyBuffer(np.ascontiguousarray(idx)) for idx in indices),
+        )
+    )
 
 
 def examples(directory: Path, chunk=None) -> list[str]:
@@ -188,12 +234,22 @@ def generate(directory: Path, examples, chunk, lg_max_space, lg_max_dim, rng) ->
     directory.mkdir(parents=True, exist_ok=True)
     for example in range(examples):
         name = f"{chunk:04d}-{example:05d}"
-        prgm = program(rng, lg_max_space, lg_max_dim)
-        plan = build(prgm)
-        record = {"program": str(plan), "formats": prgm["formats"], "drawn": prgm}
+        prgm, input_fields, output_fields, lg_dims = program(
+            rng, lg_max_space, lg_max_dim
+        )
+        tensors = inputs(rng, prgm, input_fields, output_fields, lg_dims)
+        query, produces = prgm.bodies
+        loop_order = shuffled(rng, tuple(Field(idx) for idx in lg_dims))
+        plan = Plan((fuse_loop_order(query, loop_order), produces))
+        formats = {
+            tns.name: [choose(rng, list(OPTIONS)) for _ in idxs]
+            for tns, idxs in output_fields.items()
+        }
+        record = {"program": str(plan), "formats": formats}
         (directory / f"{name}.program.json").write_text(json.dumps(record, indent=2))
-        for tns, tensor in inputs(rng, prgm).items():
-            bsp.save_binsparse(tensor, directory / f"{name}.{tns}.bsp.npz")
+        for tns, array in tensors.items():
+            path = directory / f"{name}.{tns.name}.bsp.npz"
+            bsp.save_binsparse(to_binsparse(coo(array)), path)
 
 
 def main() -> None:
