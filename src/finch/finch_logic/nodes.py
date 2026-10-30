@@ -5,9 +5,12 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Self, TypeVar
 
+import numpy as np
+
 from finch.algebra import (
     AbstractFill,
     AbstractFillFType,
+    DynamicFill,
     DynamicFillFType,
     FinchOperator,
     FType,
@@ -1127,6 +1130,39 @@ class Plan(LogicTree, LogicStatement):
         return cls(bodies)
 
 
+def format_literal(val: Any) -> str:
+    """
+    The text of a literal value. parse_logic reads it back as an equal value
+    when the value is a scalar, a fill, a dtype, an operator, or a tuple of
+    them. Other values print as their qual_str, which may not parse.
+    """
+    match val:
+        case tuple():
+            items = [format_literal(item) for item in val]
+            return f"({items[0]},)" if len(items) == 1 else f"({', '.join(items)})"
+        # The reprs of these operators leave out their parameters.
+        case ffuncs._Cast(dtype=dtype):
+            return f"astype({format_literal(dtype)})"
+        case ffuncs._InitWrite(fill=fill):
+            return f"init_write({format_literal(fill)})"
+        case ffuncs._Choose(fill=DynamicFill() as fill):
+            return f"choose({format_literal(fill)})"
+        case (
+            None
+            | bool()
+            | int()
+            | float()
+            | complex()
+            | str()
+            | np.generic()
+            | AbstractFill()
+            | FType()
+        ):
+            return repr(val)
+        case _:
+            return qual_str(val).replace("\n", "")
+
+
 class LogicPrinterContext(Context):
     def __init__(self, tab="    ", indent=0):
         super().__init__()
@@ -1151,11 +1187,26 @@ class LogicPrinterContext(Context):
         blk.indent = self.indent + 1
         return blk
 
+    def exec_bodies(self, bodies: tuple[LogicStatement, ...]):
+        # The statements of a block are those of a plan, so a plan in a plan
+        # is printed explicitly, or it would be flattened into its parent.
+        for body in bodies:
+            match body:
+                case Plan():
+                    self.exec_plan(body)
+                case _:
+                    self(body)
+
+    def exec_plan(self, prgm: Plan):
+        ctx_2 = self.subblock()
+        ctx_2.exec_bodies(prgm.bodies)
+        self.exec(f"{self.feed}plan:\n{ctx_2.emit()}".rstrip("\n"))
+
     def __call__(self, prgm: LogicNode):
         feed = self.feed
         match prgm:
             case Literal(value):
-                return qual_str(value).replace("\n", "")
+                return format_literal(value)
             case Value(ex):
                 return self(ex)
             case Field(name):
@@ -1203,10 +1254,13 @@ class LogicPrinterContext(Context):
                 ctx_2(body)
                 self.exec(f"{feed}fuse({self(idx)}):\n{ctx_2.emit()}")
                 return None
+            case Plan((_,)):
+                # A block of one statement is that statement, not a plan.
+                self.exec_plan(prgm)
+                return None
             case Plan(bodies):
                 ctx_2 = self.block()
-                for body in bodies:
-                    ctx_2(body)
+                ctx_2.exec_bodies(bodies)
                 self.exec(ctx_2.emit())
                 return None
             case Produces(args):

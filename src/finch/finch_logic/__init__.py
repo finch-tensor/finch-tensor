@@ -31,6 +31,7 @@ from .nodes import (
     fill_expression,
     is_fill_expression,
 )
+from .parser import parse_logic
 from .simplification import LogicSimplify
 from .stages import (
     LogicEvaluator,
@@ -73,4 +74,5 @@ __all__ = [
     "Value",
     "fill_expression",
     "is_fill_expression",
+    "parse_logic",
 ]
