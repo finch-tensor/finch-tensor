@@ -2,24 +2,31 @@ name: Docs
 on:
   push:
     branches:
+      - master
       - main
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 jobs:
-  docs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/configure-pages@v6
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Configure Git Credentials
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
       - uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.72.0
+          pixi-version: v0.83.0
           environments: >-
             docs
-      - name: Deploy Docs
-        run: pixi run -e docs mkdocs gh-deploy --force
+      - run: pixi run build-docs -- --clean
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - uses: actions/deploy-pages@v5
+        id: deployment
