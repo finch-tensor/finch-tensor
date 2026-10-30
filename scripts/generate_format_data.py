@@ -6,8 +6,9 @@ and C which lies in A or B, since nothing would give a field of C alone an
 extent. The layouts of all tensors follow one drawn order of the fields, and
 each query has its own drawn loop order. The formats of w and C, and the
 extents, densities, and dtype of the inputs are drawn too. Each program is
-written to DIR as JSON, and its inputs as binsparse, under the name of its
-chunk and its index in the chunk, so jobs of different chunks can share DIR.
+written to DIR as JSON, with the text of its logic plan, the formats of w and
+C, and what was drawn, and its inputs as binsparse, under the name of its chunk
+and its index in the chunk, so jobs of different chunks can share DIR.
 
     pixi run -e fitting python -m scripts.generate_format_data \
         DIR [--examples N] [--chunk K] [--lg-max-space N] [--lg-max-dim N] \
@@ -23,10 +24,29 @@ import numpy as np
 import binsparse as bsp
 
 from finch import ffuncs
+from finch.algebra import Tensor
+from finch.autoschedule.cost_models import LevelOption
 from finch.autoschedule.formatter.smart_formatter import LEVEL_OPTIONS
+from finch.autoschedule.util import flatten_plans, fuse_loop_order
+from finch.fileio import from_binsparse
+from finch.finch_logic import (
+    Aggregate,
+    Alias,
+    Field,
+    FusedAlias,
+    HardAlias,
+    Literal,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    Table,
+    parse_logic,
+)
 
 OPS = {"add": ffuncs.add, "mul": ffuncs.mul}
 OPTIONS = {option.kind: option for option in LEVEL_OPTIONS}
+A, B, C, w = HardAlias("A"), HardAlias("B"), HardAlias("C"), HardAlias("w")
 
 
 def with_subsequence(order, fields):
@@ -132,7 +152,7 @@ def rmat(S, lg_shape, density, rng):
 
 
 def program(rng, lg_max_space, lg_max_dim):
-    """A random program, as the JSON which time_format.build makes a plan of."""
+    """What is drawn for a random program, as JSON, which build makes a plan of."""
     # Each region of the Venn diagram of the indices of A, B, and C has one
     # field or none: i is only in A, j only in B, k in A and C, l in B and C,
     # m in A and B, and n in all three. Every field has 2 ** lg_dims values,
@@ -160,6 +180,32 @@ def program(rng, lg_max_space, lg_max_dim):
         },
         "dtype": choose(rng, ["float32", "float64"]),
     }
+
+
+def build(prgm) -> Plan:
+    """The plan of a program."""
+    A_idxs, B_idxs, C_idxs, w_idxs, reduced = (
+        tuple(Field(name) for name in with_subsequence(prgm["order"], names))
+        for names in ("ikmn", "jlmn", "kln", "kln", "ijm")
+    )
+    # w is fused along its leading fields, which become the outer loops of
+    # both queries, so it stores a slice of its other fields for each of them.
+    nfused = prgm["nfused"]
+    fused = w_idxs[:nfused]
+    view = FusedAlias(w, nfused) if nfused else w
+
+    product = MapJoin(Literal(OPS[prgm["op"]]), (Table(A, A_idxs), Table(B, B_idxs)))
+    reduce = Query(
+        Table(view, w_idxs),
+        Aggregate(Literal(ffuncs.add), Literal(0.0), product, reduced),
+    )
+    copy = Query(Table(C, C_idxs), Table(view, w_idxs))
+    reduce_order = tuple(Field(name) for name in prgm["reduce_order"])
+    copy_order = tuple(Field(name) for name in prgm["copy_order"])
+    body = Plan(
+        (fuse_loop_order(reduce, reduce_order), fuse_loop_order(copy, copy_order))
+    )
+    return flatten_plans(Plan((fuse_loop_order(body, fused), Produces((C,)))))
 
 
 def inputs(rng, prgm) -> dict[str, bsp.CustomTensor]:
@@ -213,12 +259,34 @@ def examples(directory: Path, chunk=None) -> list[str]:
     )
 
 
+def load(
+    directory: Path, example
+) -> tuple[Plan, dict[Alias, list[LevelOption]], dict[Alias, Tensor]]:
+    """The plan, formats, and inputs of an example which generate wrote."""
+    record = json.loads((directory / f"{example}.program.json").read_text())
+    plan = parse_logic(record["program"])
+    assert isinstance(plan, Plan)
+    formats: dict[Alias, list[LevelOption]] = {
+        HardAlias(name): [OPTIONS[kind] for kind in kinds]
+        for name, kinds in record["formats"].items()
+    }
+    bindings: dict[Alias, Tensor] = {
+        tns: from_binsparse(
+            bsp.load_binsparse(directory / f"{example}.{tns.name}.bsp.npz")
+        )
+        for tns in (A, B)
+    }
+    return plan, formats, bindings
+
+
 def generate(directory: Path, examples, chunk, lg_max_space, lg_max_dim, rng) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     for example in range(examples):
         name = f"{chunk:04d}-{example:05d}"
         prgm = program(rng, lg_max_space, lg_max_dim)
-        (directory / f"{name}.program.json").write_text(json.dumps(prgm))
+        plan = build(prgm)
+        record = {"program": str(plan), "formats": prgm["formats"], "drawn": prgm}
+        (directory / f"{name}.program.json").write_text(json.dumps(record, indent=2))
         for tns, tensor in inputs(rng, prgm).items():
             bsp.save_binsparse(tensor, directory / f"{name}.{tns}.bsp.npz")
 

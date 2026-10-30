@@ -1,9 +1,9 @@
 """
-Extract the basis features of the programs which generate_format wrote to DIR,
-or of those of one chunk, and write them to DIR as JSON. The features come
-from each program, its formats of w and C, and the stats of its inputs, so
-they are extracted without compiling or running it, and a new basis needs no
-new timings.
+Extract the basis features of the programs which generate_format_data wrote
+to DIR, or of those of one chunk, and write them to DIR as JSON. The features
+come from each program, its formats of w and C, and the stats of its inputs,
+so they are extracted without compiling or running it, and a new basis needs
+no new timings.
 
     pixi run -e fitting python -m scripts.featurize_format_data \
         DIR [--chunk K]
@@ -22,8 +22,7 @@ from finch.autoschedule.formatter.smart_formatter import LEVEL_OPTIONS
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.finch_logic import LogicLoader
 from finch.symbolic import UnvalidatedForm
-from scripts.generate_format_data import examples
-from scripts.time_format_data import load
+from scripts.generate_format_data import examples, load
 
 BASIS = ByKind(
     {

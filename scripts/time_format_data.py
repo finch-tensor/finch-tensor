@@ -1,8 +1,8 @@
 """
-Time the programs which generate_format wrote to DIR, or those of one chunk.
-Each program is compiled by Finch.jl with its formats of w and C, and reads its
-inputs as the sparse tensors which Finch parses from binsparse. Its runtime is
-measured and written to DIR as JSON.
+Time the programs which generate_format_data wrote to DIR, or those of one
+chunk. Each program is compiled by Finch.jl with its formats of w and C, and
+reads its inputs as the sparse tensors which Finch parses from binsparse. Its
+runtime is measured and written to DIR as JSON.
 
     pixi run -e fitting python -m scripts.time_format_data \
         DIR [--chunk K] [--repeat N]
@@ -13,40 +13,16 @@ import json
 import timeit
 from pathlib import Path
 
-import binsparse as bsp
-
-from finch import ffuncs
-from finch.algebra import Tensor, ftypes
+from finch.algebra import ftypes
 from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
 from finch.autoschedule.cost_models import LevelOption
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter.smart_formatter import LEVEL_BUILDERS, CostFormatter
 from finch.autoschedule.tensor_stats import DCStatsFactory
-from finch.autoschedule.util import flatten_plans, fuse_loop_order
 from finch.compile_jl.compiler import FinchJLCompiler
-from finch.fileio import from_binsparse
-from finch.finch_logic import (
-    Aggregate,
-    Alias,
-    Field,
-    FusedAlias,
-    HardAlias,
-    Literal,
-    MapJoin,
-    Plan,
-    Produces,
-    Query,
-    Table,
-)
+from finch.finch_logic import Alias
 from finch.tensor import element, fiber_tensor
-from scripts.generate_format_data import (
-    OPS,
-    OPTIONS,
-    examples,
-    with_subsequence,
-)
-
-A, B, C, w = HardAlias("A"), HardAlias("B"), HardAlias("C"), HardAlias("w")
+from scripts.generate_format_data import examples, load
 
 
 class FixedFormatter(CostFormatter):
@@ -66,52 +42,6 @@ class FixedFormatter(CostFormatter):
 
 def julia_loader():
     return CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
-
-
-def build(prgm) -> tuple[Plan, dict[Alias, list[LevelOption]]]:
-    """The plan of a program, and the formats of its w and C."""
-    A_idxs, B_idxs, C_idxs, w_idxs, reduced = (
-        tuple(Field(name) for name in with_subsequence(prgm["order"], names))
-        for names in ("ikmn", "jlmn", "kln", "kln", "ijm")
-    )
-    # w is fused along its leading fields, which become the outer loops of
-    # both queries, so it stores a slice of its other fields for each of them.
-    nfused = prgm["nfused"]
-    fused = w_idxs[:nfused]
-    view = FusedAlias(w, nfused) if nfused else w
-
-    product = MapJoin(Literal(OPS[prgm["op"]]), (Table(A, A_idxs), Table(B, B_idxs)))
-    reduce = Query(
-        Table(view, w_idxs),
-        Aggregate(Literal(ffuncs.add), Literal(0.0), product, reduced),
-    )
-    copy = Query(Table(C, C_idxs), Table(view, w_idxs))
-    reduce_order = tuple(Field(name) for name in prgm["reduce_order"])
-    copy_order = tuple(Field(name) for name in prgm["copy_order"])
-    body = Plan(
-        (fuse_loop_order(reduce, reduce_order), fuse_loop_order(copy, copy_order))
-    )
-    plan = flatten_plans(Plan((fuse_loop_order(body, fused), Produces((C,)))))
-    formats: dict[Alias, list[LevelOption]] = {
-        tns: [OPTIONS[kind] for kind in prgm["formats"][tns.name]] for tns in (w, C)
-    }
-    return plan, formats
-
-
-def load(
-    directory: Path, example
-) -> tuple[Plan, dict[Alias, list[LevelOption]], dict[Alias, Tensor]]:
-    """The plan, formats, and inputs of an example which generate_format wrote."""
-    plan, formats = build(
-        json.loads((directory / f"{example}.program.json").read_text())
-    )
-    bindings = {
-        tns: from_binsparse(
-            bsp.load_binsparse(directory / f"{example}.{tns.name}.bsp.npz")
-        )
-        for tns in (A, B)
-    }
-    return plan, formats, bindings
 
 
 def measure(plan, formats, bindings, repeat=5) -> float:
