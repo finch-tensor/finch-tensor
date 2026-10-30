@@ -2,17 +2,21 @@
 # Submit every step of fitting the formatter's cost model to DIR. Each chunk is
 # timed and featurized as soon as it is generated, and the model is fitted to
 # all of them once they are done, and written to DIR/model.json. Logs go to
-# DIR/logs. A failed step cancels the steps which depend on it.
+# DIR/logs. A failed step cancels the steps which depend on it. Every job is
+# charged to the Slurm account A if given, or to the default account otherwise.
 #
-#     scripts/launch_format_data.sh [--chunks N] [--repeat N] DIR \
+#     scripts/launch_format_data.sh [--account A] [--chunks N] [--repeat N] DIR \
 #         [generate_format_data options]
 set -euo pipefail
 
-usage="usage: $0 [--chunks N] [--repeat N] DIR [generate_format_data options]"
+usage="usage: $0 [--account A] [--chunks N] [--repeat N] DIR \
+[generate_format_data options]"
+account=
 chunks=8
 repeat=5
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --account) account=$2; shift 2 ;;
     --chunks) chunks=$2; shift 2 ;;
     --repeat) repeat=$2; shift 2 ;;
     -h | --help) echo "$usage"; exit 0 ;;
@@ -39,7 +43,8 @@ pixi run --frozen -e fitting python -c \
 
 submit() {
   local id
-  id=$(sbatch --parsable --chdir="$repo_directory" --kill-on-invalid-dep=yes "$@")
+  id=$(sbatch --parsable --chdir="$repo_directory" --kill-on-invalid-dep=yes \
+    ${account:+"--account=$account"} "$@")
   echo "${id%%;*}"
 }
 

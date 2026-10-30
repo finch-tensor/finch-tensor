@@ -12,7 +12,6 @@
 #SBATCH --array=0-7
 #SBATCH --output=time-format-data-%A_%a.log
 #SBATCH --mail-type=FAIL
-#SBATCH --mail-user=ahrens@gatech.edu
 
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"

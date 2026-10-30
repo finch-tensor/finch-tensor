@@ -11,7 +11,6 @@
 #SBATCH --time=01:00:00
 #SBATCH --output=fit-format-data-%j.log
 #SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=ahrens@gatech.edu
 
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
