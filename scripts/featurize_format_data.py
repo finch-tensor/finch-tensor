@@ -5,7 +5,7 @@ from each program, its formats of w and C, and the stats of its inputs, so
 they are extracted without compiling or running it, and a new basis needs no
 new timings.
 
-    pixi run -e test-julia python -m finch.autoschedule.fitting.featurize_format_data \
+    pixi run -e fitting python -m scripts.featurize_format_data \
         DIR [--chunk K]
 """
 

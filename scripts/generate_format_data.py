@@ -9,7 +9,7 @@ extents, densities, and dtype of the inputs are drawn too. Each program is
 written to DIR as JSON, and its inputs as binsparse, under the name of its
 chunk and its index in the chunk, so jobs of different chunks can share DIR.
 
-    pixi run -e test-julia python -m finch.autoschedule.fitting.generate_format_data \
+    pixi run -e fitting python -m scripts.generate_format_data \
         DIR [--examples N] [--chunk K] [--lg-max-space N] [--lg-max-dim N] \
         [--seed S]
 """

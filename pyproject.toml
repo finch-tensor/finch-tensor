@@ -39,6 +39,9 @@ benchmark = [
     "pytest-codspeed>=5",
     {include-group = "test"},
 ]
+fitting = [
+    "matplotlib>=3.8",
+]
 docs = [
     "mkdocs-material>=9.7.7,<10",
     "mkdocstrings[python]>=1.0.6",
@@ -89,6 +92,7 @@ c-gcc = { features = ["c-gcc"], solve-group = "default" }
 c-clang = { features = ["c-clang"], solve-group = "default" }
 julia = { features = ["julia"], solve-group = "julia" }
 test-julia = { features = ["test", "julia"], solve-group = "julia" }
+fitting = { features = ["julia", "fitting"], solve-group = "julia" }
 benchmark-julia = { features = ["test", "julia", "benchmark"], solve-group = "julia" }
 docs = { features = ["docs"], solve-group = "default" }
 pre-commit = { features = ["pre-commit"], no-default-feature = true }
