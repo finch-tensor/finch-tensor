@@ -1,0 +1,6 @@
+{
+  "program": "C[] = Aggregate(add, 0.0, MapJoin(mul, A[], B[]), )\nreturn C\n",
+  "formats": {
+    "C": []
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "program": "fuse(k):\n    fuse(m):\n        fuse(p):\n            C[m] = Aggregate(add, 0.0, MapJoin(mul, A[p], B[k, m, p]), k, p)\nreturn C\n",
+  "formats": {
+    "C": [
+      "dense"
+    ]
+  }
+}
