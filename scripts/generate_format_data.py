@@ -54,14 +54,6 @@ def with_subsequence(order, fields):
     return tuple(idx for idx in order if idx in fields)
 
 
-def seed(s_x, s_y, r_xy):
-    S = [
-        [1 + s_x + s_y + r_xy, 1 + s_x - s_y - r_xy],
-        [1 - s_x + s_y - r_xy, 1 - s_x - s_y + r_xy],
-    ]
-    # Rounding can leave an empty corner slightly below zero.
-    return np.maximum(S, 0) / 4
-
 
 def interaction_range(s_x, s_y):
     return abs(s_x + s_y) - 1, 1 - abs(s_x - s_y)
@@ -74,63 +66,9 @@ def choose(rng, options):
 def shuffled(rng, items):
     return tuple(items[p] for p in rng.permutation(len(items)))
 
-
-def interaction(rng, base, scale, align, r_range):
-    """Draws a skew (base + scale * r) / (1 + align) of C and solves for r."""
-    s = rng.uniform(*sorted((base + scale * r) / (1 + align) for r in r_range))
-    # Clipping only absorbs rounding, which dividing by a small scale amplifies.
-    return np.clip(((1 + align) * s - base) / scale, *r_range)
-
-
-def seeds(rng, lg_A, lg_B, lg_C, lg_red, lg_k):
-    # R-MAT seeds and densities for A[i, k] and B[k, j], whose product sums
-    # over k into C[i, j]. A, B, and C may have other fields, which the seeds
-    # leave unskewed, so lg_A, lg_B, and lg_C are the bits of their whole
-    # shapes, lg_red the bits of every field reduced, and lg_k those of k.
-    # Each level of a seed is a 2x2 matrix S over fields x and y, with skews
-    # s_x and s_y in [-1, 1] and interaction r_xy, where
-    #     S = [[1 + s_x + s_y + r_xy, 1 + s_x - s_y - r_xy],
-    #          [1 - s_x + s_y - r_xy, 1 - s_x - s_y + r_xy]] / 4.
-    # rmat marginalizes S over a field once it runs out of bits, so only the
-    # levels of k see both A and B. The expected number of products which
-    # land in each entry of C is
-    #     p_C = p_A p_B 2 ** lg_red (1 + align) ** lg_k,
-    # where align = s_Ak s_Bk, and on the levels of k,
-    #     s_Ci = (s_Ai + r_Aik s_Bk) / (1 + align),
-    #     s_Cj = (s_Bj + s_Ak r_Bkj) / (1 + align),
-    #     r_Cij = (s_Ai s_Bj + r_Aik r_Bkj) / (1 + align),
-    # while C copies s_Ai and s_Bj on the other levels of i and j. This is also
-    # the seed and density of C while its products rarely collide. Drawing log
-    # densities p_A, p_B, and p_C, from one expected nonzero up to dense with
-    # p_C < p_A p_B 2 ** (lg_red + lg_k), fixes align, and align = 0 would pin
-    # a skew of C. Then draw s_Ai and s_Bj in [-1, 1], s_Ak with the sign of
-    # align and |align| <= |s_Ak| <= 1, and set s_Bk = align / s_Ak. An
-    # interaction keeps S nonnegative when it lies in
-    # [|s_x + s_y| - 1, 1 - |s_x - s_y|], so draw s_Ci and s_Cj from the images
-    # of those intervals and solve for r_Aik and r_Bkj.
-    # A batch field can leave too few products for one nonzero of C, so
-    # redraw p_A and p_B until there are enough.
-    while True:
-        lg_pA, lg_pB = rng.uniform(-lg_A, 0), rng.uniform(-lg_B, 0)
-        lg_max = min(0, lg_pA + lg_pB + lg_red + lg_k)
-        if not lg_k or -lg_C <= lg_max:
-            break
-    if lg_k:
-        lg_pC = rng.uniform(-lg_C, lg_max)
-        align = 2 ** ((lg_pC - lg_pA - lg_pB - lg_red) / lg_k) - 1
-    else:
-        # Without levels of k, p_C = p_A p_B 2 ** lg_red whatever align is.
-        align = rng.uniform(-1, 1)
-    s_Ai, s_Bj = rng.uniform(-1, 1, 2)
-    s_Ak = np.copysign(rng.uniform(abs(align), 1), align)
-    s_Bk = align / s_Ak
-    r_Aik = interaction(rng, s_Ai, s_Bk, align, interaction_range(s_Ai, s_Ak))
-    r_Bkj = interaction(rng, s_Bj, s_Ak, align, interaction_range(s_Bk, s_Bj))
-    return (
-        (2**lg_pA, seed(s_Ai, s_Ak, r_Aik)),
-        (2**lg_pB, seed(s_Bk, s_Bj, r_Bkj)),
-    )
-
+def seed(skew, sparsity):
+    S = np.outer([np.array([0.5 - s/2, 0.5 + s/2]) for s in skew])
+    S = seed * sparsity
 
 def rmat(S, lg_shape, density, rng):
     """
@@ -152,102 +90,69 @@ def rmat(S, lg_shape, density, rng):
 
 
 def program(rng, lg_max_space, lg_max_dim):
-    """What is drawn for a random program, as JSON, which build makes a plan of."""
-    # Each region of the Venn diagram of the indices of A, B, and C has one
-    # field or none: i is only in A, j only in B, k in A and C, l in B and C,
-    # m in A and B, and n in all three. Every field has 2 ** lg_dims values,
-    # and all of them together address at most 2 ** lg_max_space entries.
+    """
+        What is drawn for a random program, as JSON, which build makes a plan of.
+        a random subprogram of C_ilmq += A_jlpq * B_kmpq
+    """
     while True:
-        names = [name for name in "ijklmn" if rng.random() < 0.5]
-        lg_dims = {name: int(rng.integers(1, lg_max_dim + 1)) for name in names}
+        idxs = [idx in "ijklmnp" if rng.random() < 0.5 ]
+        lg_dims = {idx: int(rng.integers(1, lg_max_dim + 1)) for idx in idxs}
         if sum(lg_dims.values()) <= lg_max_space:
             break
-    order = shuffled(rng, names)
-    w_names = with_subsequence(order, "kln")
-    nfused = int(rng.integers(0, len(w_names) + 1))
-    return {
-        "op": choose(rng, list(OPS)),
-        "order": order,
-        "lg_dims": lg_dims,
-        "nfused": nfused,
-        "reduce_order": shuffled(
-            rng, (*w_names[nfused:], *with_subsequence(order, "ijm"))
+    order = shuffled(rng, idxs)
+    A_idxs = [Field(idx) for idx in with_subsequence("jlpq", order)]
+    if rng.random() < 0.2:
+        A_idxs = shuffled(rng, idxs)
+    B_idxs = [Field(idx) for idx in with_subsequence("kmpq", order)]
+    if rng.random() < 0.2:
+        B_idxs = shuffled(rng, idxs)
+    C_idxs = [Field(idx) for idx in with_subsequence("ilmq", order)]
+    if rng.random() < 0.2:
+        C_idxs = shuffled(rng, idxs)
+    r_idxs = [Field(idx) for idx in with_subsequence("jkp", order)]
+    op = rng.choice([ffuncs.add, ffuncs.mul])
+    prgm = Plan(
+        Query(
+            Table(HardAlias("C"), C_idxs),
+            Aggregate(
+                Literal(op),
+                Literal(0.0),
+                MapJoin(
+                    Table(HardAlias("A"), A_idxs),
+                    Table(HardAlias("B"), B_idxs),
+                ),
+                r_idxs
+            )
         ),
-        "copy_order": shuffled(rng, w_names[nfused:]),
-        "formats": {
-            name: [choose(rng, list(OPTIONS)) for _ in range(ndim)]
-            for name, ndim in (("w", len(w_names) - nfused), ("C", len(w_names)))
-        },
-        "dtype": choose(rng, ["float32", "float64"]),
+        Produces((C,))
+    )
+    input_fields = {
+        HardAlias("A"):A_idxs,
+        HardAlias("B"):B_idxs,
     }
+    output_fields = {
+        HardAlias("C"):C_idxs,
+    }
+    return prgm, input_fields, output_fields, lg_dims
 
+def choose_seed(idxs, lg_dims):
+    skews = [rng.choice([-1, 1])*rng.random() for _ in idxs]
+    sparsity = 2^(-1 * rng.random(sum(lg_dims[idxs])))
+    return seed(skew, sparsity)
 
-def build(prgm) -> Plan:
-    """The plan of a program."""
-    A_idxs, B_idxs, C_idxs, w_idxs, reduced = (
-        tuple(Field(name) for name in with_subsequence(prgm["order"], names))
-        for names in ("ikmn", "jlmn", "kln", "kln", "ijm")
-    )
-    # w is fused along its leading fields, which become the outer loops of
-    # both queries, so it stores a slice of its other fields for each of them.
-    nfused = prgm["nfused"]
-    fused = w_idxs[:nfused]
-    view = FusedAlias(w, nfused) if nfused else w
+def inputs(rng, prgm, input_fields, output_fields, lg_dims):
+    samples = []
+    for i in range(100):
+        seeds = {name: choose_seed(idxs) for name, idxs in input_fields}
+        inputs = dict(map(rmat, seeds))
+        outputs = DEFAULT_SCHEDULER(prgm, inputs)
+        push!(samples, {name:output.count_nonfill_values() for name:output in outputs})
+    output_sparsities = {name:sum(choose_seed(idxs, lg_dims)) for name, idxs in output_fields}
+    #select sample with closest output sparsity.
+    
 
-    product = MapJoin(Literal(OPS[prgm["op"]]), (Table(A, A_idxs), Table(B, B_idxs)))
-    reduce = Query(
-        Table(view, w_idxs),
-        Aggregate(Literal(ffuncs.add), Literal(0.0), product, reduced),
-    )
-    copy = Query(Table(C, C_idxs), Table(view, w_idxs))
-    reduce_order = tuple(Field(name) for name in prgm["reduce_order"])
-    copy_order = tuple(Field(name) for name in prgm["copy_order"])
-    body = Plan(
-        (fuse_loop_order(reduce, reduce_order), fuse_loop_order(copy, copy_order))
-    )
-    return flatten_plans(Plan((fuse_loop_order(body, fused), Produces((C,)))))
+        
 
-
-def inputs(rng, prgm) -> dict[str, bsp.CustomTensor]:
-    """Binsparse COO tensors A and B for a program, drawn from R-MAT seeds."""
-    order, lg_dims = prgm["order"], prgm["lg_dims"]
-    lg_A, lg_B, lg_C, lg_red, lg_m = (
-        sum(lg_dims.get(name, 0) for name in names)
-        for names in ("ikmn", "jlmn", "kln", "ijm", "m")
-    )
-    (p_A, S_A), (p_B, S_B) = seeds(rng, lg_A, lg_B, lg_C, lg_red, lg_m)
-    dtype = np.dtype(prgm["dtype"])
-    tensors = {}
-    # The seeds skew A[k, m] B[m, l], and leave i, j, and n unskewed.
-    for tns, names, p, S, xy in (
-        ("A", "ikmn", p_A, S_A, "km"),
-        ("B", "jlmn", p_B, S_B, "ml"),
-    ):
-        idxs = with_subsequence(order, names)
-        axes = [idx for idx in xy if idx in lg_dims]
-        S = S.sum(axis=tuple(ax for ax, idx in enumerate(xy) if idx not in lg_dims))
-        for idx in idxs:
-            if idx not in axes:
-                S = np.multiply.outer(S, [0.5, 0.5])
-                axes.append(idx)
-        S = np.transpose(S, [axes.index(idx) for idx in idxs])
-        lg_shape = tuple(lg_dims[idx] for idx in idxs)
-        coords = rmat(S, lg_shape, p, rng)
-        tensors[tns] = coo(rng, coords, tuple(2**lg for lg in lg_shape), dtype)
-    return tensors
-
-
-def coo(rng, coords, shape, dtype) -> bsp.CustomTensor:
-    """A binsparse COO tensor of random values at coords, merging duplicates."""
-    if shape:
-        flat = np.unique(np.ravel_multi_index(coords, shape))
-        values = rng.random(flat.size).astype(dtype)
-        indices = np.unravel_index(flat, shape)
-        level = bsp.SparseLevel(len(shape), bsp.ElementLevel(values), indices)
-    else:
-        values = rng.random(1).astype(dtype)
-        level = bsp.ElementLevel(values)
-    return bsp.CustomTensor(shape, values.size, True, dtype.type(0), level)
 
 
 def examples(directory: Path, chunk=None) -> list[str]:
