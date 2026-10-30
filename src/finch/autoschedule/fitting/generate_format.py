@@ -204,6 +204,15 @@ def coo(rng, coords, shape, dtype) -> bsp.CustomTensor:
     return bsp.CustomTensor(shape, values.size, True, dtype.type(0), level)
 
 
+def examples(directory: Path, chunk=None) -> list[str]:
+    """The names of the examples in directory, or of those of one chunk."""
+    prefix = "*" if chunk is None else f"{chunk:04d}-*"
+    return sorted(
+        path.name.removesuffix(".program.json")
+        for path in directory.glob(f"{prefix}.program.json")
+    )
+
+
 def generate(directory: Path, examples, chunk, lg_max_space, lg_max_dim, rng) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     for example in range(examples):

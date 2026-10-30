@@ -1,7 +1,7 @@
 """
-Fit a LinearCostModel of the formatter's basis to the timings which
-time_format wrote to DIR, or to those of one chunk, and write it to model.json
-if given.
+Fit a LinearCostModel of the formatter's basis to the features which
+featurize_format and the timings which time_format wrote to DIR, or to those
+of one chunk, and write it to model.json if given.
 
     pixi run -e test-julia python -m finch.autoschedule.fitting.fit_format \
         DIR [--chunk K] [model.json]
@@ -14,19 +14,18 @@ from pathlib import Path
 import numpy as np
 
 from finch.autoschedule.cost_models import LinearCostModel
-from finch.autoschedule.fitting.time_format import BASIS
+from finch.autoschedule.fitting.featurize_format import BASIS
+from finch.autoschedule.fitting.generate_format import examples
 
 
 def fit(directory: Path, chunk, output: Path | None) -> None:
-    prefix = "*" if chunk is None else f"{chunk:04d}-*"
-    timings = [
-        json.loads(path.read_text())
-        for path in sorted(directory.glob(f"{prefix}.timing.json"))
-    ]
-    features = [
-        np.array(timing["features"]).reshape(-1, BASIS.n_features) for timing in timings
-    ]
-    runtimes = [timing["runtime"] for timing in timings]
+    features: list[np.ndarray] = []
+    runtimes: list[float] = []
+    for example in examples(directory, chunk):
+        rows = json.loads((directory / f"{example}.features.json").read_text())
+        features.append(np.array(rows["features"]).reshape(-1, BASIS.n_features))
+        timing = json.loads((directory / f"{example}.timing.json").read_text())
+        runtimes.append(timing["runtime"])
     model = LinearCostModel(BASIS, np.zeros(BASIS.n_features)).fit(features, runtimes)
     start = 0
     for kind, basis in BASIS.by_kind.items():
