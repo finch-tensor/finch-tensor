@@ -2,6 +2,9 @@ from functools import wraps
 
 import pytest
 
+from finch import ffuncs
+from finch.algebra import FinchOperator, SingletonOperatorFType
+
 
 def mlir_backend(func):
     @wraps(func)
@@ -20,3 +23,26 @@ def with_workspaces(program, *args):
         *args,
         *(arg.result_type.construct((0,) * arg.result_type.ndim) for arg in workspaces),
     )
+
+
+class _BumpFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return bump
+
+    def return_type(self, *args):
+        return ffuncs.add.ftype.return_type(*args)
+
+
+class _Bump(FinchOperator):
+    """adds its arguments, but its ftype doesn't say it's pure"""
+
+    @property
+    def ftype(self):
+        return _BumpFType()
+
+    def __call__(self, *args):
+        return ffuncs.add(*args)
+
+
+bump = _Bump()

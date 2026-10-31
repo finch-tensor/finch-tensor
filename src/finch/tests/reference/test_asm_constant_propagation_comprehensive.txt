@@ -1,0 +1,42 @@
+def compute(x: finch.int64, y: finch.int64) -> finch.int64:
+    temp: finch.int64 = x
+    temp: finch.int64 = add(temp, y)
+    return temp
+
+def main() -> finch.int64:
+    a: finch.int64 = 10
+    b: finch.int64 = 10
+    c: finch.int64 = 10
+    d: finch.int64 = 5
+    if gt(c, 5):
+        a: finch.int64 = 15
+        b: finch.int64 = 15
+    result: finch.int64 = 0
+    for i in range(0, 5):
+        temp: finch.int64 = i
+        result: finch.int64 = add(result, temp)
+        if eq(mod(i, 2), 0):
+            result: finch.int64 = mul(result, 2)
+    if gt(result, 20):
+        c: finch.int64 = result
+        result: finch.int64 = add(c, b)
+    else:
+        c: finch.int64 = b
+        result: finch.int64 = mul(c, 3)
+    for i in range(0, 3):
+        a: finch.int64 = i
+        for j in range(0, 2):
+            b: finch.int64 = j
+            result: finch.int64 = add(result, add(a, b))
+    d: finch.int64 = result
+    if lt(d, 100):
+        c: finch.int64 = d
+        if gt(c, 50):
+            result: finch.int64 = mul(c, 2)
+        else:
+            result: finch.int64 = c
+    else:
+        result: finch.int64 = d
+    a: finch.int64 = result
+    b: finch.int64 = a
+    return b
