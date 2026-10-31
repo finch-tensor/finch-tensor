@@ -19,7 +19,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from finch.autoschedule.cost_models import LinearCostModel
-from scripts.featurize_format_data import BASIS
+from scripts.featurize_format_data import BASIS, KINDS
 from scripts.generate_format_data import examples, path
 
 
@@ -81,7 +81,7 @@ def fit(directory: Path, chunk, output: Path | None, seed) -> None:
     print(f"fitting to {len(features)} programs", flush=True)
     model = LinearCostModel(BASIS, np.zeros(BASIS.n_features)).fit(features, runtimes)
     start = 0
-    for kind, basis in BASIS.basis.by_kind.items():
+    for kind, basis in KINDS.by_kind.items():
         coefficients = model.coefficients[start : start + basis.n_features]
         print(kind, np.array2string(coefficients, precision=3))
         start += basis.n_features

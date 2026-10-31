@@ -36,15 +36,14 @@ from finch.tensor import ElementLevel
 from scripts.generate_format_data import examples, load, path
 from scripts.time_format_data import reformat
 
-# Each program adds a constant to its cost.
-BASIS = GlobalAffine(
-    ByKind(
-        {
-            option.kind: LevelBasis(type(option))
-            for option in (*LEVEL_OPTIONS, ElementLevelOption())
-        }
-    )
+KINDS = ByKind(
+    {
+        option.kind: LevelBasis(type(option))
+        for option in (*LEVEL_OPTIONS, ElementLevelOption())
+    }
 )
+# Each program adds a constant to its cost.
+BASIS = GlobalAffine(KINDS)
 
 
 class FeatureLoader(UnvalidatedForm, LogicLoader):
