@@ -14,23 +14,15 @@ from collections.abc import Sequence
 from finch.symbolic import UnvalidatedForm
 
 from .cfg_builder import NumberedStatement
-from .dataflow import assembly_dataflow_run, has_effects
+from .dataflow import ScopedRewriter, assembly_dataflow_run, has_effects
 from .liveness import AssemblyLiveVariables
 from .nodes import (
     AssemblyExpression,
     AssemblyNode,
-    AssemblyStatement,
     AssemblyTree,
     Assign,
-    Block,
-    BufferLoop,
-    ForLoop,
-    Function,
-    If,
-    IfElse,
     Module,
     Variable,
-    WhileLoop,
 )
 from .stages import AssemblyTransform
 
@@ -66,70 +58,19 @@ def _names(node: AssemblyNode) -> set[str]:
     return set()
 
 
-class _DeadCodeRemover:
-    """
-    walks the numbered program tracking the variables in scope, and drops the
-    dead statements, using what is live after each one.
-    """
+class _DeadCodeRemover(ScopedRewriter):
+    """drops the dead statements, using what is live after each one"""
 
     def __init__(self, ctx: AssemblyLiveVariables):
+        super().__init__()
         self.live = {stmt.sid: state for stmt, state in ctx.statement_states()}
-        self.scopes: list[set[str]] = []
-
-    def __call__(self, node: AssemblyNode) -> AssemblyNode:
-        match node:
-            case Module(funcs):
-                return Module(tuple(self.function(func) for func in funcs))
-            case Function():
-                return self.function(node)
-        return node
-
-    def function(self, func: Function) -> Function:
-        args = {arg.name for arg in func.args}
-        return Function(func.name, func.args, self.scoped(func.body, args))
-
-    def scoped(
-        self, body: AssemblyStatement, decls: set[str] | None = None
-    ) -> AssemblyStatement:
-        self.scopes.append(set(decls or ()))
-        try:
-            match body:
-                case Block(bodies):
-                    return Block(self.block(bodies))
-            kept = self.block((body,))
-            match kept:
-                case (AssemblyStatement() as stmt,):
-                    return stmt
-            return Block(kept)
-        finally:
-            self.scopes.pop()
 
     def block(self, bodies: Sequence) -> tuple:
-        kept = []
-        for i, stmt in enumerate(bodies):
-            if not self.dead(stmt, bodies[i + 1 :]):
-                kept.append(self.statement(stmt))
-        return tuple(kept)
-
-    def statement(self, node):
-        match node:
-            case Block():
-                return self.scoped(node)
-            case If(cond, body):
-                return If(cond, self.scoped(body))
-            case IfElse(cond, body, else_body):
-                return IfElse(cond, self.scoped(body), self.scoped(else_body))
-            case WhileLoop(cond, body):
-                return WhileLoop(cond, self.scoped(body))
-            case ForLoop(var, start, end, body):
-                return ForLoop(var, start, end, self.scoped(body, {var.name}))
-            case BufferLoop(buf, var, body):
-                return BufferLoop(buf, var, self.scoped(body, {var.name}))
-            case NumberedStatement(Assign(Variable(name, _), _), _) if not any(
-                name in scope for scope in self.scopes
-            ):
-                self.scopes[-1].add(name)
-        return node
+        return tuple(
+            self.statement(stmt)
+            for i, stmt in enumerate(bodies)
+            if not self.dead(stmt, bodies[i + 1 :])
+        )
 
     def dead(self, stmt, rest: Sequence) -> bool:
         match stmt:
@@ -137,7 +78,7 @@ class _DeadCodeRemover:
                 after = self.live.get(sid)
                 if after is None or name in after or has_effects(assign):
                     return False
-                if any(name in scope for scope in self.scopes):
+                if self.visible(name):
                     return True
                 # a declaration can go if the next mention in its block re-assigns
                 for later in rest:

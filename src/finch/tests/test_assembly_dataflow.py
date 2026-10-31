@@ -1,12 +1,16 @@
+from collections import namedtuple
+
 import numpy as np
 
 import finch
 import finch.finch_assembly as asm
 from finch import ffuncs
+from finch.algebra import ftype
 from finch.codegen import NumpyBuffer
 from finch.finch_assembly import (
     AssemblyCopyPropagation,
     NumberedStatement,
+    assembly_check_types,
     assembly_copy_propagation,
     assembly_dataflow_analyze,
     get_vars_in_expr,
@@ -183,6 +187,82 @@ def test_asm_copy_propagation_skips_dead_blocks():
     assert dead
     assert not dead & ctx.reached
     assert assembly_copy_propagation(make_prgm(b)) == make_prgm(a)
+
+
+def call(op, *args):
+    return asm.Call(asm.Literal(op), args)
+
+
+def variables(names, type_=finch.int64):
+    return [asm.Variable(name, type_) for name in names.split()]
+
+
+def module(args, *body, ret=finch.int64):
+    arg_types = tuple(arg.result_type for arg in args)
+    func = asm.Variable("f", asm.AssemblyKernelFType("f", arg_types, ret))
+    return asm.Module((asm.Function(func, tuple(args), asm.Block(body)),))
+
+
+def test_asm_copy_propagation_respects_scopes():
+    """
+    `t` is declared in a branch, so it can't stand in for `x` after the if,
+    even when the other branch returns or breaks and only `x = t` reaches it.
+    """
+    a, c, n, i, s, t, x = variables("a c n i s t x")
+    zero, one = asm.Literal(np.int64(0)), asm.Literal(np.int64(1))
+
+    def branch(cond, exit_):
+        return asm.IfElse(
+            cond,
+            asm.Block((asm.Assign(t, call(ffuncs.add, a, one)), asm.Assign(x, t))),
+            asm.Block((exit_,)),
+        )
+
+    returns = module(
+        (a, c),
+        asm.Assign(x, a),
+        branch(call(ffuncs.lt, zero, c), asm.Return(zero)),
+        asm.Return(call(ffuncs.add, x, one)),
+    )
+    breaks = module(
+        (a, n),
+        asm.Assign(x, a),
+        asm.Assign(s, zero),
+        asm.Assign(i, zero),
+        asm.WhileLoop(
+            call(ffuncs.lt, i, n),
+            asm.Block(
+                (
+                    asm.Assign(i, call(ffuncs.add, i, one)),
+                    branch(call(ffuncs.lt, i, asm.Literal(np.int64(3))), asm.Break()),
+                    asm.Assign(s, call(ffuncs.add, s, x)),
+                )
+            ),
+        ),
+        asm.Return(s),
+    )
+    for prgm in (returns, breaks):
+        result = assembly_copy_propagation(prgm)
+        assert result == prgm
+        assembly_check_types(result)
+
+
+def test_asm_copy_propagation_setattr():
+    """mlir rebinds the target of a setattr, so `q` stops being a copy of `p`"""
+    point_t = ftype(namedtuple("Point", ["x", "y"])(np.float64(1.0), np.float64(2.0)))
+    p, q = asm.Variable("p", point_t), asm.Variable("q", point_t)
+
+    def x_of(obj):
+        return asm.GetAttr(obj, asm.Literal("x"))
+
+    prgm = module(
+        (p,),
+        asm.Assign(q, p),
+        asm.SetAttr(q, asm.Literal("x"), asm.Literal(np.float64(5.0))),
+        asm.Return(call(ffuncs.add, x_of(p), x_of(q))),
+        ret=finch.float64,
+    )
+    assert assembly_copy_propagation(prgm) == prgm
 
 
 class _VariablesReadLater(AbstractAssemblyDataflow):
