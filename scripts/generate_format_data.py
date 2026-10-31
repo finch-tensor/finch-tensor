@@ -72,27 +72,85 @@ def seed(skew, sparsity):
     return S * sparsity
 
 
+def levels(S, lg_shape):
+    """
+    The axes with bits left at each level of R-MAT with the seed S on a tensor
+    of shape 2 ** lg_shape, and the seed over them. At each level a ball picks
+    an entry of S, and each axis with bits left takes that entry's bit along it,
+    so an axis which has run out of bits marginalizes S over it.
+    """
+    S = np.asarray(S) / np.sum(S)
+    for level in range(max(lg_shape, default=0)):
+        done = tuple(d for d, lg in enumerate(lg_shape) if lg <= level)
+        live = tuple(d for d, lg in enumerate(lg_shape) if level < lg)
+        yield live, S.sum(axis=done)
+
+
+def cell_probabilities(S, lg_shape):
+    """
+    The probability that a ball dropped by R-MAT with the seed S lands in each
+    cell of a tensor of shape 2 ** lg_shape.
+    """
+    P = np.ones(())
+    bits = []
+    for level, (live, S_level) in enumerate(levels(S, lg_shape)):
+        P = np.multiply.outer(P, S_level)
+        bits += [(d, level) for d in live]
+    # The bits of an axis, from the top, make its coordinate.
+    order = sorted(range(len(bits)), key=bits.__getitem__)
+    return P.transpose(order).reshape(tuple(2**lg for lg in lg_shape))
+
+
+def drop_balls(S, lg_shape, nnz, rng):
+    """
+    The flat indices of the first nnz distinct cells which balls dropped by
+    R-MAT with the seed S land in, in a tensor of shape 2 ** lg_shape.
+    """
+    shape = tuple(2**lg for lg in lg_shape)
+    cells = np.empty(0, np.int64)
+    distinct, first = cells, cells
+    while distinct.size < nnz:
+        need = nnz - distinct.size
+        n = need + need // 4 + 16
+        coords = [np.zeros(n, np.int64) for _ in lg_shape]
+        for live, S_level in levels(S, lg_shape):
+            picks = rng.choice(S_level.size, size=n, p=S_level.ravel())
+            for d, bit in zip(
+                live, np.unravel_index(picks, S_level.shape), strict=True
+            ):
+                coords[d] = coords[d] << 1 | bit
+        cells = np.concatenate([cells, np.ravel_multi_index(coords, shape)])
+        distinct, first = np.unique(cells, return_index=True)
+    return distinct[np.argsort(first)[:nnz]]
+
+
 def rmat(S, lg_shape, dtype, rng):
     """
-    A dense array of S.sum() * 2 ** sum(lg_shape) balls dropped into a tensor of
-    shape 2 ** lg_shape. At each level a ball picks an entry of the seed S, and
-    each axis with bits left takes that entry's bit along it, so an axis which
-    has run out of bits marginalizes S over it.
+    A dense array of shape 2 ** lg_shape whose S.sum() * 2 ** sum(lg_shape)
+    nonzeros are the first distinct cells which balls dropped by R-MAT with the
+    seed S land in.
     """
     # Values are in (0, 1], so neither a sum nor a product of them is zero.
     if not lg_shape:
         return np.array(1 - rng.random(), dtype)
-    S = np.asarray(S)
-    nnz = round(S.sum() * 2 ** sum(lg_shape))
-    picks = rng.choice(S.size, size=(nnz, max(lg_shape)), p=S.ravel() / S.sum())
-    bits = np.unravel_index(picks, S.shape)
-    coords = tuple(
-        (b[:, :lg] << np.arange(lg - 1, -1, -1)).sum(axis=1)
-        for b, lg in zip(bits, lg_shape, strict=True)
-    )
-    tns = np.zeros(tuple(2**lg for lg in lg_shape), dtype)
-    tns[coords] = 1 - rng.random(nnz)
-    return tns
+    size = 2 ** sum(lg_shape)
+    nnz = round(np.sum(S) * size)
+    # A ball lands in one of about 2 ** H cells, for the entropy H of the cell
+    # it lands in. When nnz is well under that and under the size, balls are
+    # dropped until nnz cells are hit, and otherwise every cell is ordered.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        H = -sum(np.nansum(P * np.log2(P)) for _, P in levels(S, lg_shape))
+    if np.log2(nnz) <= min(H - 2, sum(lg_shape) - 5):
+        cells = drop_balls(S, lg_shape, nnz, rng)
+    else:
+        # The order in which balls first land in cells is the order of
+        # exponential draws over the probabilities of the cells.
+        with np.errstate(divide="ignore"):
+            keys = rng.exponential(size=size) / cell_probabilities(S, lg_shape).ravel()
+        cells = np.argpartition(keys, nnz - 1)[:nnz]
+    tns = np.zeros(size, dtype)
+    tns[cells] = 1 - rng.random(nnz)
+    return tns.reshape(tuple(2**lg for lg in lg_shape))
 
 
 def program(rng, lg_max_space, lg_max_dim):
