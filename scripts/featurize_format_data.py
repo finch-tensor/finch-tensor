@@ -8,7 +8,7 @@ value they store is set to 1, so that their stats count the values each format
 stores.
 
     pixi run -e fitting python -m scripts.featurize_format_data \
-        DIR [--chunk K]
+        DIR [--chunk K] [--resume]
 """
 
 import argparse
@@ -85,8 +85,14 @@ def features(plan, formats, bindings) -> np.ndarray:
     return loader.features
 
 
-def featurize(directory: Path, chunk) -> None:
+def featurize(directory: Path, chunk, resume) -> None:
     names = examples(directory, chunk)
+    if resume:
+        names = [
+            example
+            for example in names
+            if not path(directory, example, "features.json").exists()
+        ]
     for i, example in enumerate(names, 1):
         plan, formats, bindings = load(directory, example)
         bindings = {tns: stored(arg, formats[tns]) for tns, arg in bindings.items()}
@@ -103,8 +109,13 @@ def main() -> None:
     )
     parser.add_argument("directory", type=Path)
     parser.add_argument("--chunk", type=int, help="the only chunk to featurize")
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="skip the programs which already have features, of the same basis",
+    )
     args = parser.parse_args()
-    featurize(args.directory, args.chunk)
+    featurize(args.directory, args.chunk, args.resume)
 
 
 if __name__ == "__main__":
