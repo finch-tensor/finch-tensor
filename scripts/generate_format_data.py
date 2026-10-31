@@ -401,13 +401,13 @@ def main() -> None:
     parser.add_argument(
         "--lg-max-space",
         type=int,
-        default=24,
+        default=27,
         help="log2 of the most entries all the fields of a program may address",
     )
     parser.add_argument(
         "--lg-max-dim",
         type=int,
-        default=11,
+        default=13,
         help="log2 of the most values of any one field",
     )
     parser.add_argument("--seed", type=int)
