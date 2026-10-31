@@ -14,6 +14,10 @@ from .dataflow import (
     assembly_dataflow_analyze,
     assembly_dataflow_run,
 )
+from .dead_code_elimination import (
+    AssemblyDeadCodeEliminationTransform,
+    assembly_dead_code_elimination,
+)
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .liveness import AssemblyLiveVariables
 from .nodes import (
@@ -64,6 +68,7 @@ __all__ = [
     "AssemblyConstantPropagation",
     "AssemblyConstantPropagationTransform",
     "AssemblyCopyPropagation",
+    "AssemblyDeadCodeEliminationTransform",
     "AssemblyExpression",
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
@@ -112,6 +117,7 @@ __all__ = [
     "assembly_copy_propagation",
     "assembly_dataflow_analyze",
     "assembly_dataflow_run",
+    "assembly_dead_code_elimination",
     "element_type",
     "get_vars_in_expr",
     "length_type",
