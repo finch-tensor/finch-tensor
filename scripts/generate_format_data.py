@@ -28,7 +28,6 @@ import finch as fl
 from finch import ffuncs
 from finch.algebra import Tensor, ftype
 from finch.autoschedule.cost_models import LevelOption
-from finch.autoschedule.default_schedulers import COMPILE_NUMBA
 from finch.autoschedule.formatter.smart_formatter import LEVEL_OPTIONS
 from finch.autoschedule.util import fuse_loop_order
 from finch.codegen import NumpyBuffer
@@ -39,6 +38,7 @@ from finch.finch_logic import (
     Field,
     HardAlias,
     Literal,
+    LogicInterpreter,
     MapJoin,
     Plan,
     Produces,
@@ -206,36 +206,46 @@ def choose_seed(rng, idxs, lg_dims):
     return seed(skews, sparsity)
 
 
-def inputs(rng, input_fields, lg_dims, dtype):
+def inputs(rng, input_fields, lg_dims, seeds, dtype):
     return {
-        name: rmat(
-            choose_seed(rng, idxs, lg_dims),
-            [lg_dims[idx.name] for idx in idxs],
-            dtype,
-            rng,
-        )
+        name: rmat(seeds[name], [lg_dims[idx.name] for idx in idxs], dtype, rng)
         for name, idxs in input_fields.items()
     }
 
 
-def lg_densities(prgm, input_fields, output_fields, lg_dims, tensors):
+def seed_lg_densities(prgm, input_fields, output_fields, lg_dims, seeds):
     """
-    The log nonzeros of the inputs and outputs of prgm, each as a fraction of
-    its log size. An empty tensor counts as one nonzero, and a scalar is dense.
+    The log nonzeros of the inputs which rmat draws from seeds, and the log
+    expected products of the output of prgm, each as a fraction of its log
+    size. By the mixed product property, the expected products are the product
+    over levels of the sum of prgm run on the seeds of the level, which are the
+    same at levels where the same fields have bits left.
     """
-    # The default scheduler interprets, which is too slow to run this often.
-    outputs = COMPILE_NUMBA(
-        prgm, {name: fl.asarray(tns) for name, tns in tensors.items()}
-    )
-    arrays = {**tensors, **dict(zip(output_fields, outputs, strict=True))}
     fields = {**input_fields, **output_fields}
+    lg_size = {
+        tns: sum(lg_dims[idx.name] for idx in idxs) for tns, idxs in fields.items()
+    }
+    nnzs = {tns: round(np.sum(seeds[tns]) * 2 ** lg_size[tns]) for tns in input_fields}
+    products = nnzs[A] * nnzs[B]
+    done = 0
+    for lg in sorted(set(lg_dims.values())):
+        level = {}
+        for tns, idxs in input_fields.items():
+            S = np.asarray(seeds[tns]) / np.sum(seeds[tns])
+            out = tuple(d for d, idx in enumerate(idxs) if lg_dims[idx.name] < lg)
+            level[tns] = fl.asarray(S.sum(axis=out, keepdims=True))
+        (prod,) = LogicInterpreter()(prgm, level)
+        products *= np.sum(prod.to_numpy()) ** (lg - done)
+        done = lg
 
-    def fraction(name):
-        lg_size = sum(lg_dims[idx.name] for idx in fields[name])
-        nnz = max(np.count_nonzero(np.asarray(arrays[name])), 1)
-        return np.log2(nnz) / lg_size if lg_size else 1.0
+    def fraction(nnz, lg):
+        return min(np.log2(max(nnz, 1)) / lg, 1.0) if lg else 1.0
 
-    return [fraction(name) for name in fields]
+    return [
+        fraction(nnzs[A], lg_size[A]),
+        fraction(nnzs[B], lg_size[B]),
+        fraction(products, lg_size[C]),
+    ]
 
 
 def spread(rng, points, n):
@@ -255,23 +265,18 @@ def spread(rng, points, n):
 def program_inputs(rng, lg_max_space, lg_max_dim, samples, keep):
     """
     A drawn program, as its plan with a drawn loop order and the drawn formats
-    of A, B, and C, paired with each of keep of samples draws of its inputs,
-    spread evenly over the log densities of A, B, and C.
+    of A, B, and C, paired with the inputs of each of keep of samples draws of
+    their seeds, spread evenly over the log densities of A and B and the log
+    expected products of C.
     """
     prgm, input_fields, output_fields, lg_dims = program(rng, lg_max_space, lg_max_dim)
     dtype = choose(rng, [np.float32, np.float64])
-    # Each draw of the inputs has its own seed, so a kept draw is drawn again
-    # rather than held while the rest are drawn.
-    seeds = rng.integers(2**63, size=samples)
+    seeds = [
+        {tns: choose_seed(rng, idxs, lg_dims) for tns, idxs in input_fields.items()}
+        for _ in range(samples)
+    ]
     points = [
-        lg_densities(
-            prgm,
-            input_fields,
-            output_fields,
-            lg_dims,
-            inputs(np.random.default_rng(s), input_fields, lg_dims, dtype),
-        )
-        for s in seeds
+        seed_lg_densities(prgm, input_fields, output_fields, lg_dims, S) for S in seeds
     ]
     query, produces = prgm.bodies
     loop_order = shuffled(rng, tuple(Field(idx) for idx in lg_dims))
@@ -283,7 +288,7 @@ def program_inputs(rng, lg_max_space, lg_max_dim, samples, keep):
     return [
         (
             (plan, formats),
-            inputs(np.random.default_rng(seeds[i]), input_fields, lg_dims, dtype),
+            inputs(rng, input_fields, lg_dims, seeds[i], dtype),
         )
         for i in spread(rng, points, keep)
     ]
@@ -381,8 +386,8 @@ def main() -> None:
     parser.add_argument(
         "--samples",
         type=int,
-        default=100,
-        help="the draws of the inputs of each program",
+        default=1000,
+        help="the draws of the seeds of the inputs of each program",
     )
     parser.add_argument(
         "--keep",
