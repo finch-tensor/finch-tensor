@@ -1497,6 +1497,62 @@ def test_c_min_max(operator, values):
     np.testing.assert_equal(result, expected)
 
 
+DIVISION_VALUES = [
+    (np.int64(7), np.int64(2)),
+    (np.int64(-7), np.int64(2)),
+    (np.int64(7), np.int64(-2)),
+    (np.int64(-7), np.int64(-2)),
+    (np.int64(-6), np.int64(3)),
+    (np.int8(-7), np.int32(2)),
+    (np.uint64(7), np.uint64(2)),
+    (np.float64(-7.5), np.float64(2.0)),
+    (np.float64(7.5), np.float64(-2.0)),
+    (np.float64(6.0), np.float64(-3.0)),
+    (np.float32(-7.5), np.float32(2.0)),
+]
+
+
+def division_kernel(operator, values):
+    args = tuple(asm.Variable(f"x{i}", ftype(value)) for i, value in enumerate(values))
+    call = asm.Call(asm.Literal(operator), args)
+    return asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "divide",
+                    asm.AssemblyKernelFType(
+                        "divide",
+                        tuple(arg.result_type for arg in args),
+                        call.result_type,
+                    ),
+                ),
+                args,
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+
+@pytest.mark.parametrize("operator", [ffuncs.truediv, ffuncs.floordiv, ffuncs.mod])
+@pytest.mark.parametrize("values", DIVISION_VALUES)
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
+        pytest.param(MLIRCompiler(), marks=pytest.mark.mlir_backend),
+    ],
+)
+def test_division(compiler, operator, values):
+    """backends round and sign division and mod like numpy"""
+    if isinstance(compiler, MLIRCompiler):
+        pytest.importorskip("mlir", reason="MLIR Python bindings not installed.")
+    result = compiler(division_kernel(operator, values)).divide(*values)
+    expected = operator(*values)
+    # on windows numpy returns `intc` where the backends return `int32`
+    assert result.dtype == expected.dtype
+    np.testing.assert_equal(result, expected)
+
+
 @mlir_backend
 @pytest.mark.parametrize(
     "condition,expected",
