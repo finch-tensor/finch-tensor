@@ -20,9 +20,9 @@ import numpy as np
 
 from finch.algebra import Tensor
 from finch.autoschedule.cost_models import (
-    Affine,
     ByKind,
     ElementLevelOption,
+    GlobalAffine,
     LevelBasis,
     LevelOption,
 )
@@ -36,13 +36,14 @@ from finch.tensor import ElementLevel
 from scripts.generate_format_data import examples, load, path
 from scripts.time_format_data import reformat
 
-# Each kind of level adds a constant to the cost of each of its rows.
-BASIS = ByKind(
+KINDS = ByKind(
     {
-        option.kind: Affine(LevelBasis(type(option)))
+        option.kind: LevelBasis(type(option))
         for option in (*LEVEL_OPTIONS, ElementLevelOption())
     }
 )
+# Each program adds a constant to its cost.
+BASIS = GlobalAffine(KINDS)
 
 
 class FeatureLoader(UnvalidatedForm, LogicLoader):

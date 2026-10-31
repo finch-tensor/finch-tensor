@@ -288,6 +288,31 @@ class Affine(RowMap[C]):
         return np.hstack([rows, np.ones((len(rows), 1))])
 
 
+class GlobalAffine(Affine[C]):
+    """
+    The features of each row of a basis followed by a 0, and one more row of a
+    program which is 0 but for a 1 in that column, so a linear model of them
+    adds a constant to the cost of each program, where Affine adds one to each
+    row. The extra row belongs to no component, so the costs of components
+    exclude the constant, and the basis must be outermost.
+    """
+
+    def transform(self, rows: np.ndarray) -> np.ndarray:
+        return np.hstack([rows, np.zeros((len(rows), 1))])
+
+    def get_features(
+        self,
+        term: LogicStatement,
+        bindings: Mapping[Alias, Any],
+        stats: Mapping[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> np.ndarray:
+        rows = super().get_features(term, bindings, stats, stats_factory)
+        constant = np.zeros((1, self.n_features))
+        constant[0, -1] = 1.0
+        return np.concatenate([rows, constant])
+
+
 class KNearest(RowMap[C]):
     """
     The weights of the k landmark rows nearest each row of a basis by

@@ -19,6 +19,7 @@ from finch.autoschedule.cost_models import (
     CostModel,
     DenseLevelOption,
     FlopsBasis,
+    GlobalAffine,
     KNearest,
     LevelBasis,
     LinearCostModel,
@@ -141,6 +142,7 @@ def test_stratify_fits_separate_coefficients_per_regime(rng):
     [
         FLOPS_COST_MODEL,
         LOOP_COST_MODEL,
+        LinearCostModel(GlobalAffine(PigeonBasis()), np.arange(4)),
         LinearCostModel(
             Concat(
                 Stratify(Quadratic(PigeonBasis()), 0, [2.0, 4.0], increasing=True),
@@ -367,6 +369,14 @@ def test_flops_cost_retains_query_components(factory):
     nonlinear = LinearCostModel(Quadratic(FlopsBasis()), [1.0, 0.0, 0.0, 10.0])
     assert nonlinear.predict_cost(plan, {}, stats, sf) == 120.0
     assert set(stats) == {a}
+    # The constant is in an extra row of the program, and no component's cost.
+    affine = LinearCostModel(GlobalAffine(FlopsBasis()), [2.0, 3.0, 100.0])
+    np.testing.assert_array_equal(
+        affine.get_features(plan, {}, stats, sf), [[6, 2, 0], [2, 2, 0], [0, 0, 1]]
+    )
+    assert affine.predict_cost(plan, {}, stats, sf) == 128.0
+    machine = StatsMachine(sf, dict(stats))
+    assert affine.predict_component_cost(Statement(plan.bodies[0]), machine) == 18.0
 
 
 @pytest.mark.parametrize(
