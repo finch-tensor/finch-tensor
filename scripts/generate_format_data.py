@@ -382,7 +382,7 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("directory", type=Path)
-    parser.add_argument("--programs", type=int, default=32)
+    parser.add_argument("--programs", type=int, default=512)
     parser.add_argument(
         "--samples",
         type=int,

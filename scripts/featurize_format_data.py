@@ -65,7 +65,8 @@ class FeatureLoader(UnvalidatedForm, LogicLoader):
 
 def stored(tns: Tensor, options: list[LevelOption]) -> Tensor:
     """A copy of tns with the level options, each value of which it stores is 1."""
-    copy = jl_tensor_to_python(reformat(tns, options).raw_julia_obj)
+    # A scalar has no levels to format, and Finch.jl returns it as a Scalar.
+    copy = jl_tensor_to_python(reformat(tns, options).raw_julia_obj) if options else tns
     lvl = copy.lvl
     while True:
         match lvl:
