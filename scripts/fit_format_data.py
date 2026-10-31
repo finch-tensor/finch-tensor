@@ -81,7 +81,7 @@ def fit(directory: Path, chunk, output: Path | None, seed) -> None:
     print(f"fitting to {len(features)} programs", flush=True)
     model = LinearCostModel(BASIS, np.zeros(BASIS.n_features)).fit(features, runtimes)
     start = 0
-    for kind, basis in BASIS.by_kind.items():
+    for kind, basis in BASIS.basis.by_kind.items():
         coefficients = model.coefficients[start : start + basis.n_features]
         print(kind, np.array2string(coefficients, precision=3))
         start += basis.n_features
