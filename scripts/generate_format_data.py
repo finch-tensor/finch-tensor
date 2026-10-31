@@ -105,13 +105,13 @@ def program(rng, lg_max_space, lg_max_dim):
             break
     order = shuffled(rng, idxs)
     A_idxs = tuple(Field(idx) for idx in with_subsequence(order, "jlpq"))
-    if rng.random() < 0.2:
-        A_idxs = shuffled(rng, A_idxs)
+    #if rng.random() < 0.2:
+    #    A_idxs = shuffled(rng, A_idxs)
     B_idxs = tuple(Field(idx) for idx in with_subsequence(order, "kmpq"))
-    if rng.random() < 0.2:
-        B_idxs = shuffled(rng, B_idxs)
+    #if rng.random() < 0.2:
+    #    B_idxs = shuffled(rng, B_idxs)
     C_idxs = tuple(Field(idx) for idx in with_subsequence(order, "lmq"))
-    if rng.random() < 0.2:
+    if rng.random() < 0.3:
         C_idxs = shuffled(rng, C_idxs)
     r_idxs = tuple(Field(idx) for idx in with_subsequence(order, "jkp"))
     prgm = Plan.from_children(
