@@ -6,20 +6,26 @@
 # of the jobs to DIR/jobs.txt, which scripts/status_format_data.sh reads to
 # show their progress. A failed step cancels the steps which depend on it.
 # Every job is charged to the Slurm account A if given, or to the default
-# account otherwise.
+# account otherwise. With --resume, DIR's programs are kept rather than
+# generated, only those not yet timed or featurized are, and the jobs are added
+# to DIR/jobs.txt. Options of this script come before DIR, and those after it
+# are generate_format_data's.
 #
-#     scripts/launch_format_data.sh [--account A] [--chunks N] [--repeat N] DIR \
-#         [generate_format_data options]
+#     scripts/launch_format_data.sh [--account A] [--chunks N] [--repeat N] \
+#         [--resume] DIR [generate_format_data options]
 set -euo pipefail
 
-usage="usage: $0 [--account A] [--chunks N] [--repeat N] DIR \
+usage="usage: $0 [--account A] [--chunks N] [--repeat N] [--resume] DIR \
 [generate_format_data options]"
 account=
 chunks=8
 repeat=5
+resume=
 while [[ $# -gt 0 ]]; do
   case $1 in
     --account) account=$2; shift 2 ;;
+    --account=*) account=${1#*=}; shift ;;
+    --resume) resume=--resume; shift ;;
     --chunks) chunks=$2; shift 2 ;;
     --repeat) repeat=$2; shift 2 ;;
     -h | --help) echo "$usage"; exit 0 ;;
@@ -33,6 +39,15 @@ fi
 mkdir -p "$1/logs"
 directory=$(cd -- "$1" && pwd)
 shift
+if [[ $resume && $# -gt 0 ]]; then
+  echo "$0: --resume generates nothing, so takes no generate options: $*" >&2
+  exit 2
+fi
+# Generating again would replace programs whose timings and features remain.
+if [[ ! $resume ]] && compgen -G "$directory/data/*.program.json" >/dev/null; then
+  echo "$0: $directory already has programs; pass --resume before it" >&2
+  exit 2
+fi
 
 cd -- "$(dirname -- "$0")"
 repo_directory=$(git rev-parse --show-toplevel)
@@ -43,11 +58,21 @@ cd -- "$repo_directory"
 # depot. Julia caches precompiled packages for the CPU which compiles them, so
 # compile them for the targets of Julia's own x86 builds, which every node can
 # load. This doesn't change the code Julia compiles while running, such as the
-# kernels being timed, which is always for the CPU it runs on.
+# kernels being timed, which is always for the CPU it runs on. juliapkg only
+# records that it installed Julia's packages, so install any which the depot
+# lacks, such as a depot of another machine, at the versions it recorded.
 export JULIA_CPU_TARGET=${JULIA_CPU_TARGET:-"generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1);x86-64-v4,-rdrnd,base(1)"}
 pixi install --frozen -e fitting
-pixi run --frozen -e fitting python -c \
-  "from finch.compile_jl.julia import init_julia; init_julia()"
+pixi run --frozen -e fitting python -c '
+import subprocess, juliapkg
+subprocess.run(
+    [juliapkg.executable(), f"--project={juliapkg.project()}", "-e",
+     "using Pkg; Pkg.instantiate()"],
+    check=True,
+)
+from finch.compile_jl.julia import init_julia
+init_julia()
+'
 
 submit() {
   local id
@@ -57,20 +82,22 @@ submit() {
 }
 
 jobs=$directory/jobs.txt
-: >"$jobs"
-
 array=--array=0-$((chunks - 1))
 logs=$directory/logs
-generate=$(submit "$array" --output="$logs/generate-%A_%a.log" \
-  scripts/generate_format_data.slurm "$directory" "$@")
-echo "generate $generate" >>"$jobs"
-time=$(submit "$array" --dependency="aftercorr:$generate" \
+generate=
+if [[ ! $resume ]]; then
+  : >"$jobs"
+  generate=$(submit "$array" --output="$logs/generate-%A_%a.log" \
+    scripts/generate_format_data.slurm "$directory" "$@")
+  echo "generate $generate" >>"$jobs"
+fi
+time=$(submit "$array" ${generate:+"--dependency=aftercorr:$generate"} \
   --output="$logs/time-%A_%a.log" \
-  scripts/time_format_data.slurm "$directory" --repeat "$repeat")
+  scripts/time_format_data.slurm "$directory" --repeat "$repeat" $resume)
 echo "time $time" >>"$jobs"
-featurize=$(submit "$array" --dependency="aftercorr:$generate" \
+featurize=$(submit "$array" ${generate:+"--dependency=aftercorr:$generate"} \
   --output="$logs/featurize-%A_%a.log" \
-  scripts/featurize_format_data.slurm "$directory")
+  scripts/featurize_format_data.slurm "$directory" $resume)
 echo "featurize $featurize" >>"$jobs"
 fit=$(submit --dependency="afterok:$time:$featurize" \
   --output="$logs/fit-%j.log" \

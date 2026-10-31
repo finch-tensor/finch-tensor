@@ -2,7 +2,7 @@
 # Time the programs of one chunk of DIR per array task. Submit from the
 # repository, or run every step with scripts/launch_format_data.sh.
 #
-#     sbatch scripts/time_format_data.slurm DIR [--repeat N]
+#     sbatch scripts/time_format_data.slurm DIR [--repeat N] [--resume]
 #
 # Each task takes a whole node, so other jobs don't disturb its timings.
 #SBATCH --job-name=time-format-data

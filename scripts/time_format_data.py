@@ -5,7 +5,7 @@ its inputs after they are copied from binsparse COO into their formats. Its
 runtime is measured and written to DIR/data as JSON.
 
     pixi run -e fitting python -m scripts.time_format_data \
-        DIR [--chunk K] [--repeat N]
+        DIR [--chunk K] [--repeat N] [--resume]
 """
 
 import argparse
@@ -65,8 +65,14 @@ def measure(plan, formats, bindings, repeat=5) -> float:
     return min(timeit.repeat(lambda: executor(plan, bindings), number=1, repeat=repeat))
 
 
-def time_programs(directory: Path, chunk, repeat) -> None:
+def time_programs(directory: Path, chunk, repeat, resume) -> None:
     names = examples(directory, chunk)
+    if resume:
+        names = [
+            example
+            for example in names
+            if not path(directory, example, "timing.json").exists()
+        ]
     for i, example in enumerate(names, 1):
         plan, formats, bindings = load(directory, example)
         bindings = {tns: reformat(arg, formats[tns]) for tns, arg in bindings.items()}
@@ -83,8 +89,11 @@ def main() -> None:
     parser.add_argument("directory", type=Path)
     parser.add_argument("--chunk", type=int, help="the only chunk to time")
     parser.add_argument("--repeat", type=int, default=5)
+    parser.add_argument(
+        "--resume", action="store_true", help="skip the programs already timed"
+    )
     args = parser.parse_args()
-    time_programs(args.directory, args.chunk, args.repeat)
+    time_programs(args.directory, args.chunk, args.repeat, args.resume)
 
 
 if __name__ == "__main__":
