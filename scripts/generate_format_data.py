@@ -1,11 +1,12 @@
 """
 Draw programs for fitting the formatter's cost model, and their inputs. Each
 program is a random subprogram of C_lmq += A_jlpq * B_kmpq, with a drawn loop
-order and formats of C, and its inputs are R-MAT tensors which give C a drawn
-sparsity. Each program is written to DIR/data as JSON, with the text of its
-logic plan and the formats of C, and its inputs as binsparse, under the name of
-its chunk and its index in the chunk, so jobs of different chunks can share
-DIR.
+order and formats of A, B, and C, and its inputs are R-MAT tensors which give C
+a drawn sparsity. Each program is written to DIR/data as JSON, with the text of
+its logic plan, the formats of A, B, and C, and the paths of their binsparse
+files, under the name of its chunk and its index in the chunk, so jobs of
+different chunks can share DIR. The inputs are stored as COO, and C as an empty
+COO tensor of its rank.
 
     pixi run -e fitting python -m scripts.generate_format_data \
         DIR [--examples N] [--chunk K] [--lg-max-space N] [--lg-max-dim N] \
@@ -218,7 +219,10 @@ def examples(directory: Path, chunk=None) -> list[str]:
 def load(
     directory: Path, example
 ) -> tuple[Plan, dict[Alias, list[LevelOption]], dict[Alias, Tensor]]:
-    """The plan, formats, and inputs of an example which generate wrote."""
+    """
+    The plan, formats, and inputs of an example which generate wrote. The inputs
+    are COO, whatever their formats.
+    """
     record = json.loads(path(directory, example, "program.json").read_text())
     plan = parse_logic(record["program"])
     assert isinstance(plan, Plan)
@@ -228,7 +232,7 @@ def load(
     }
     bindings: dict[Alias, Tensor] = {
         tns: from_binsparse(
-            bsp.load_binsparse(path(directory, example, f"{tns.name}.bsp.npz"))
+            bsp.load_binsparse(directory / "data" / record["paths"][tns.name])
         )
         for tns in (A, B)
     }
@@ -249,14 +253,17 @@ def generate(directory: Path, examples, chunk, lg_max_space, lg_max_dim, rng) ->
         query, produces = prgm.bodies
         loop_order = shuffled(rng, tuple(Field(idx) for idx in lg_dims))
         plan = Plan((fuse_loop_order(query, loop_order), produces))
+        fields = {**input_fields, **output_fields}
         formats = {
             tns.name: [choose(rng, list(OPTIONS)) for _ in idxs]
-            for tns, idxs in output_fields.items()
+            for tns, idxs in fields.items()
         }
-        record = {"program": str(plan), "formats": formats}
+        tensors[C] = np.zeros((0,) * len(output_fields[C]), dtype)
+        paths = {tns.name: f"{name}.{tns.name}.bsp.npz" for tns in fields}
+        record = {"program": str(plan), "formats": formats, "paths": paths}
         path(directory, name, "program.json").write_text(json.dumps(record, indent=2))
         for tns, array in tensors.items():
-            file = path(directory, name, f"{tns.name}.bsp.npz")
+            file = directory / "data" / paths[tns.name]
             bsp.save_binsparse(to_binsparse(coo(array, idx_type)), file)
         lg_C = sum(lg_dims[idx.name] for idx in output_fields[C])
         print(

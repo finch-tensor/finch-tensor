@@ -1,7 +1,7 @@
 """
 Extract the basis features of the programs which generate_format_data wrote
 to DIR, or of those of one chunk, and write them to DIR/data as JSON. The features
-come from each program, its formats of w and C, and the stats of its inputs,
+come from each program, its formats of A, B, and C, and the stats of its inputs,
 so they are extracted without compiling or running it, and a new basis needs
 no new timings.
 
