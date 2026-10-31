@@ -503,3 +503,67 @@ def create_asm_comprehensive_node():
     )
 
     return asm.Module((helper_func, main_func))
+
+
+def create_asm_gvn_node():
+    a = asm.Variable("a", finch.int64)
+    b = asm.Variable("b", finch.int64)
+    n = asm.Variable("n", finch.int64)
+    s = asm.Variable("s", finch.int64)
+    c = asm.Variable("c", finch.int64)
+    d = asm.Variable("d", finch.int64)
+    x = asm.Variable("x", finch.int64)
+    e = asm.Variable("e", finch.int64)
+    i = asm.Variable("i", finch.int64)
+    acc = asm.Variable("acc", finch.int64)
+    y = asm.Variable("y", finch.int64)
+
+    def add(x, y):
+        return asm.Call(asm.Literal(ffuncs.add), (x, y))
+
+    def mul(x, y):
+        return asm.Call(asm.Literal(ffuncs.mul), (x, y))
+
+    two = asm.Literal(np.int64(2))
+    zero = asm.Literal(np.int64(0))
+
+    return asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "gvn",
+                    asm.AssemblyKernelFType(
+                        "gvn", (finch.int64, finch.int64, finch.int64), finch.int64
+                    ),
+                ),
+                (a, b, n),
+                asm.Block(
+                    (
+                        asm.Assign(s, add(a, b)),
+                        asm.Assign(c, a),
+                        asm.Assign(d, add(c, b)),
+                        asm.Assign(x, zero),
+                        asm.IfElse(
+                            asm.Call(asm.Literal(ffuncs.lt), (a, b)),
+                            asm.Block((asm.Assign(x, mul(s, two)),)),
+                            asm.Block((asm.Assign(x, mul(d, two)),)),
+                        ),
+                        asm.Assign(acc, zero),
+                        asm.ForLoop(
+                            i,
+                            zero,
+                            n,
+                            asm.Block(
+                                (
+                                    asm.Assign(e, add(a, b)),
+                                    asm.Assign(acc, add(acc, mul(e, i))),
+                                )
+                            ),
+                        ),
+                        asm.Assign(y, mul(add(a, b), two)),
+                        asm.Return(add(acc, y)),
+                    )
+                ),
+            ),
+        )
+    )
