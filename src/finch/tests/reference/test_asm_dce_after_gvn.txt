@@ -1,0 +1,12 @@
+def gvn(a: finch.int64, b: finch.int64, n: finch.int64) -> finch.int64:
+    s: finch.int64 = add(a, b)
+    x: finch.int64 = 0
+    if lt(a, b):
+        x: finch.int64 = mul(s, 2)
+    else:
+        x: finch.int64 = mul(s, 2)
+    acc: finch.int64 = 0
+    for i in range(0, n):
+        acc: finch.int64 = add(acc, mul(s, i))
+    y: finch.int64 = x
+    return add(acc, y)
