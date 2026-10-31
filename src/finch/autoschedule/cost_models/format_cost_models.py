@@ -50,8 +50,9 @@ def alias_blocks(
     Return the stats and fused fields of each block of alias in term, in program
     order. A block is a query which defines alias and the in-place updates which
     follow it, and its stats are the union of the supports of its results, with
-    the fill of alias. Every block stores the same rank. term is evaluated from
-    the bindings of machine.
+    the fill of alias. An alias which term reads but never defines, such as an
+    input, is one block of its binding. Every block stores the same rank. term
+    is evaluated from the bindings of machine.
     """
     stats_factory = machine.stats_factory
     stats_interpreter = StatsMachine(stats_factory, OrderedDict(machine.bindings))
@@ -91,6 +92,8 @@ def alias_blocks(
                 raise ValueError(f"Unsupported statement type: {stmt}")
 
     visit_stmt(term)
+    if not blocks and alias in machine.bindings:
+        blocks.append((machine.bindings[alias], ()))
     if len({len(stats.index_order) - len(over) for stats, over in blocks}) > 1:
         raise ValueError(f"Cannot change the rank of allocated tensor {alias}.")
     return blocks

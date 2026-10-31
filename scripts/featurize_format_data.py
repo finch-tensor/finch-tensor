@@ -3,7 +3,9 @@ Extract the basis features of the programs which generate_format_data wrote
 to DIR, or of those of one chunk, and write them to DIR/data as JSON. The features
 come from each program, its formats of A, B, and C, and the stats of its inputs,
 so they are extracted without compiling or running it, and a new basis needs
-no new timings.
+no new timings. The inputs are copied into their formats by Finch.jl, and each
+value they store is set to 1, so that their stats count the values each format
+stores.
 
     pixi run -e fitting python -m scripts.featurize_format_data \
         DIR [--chunk K]
@@ -16,13 +18,22 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from finch.autoschedule.cost_models import ByKind, ElementLevelOption, LevelBasis
+from finch.algebra import Tensor
+from finch.autoschedule.cost_models import (
+    ByKind,
+    ElementLevelOption,
+    LevelBasis,
+    LevelOption,
+)
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter.smart_formatter import LEVEL_OPTIONS
 from finch.autoschedule.tensor_stats import DCStatsFactory
+from finch.compile_jl.interop import jl_tensor_to_python
 from finch.finch_logic import LogicLoader
 from finch.symbolic import UnvalidatedForm
+from finch.tensor import ElementLevel
 from scripts.generate_format_data import examples, load, path
+from scripts.time_format_data import reformat
 
 BASIS = ByKind(
     {
@@ -50,6 +61,19 @@ class FeatureLoader(UnvalidatedForm, LogicLoader):
         return SimpleNamespace(main=lambda *args: ()), bindings
 
 
+def stored(tns: Tensor, options: list[LevelOption]) -> Tensor:
+    """A copy of tns with the level options, each value of which it stores is 1."""
+    copy = jl_tensor_to_python(reformat(tns, options).raw_julia_obj)
+    lvl = copy.lvl
+    while True:
+        match lvl:
+            case ElementLevel(_, val):
+                val.arr[:] = 1
+                return copy
+            case _:
+                lvl = lvl.lvl
+
+
 def features(plan, formats, bindings) -> np.ndarray:
     """The basis features of plan, as the executor would format it."""
     loader = FeatureLoader(formats)
@@ -60,7 +84,9 @@ def features(plan, formats, bindings) -> np.ndarray:
 def featurize(directory: Path, chunk) -> None:
     names = examples(directory, chunk)
     for i, example in enumerate(names, 1):
-        rows = features(*load(directory, example))
+        plan, formats, bindings = load(directory, example)
+        bindings = {tns: stored(arg, formats[tns]) for tns, arg in bindings.items()}
+        rows = features(plan, formats, bindings)
         path(directory, example, "features.json").write_text(
             json.dumps({"features": rows.tolist()})
         )
