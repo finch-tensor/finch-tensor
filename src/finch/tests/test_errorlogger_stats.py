@@ -15,7 +15,6 @@ from finch.autoschedule.factorizer.optimize import DefaultLogicFactorizer
 from finch.autoschedule.formatter import DefaultLogicFormatter
 from finch.autoschedule.loop_orderer import DefaultLoopOrderer
 from finch.autoschedule.tensor_stats.errorlogger_stats import (
-    ErrorLog,
     ErrorLoggerStatsFactory,
     ErrorReport,
 )
@@ -50,7 +49,7 @@ def test_errorlogger_uniform_random_matmul():
     matrix = sps.csr_array(DATASETS["Uniform Random"]())
     tensor = ft.asarray(matrix)
     factories = tuple(make_models().values())
-    logger = ErrorLoggerStatsFactory(*factories, log=ErrorLog())
+    logger = ErrorLoggerStatsFactory(*factories)
     schedule = LogicNormalizer(LogicExecutor(jl_load, stats_factory=logger))
     kernel = make_kernel_stats(logger, tensor)("SpGEMM")
     with ft.with_default_scheduler(schedule):
@@ -73,9 +72,9 @@ def test_errorlogger_uniform_random_matmul():
 )
 def test_errorlogger_web_notre_dame_matmul():
     matrix = sps.csr_array(DATASETS["web-NotreDame"]())
-    tensor = ft.asarray(matrix)
+    tensor = ft.asarray(sps.csr_array(DATASETS["web-NotreDame"]()))
     factories = tuple(make_models().values())
-    logger = ErrorLoggerStatsFactory(*factories, log=ErrorLog())
+    logger = ErrorLoggerStatsFactory(*factories)
     schedule = LogicNormalizer(LogicExecutor(jl_load, stats_factory=logger))
     kernel = make_kernel_stats(logger, tensor)("SpGEMM")
     with ft.with_default_scheduler(schedule):

@@ -20,18 +20,14 @@ class ErrorLoggerStatsFactory(
     BaseTensorStatsFactory["ErrorLoggerStats"],
     StatsFactory["ErrorLoggerStats"],
 ):
-    def __init__(
-        self,
-        *factories: StatsFactory[Any],
-        log: ErrorLog | None = None,
-    ):
+    def __init__(self, *factories: StatsFactory[Any]):
         if not factories:
             raise ValueError("At least one estimator is required")
 
         super().__init__(ErrorLoggerStats)
         self.factories = factories
         self.exact_factory = ExactStatsFactory()
-        self.log = ErrorLog() if log is None else log
+        self.log = ErrorLog()
 
         # Sampling factories with the same budget share one seed dict
         seeds: dict[int, dict[tuple[Field, int], int]] = {}
