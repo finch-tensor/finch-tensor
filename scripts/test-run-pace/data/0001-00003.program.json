@@ -1,9 +1,0 @@
-{
-  "program": "fuse(q):\n    fuse(m):\n        C[m, q] = Aggregate(add, 0.0, MapJoin(mul, A[q], B[m, q]), )\nreturn C\n",
-  "formats": {
-    "C": [
-      "sparse_hash",
-      "dense"
-    ]
-  }
-}
