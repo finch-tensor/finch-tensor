@@ -2,8 +2,8 @@
 # Generate the programs of one chunk of DIR per array task. Submit from the
 # repository, or run every step with scripts/launch_format_data.sh.
 #
-#     sbatch scripts/generate_format_data.slurm DIR [--examples N] \
-#         [--lg-max-space N] [--lg-max-dim N] [--seed S]
+#     sbatch scripts/generate_format_data.slurm DIR [--programs N] \
+#         [--samples N] [--keep N] [--lg-max-space N] [--lg-max-dim N] [--seed S]
 #
 # The seed defaults to the job ID, so each submission draws new programs.
 #SBATCH --job-name=generate-format-data

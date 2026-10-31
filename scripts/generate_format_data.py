@@ -1,16 +1,18 @@
 """
 Draw programs for fitting the formatter's cost model, and their inputs. Each
 program is a random subprogram of C_lmq += A_jlpq * B_kmpq, with a drawn loop
-order and formats of A, B, and C, and its inputs are R-MAT tensors which give C
-a drawn sparsity. Each program is written to DIR/data as JSON, with the text of
-its logic plan, the formats of A, B, and C, and the paths of their binsparse
-files, under the name of its chunk and its index in the chunk, so jobs of
-different chunks can share DIR. The inputs are stored as COO, and C as an empty
-COO tensor of its rank.
+order and formats of A, B, and C, and its inputs are R-MAT tensors of drawn
+densities. Of the samples draws of the inputs of a program, keep are kept,
+spread evenly over the densities of A, B, and C, and each makes an example with
+the program. Each example is written to DIR/data as JSON, with the text of its
+logic plan, the formats of A, B, and C, and the paths of their binsparse files,
+under the name of its chunk and its index in the chunk, so jobs of different
+chunks can share DIR. The inputs are stored as COO, and C as an empty COO tensor
+of its rank.
 
     pixi run -e fitting python -m scripts.generate_format_data \
-        DIR [--examples N] [--chunk K] [--lg-max-space N] [--lg-max-dim N] \
-        [--seed S]
+        DIR [--programs N] [--samples N] [--keep N] [--chunk K] \
+        [--lg-max-space N] [--lg-max-dim N] [--seed S]
 """
 
 import argparse
@@ -105,10 +107,10 @@ def program(rng, lg_max_space, lg_max_dim):
             break
     order = shuffled(rng, idxs)
     A_idxs = tuple(Field(idx) for idx in with_subsequence(order, "jlpq"))
-    #if rng.random() < 0.2:
+    # if rng.random() < 0.2:
     #    A_idxs = shuffled(rng, A_idxs)
     B_idxs = tuple(Field(idx) for idx in with_subsequence(order, "kmpq"))
-    #if rng.random() < 0.2:
+    # if rng.random() < 0.2:
     #    B_idxs = shuffled(rng, B_idxs)
     C_idxs = tuple(Field(idx) for idx in with_subsequence(order, "lmq"))
     if rng.random() < 0.3:
@@ -146,43 +148,87 @@ def choose_seed(rng, idxs, lg_dims):
     return seed(skews, sparsity)
 
 
-def inputs(rng, prgm, input_fields, output_fields, lg_dims, dtype):
-    samples = []
-    for _ in range(100):
-        seeds = {
-            name: choose_seed(rng, idxs, lg_dims) for name, idxs in input_fields.items()
-        }
-        inputs = {
-            name: rmat(S, [lg_dims[idx.name] for idx in input_fields[name]], dtype, rng)
-            for name, S in seeds.items()
-        }
-        # The default scheduler interprets, which is too slow to run this often.
-        outputs = COMPILE_NUMBA(
-            prgm, {name: fl.asarray(tns) for name, tns in inputs.items()}
+def inputs(rng, input_fields, lg_dims, dtype):
+    return {
+        name: rmat(
+            choose_seed(rng, idxs, lg_dims),
+            [lg_dims[idx.name] for idx in idxs],
+            dtype,
+            rng,
         )
-        nnzs = {
-            name: np.count_nonzero(np.asarray(output))
-            for name, output in zip(output_fields, outputs, strict=True)
-        }
-        samples.append((inputs, nnzs))
-    output_sparsities = {
-        name: choose_seed(rng, idxs, lg_dims).sum()
-        for name, idxs in output_fields.items()
+        for name, idxs in input_fields.items()
     }
 
-    # Select the sample with the closest output sparsity, in log. An empty
-    # output counts as one nonzero.
-    def distance(sample):
-        _, nnzs = sample
-        return sum(
-            abs(
-                np.log2(max(nnz, 1) / output_sparsities[name])
-                - sum(lg_dims[idx.name] for idx in output_fields[name])
-            )
-            for name, nnz in nnzs.items()
-        )
 
-    return min(samples, key=distance)
+def lg_densities(prgm, input_fields, output_fields, lg_dims, tensors):
+    """
+    The log nonzeros of the inputs and outputs of prgm, each as a fraction of
+    its log size. An empty tensor counts as one nonzero, and a scalar is dense.
+    """
+    # The default scheduler interprets, which is too slow to run this often.
+    outputs = COMPILE_NUMBA(
+        prgm, {name: fl.asarray(tns) for name, tns in tensors.items()}
+    )
+    arrays = {**tensors, **dict(zip(output_fields, outputs, strict=True))}
+    fields = {**input_fields, **output_fields}
+
+    def fraction(name):
+        lg_size = sum(lg_dims[idx.name] for idx in fields[name])
+        nnz = max(np.count_nonzero(np.asarray(arrays[name])), 1)
+        return np.log2(nnz) / lg_size if lg_size else 1.0
+
+    return [fraction(name) for name in fields]
+
+
+def spread(rng, points, n):
+    """
+    The indices of n of points, each the nearest to a uniform draw from the
+    unit cube which no earlier draw took.
+    """
+    points = np.asarray(points)
+    chosen: list[int] = []
+    for target in rng.random((n, points.shape[1])):
+        distance = np.linalg.norm(points - target, axis=1)
+        distance[chosen] = np.inf
+        chosen.append(int(np.argmin(distance)))
+    return chosen
+
+
+def program_inputs(rng, lg_max_space, lg_max_dim, samples, keep):
+    """
+    A drawn program, as its plan with a drawn loop order and the drawn formats
+    of A, B, and C, paired with each of keep of samples draws of its inputs,
+    spread evenly over the log densities of A, B, and C.
+    """
+    prgm, input_fields, output_fields, lg_dims = program(rng, lg_max_space, lg_max_dim)
+    dtype = choose(rng, [np.float32, np.float64])
+    # Each draw of the inputs has its own seed, so a kept draw is drawn again
+    # rather than held while the rest are drawn.
+    seeds = rng.integers(2**63, size=samples)
+    points = [
+        lg_densities(
+            prgm,
+            input_fields,
+            output_fields,
+            lg_dims,
+            inputs(np.random.default_rng(s), input_fields, lg_dims, dtype),
+        )
+        for s in seeds
+    ]
+    query, produces = prgm.bodies
+    loop_order = shuffled(rng, tuple(Field(idx) for idx in lg_dims))
+    plan = Plan((fuse_loop_order(query, loop_order), produces))
+    formats = {
+        tns.name: [choose(rng, list(OPTIONS)) for _ in idxs]
+        for tns, idxs in {**input_fields, **output_fields}.items()
+    }
+    return [
+        (
+            (plan, formats),
+            inputs(np.random.default_rng(seeds[i]), input_fields, lg_dims, dtype),
+        )
+        for i in spread(rng, points, keep)
+    ]
 
 
 def coo(tns: np.ndarray, idx_type) -> FiberTensor:
@@ -239,36 +285,31 @@ def load(
     return plan, formats, bindings
 
 
-def generate(directory: Path, examples, chunk, lg_max_space, lg_max_dim, rng) -> None:
+def generate(
+    directory: Path, programs, chunk, lg_max_space, lg_max_dim, samples, keep, rng
+) -> None:
     (directory / "data").mkdir(parents=True, exist_ok=True)
-    for example in range(examples):
+    example = 0
+    for i in range(programs):
         start = time.perf_counter()
-        name = f"{chunk:04d}-{example:05d}"
-        prgm, input_fields, output_fields, lg_dims = program(
-            rng, lg_max_space, lg_max_dim
-        )
-        dtype = choose(rng, [np.float32, np.float64])
-        idx_type = choose(rng, [np.int32, np.int64])
-        tensors, nnzs = inputs(rng, prgm, input_fields, output_fields, lg_dims, dtype)
-        query, produces = prgm.bodies
-        loop_order = shuffled(rng, tuple(Field(idx) for idx in lg_dims))
-        plan = Plan((fuse_loop_order(query, loop_order), produces))
-        fields = {**input_fields, **output_fields}
-        formats = {
-            tns.name: [choose(rng, list(OPTIONS)) for _ in idxs]
-            for tns, idxs in fields.items()
-        }
-        tensors[C] = np.zeros((0,) * len(output_fields[C]), dtype)
-        paths = {tns.name: f"{name}.{tns.name}.bsp.npz" for tns in fields}
-        record = {"program": str(plan), "formats": formats, "paths": paths}
-        path(directory, name, "program.json").write_text(json.dumps(record, indent=2))
-        for tns, array in tensors.items():
-            file = directory / "data" / paths[tns.name]
-            bsp.save_binsparse(to_binsparse(coo(array, idx_type)), file)
-        lg_C = sum(lg_dims[idx.name] for idx in output_fields[C])
+        pairs = program_inputs(rng, lg_max_space, lg_max_dim, samples, keep)
+        for (plan, formats), tensors in pairs:
+            name = f"{chunk:04d}-{example:05d}"
+            idx_type = choose(rng, [np.int32, np.int64])
+            C_dummy = np.zeros((0,) * len(formats["C"]), tensors[A].dtype)
+            tensors = {**tensors, C: C_dummy}
+            paths = {tns.name: f"{name}.{tns.name}.bsp.npz" for tns in tensors}
+            record = {"program": str(plan), "formats": formats, "paths": paths}
+            path(directory, name, "program.json").write_text(
+                json.dumps(record, indent=2)
+            )
+            for tns, array in tensors.items():
+                file = directory / "data" / paths[tns.name]
+                bsp.save_binsparse(to_binsparse(coo(array, idx_type)), file)
+            example += 1
         print(
-            f"[{example + 1}/{examples}] {name}: fields {''.join(lg_dims)}, "
-            f"C density {nnzs[C] / 2**lg_C:.2g}, {time.perf_counter() - start:.1f}s",
+            f"[{i + 1}/{programs}] {len(pairs)} examples through {name}, "
+            f"{time.perf_counter() - start:.1f}s",
             flush=True,
         )
 
@@ -278,32 +319,48 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("directory", type=Path)
-    parser.add_argument("--examples", type=int, default=10)
+    parser.add_argument("--programs", type=int, default=10)
+    parser.add_argument(
+        "--samples",
+        type=int,
+        default=100,
+        help="the draws of the inputs of each program",
+    )
+    parser.add_argument(
+        "--keep",
+        type=int,
+        default=10,
+        help="the draws of the inputs of each program which are kept as examples",
+    )
     parser.add_argument(
         "--chunk", type=int, default=0, help="the chunk which names the examples"
     )
     parser.add_argument(
         "--lg-max-space",
         type=int,
-        default=17,
+        default=24,
         help="log2 of the most entries all the fields of a program may address",
     )
     parser.add_argument(
         "--lg-max-dim",
         type=int,
-        default=9,
+        default=11,
         help="log2 of the most values of any one field",
     )
     parser.add_argument("--seed", type=int)
     args = parser.parse_args()
+    if args.keep > args.samples:
+        parser.error("--keep may be at most --samples")
     # Chunks drawn with one seed still draw different programs.
     rng = np.random.default_rng(None if args.seed is None else (args.seed, args.chunk))
     generate(
         args.directory,
-        args.examples,
+        args.programs,
         args.chunk,
         args.lg_max_space,
         args.lg_max_dim,
+        args.samples,
+        args.keep,
         rng,
     )
 
