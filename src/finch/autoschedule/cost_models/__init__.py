@@ -1,4 +1,5 @@
 from .cost_models import (
+    Affine,
     Basis,
     ByKind,
     Concat,
@@ -36,6 +37,7 @@ from .loop_cost_models import (
 __all__ = [
     "FLOPS_COST_MODEL",
     "LOOP_COST_MODEL",
+    "Affine",
     "Basis",
     "ByKind",
     "Concat",

@@ -304,6 +304,33 @@ def test_fused_alias_levels_describe_the_largest_slice():
     np.testing.assert_allclose(features[0, :4], [1, 1, 2 * size, size])
 
 
+def test_inputs_are_formatted_from_their_bindings():
+    i, j = Field("i"), Field("j")
+    a, b = HardAlias("a"), HardAlias("b")
+    sf = DCStatsFactory()
+    stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.eye(4)), (i, j))}
+    copy = fuse_loop_order(Query(Table(b, (i, j)), Table(a, (i, j))), (i, j))
+    plan = Plan((copy, Produces((b,))))
+    basis = LevelBasis(DenseLevelOption)
+    formats: dict[Alias, list[LevelOption]] = {
+        a: [DenseLevelOption(), SparseHashLevelOption(), ElementLevelOption()]
+    }
+    dense, sparse, element = basis.components(
+        plan, formats, StatsMachine(sf, dict(stats))
+    )
+
+    # The input stores its 4 rows, and then the one entry of each.
+    assert [(c.depth, c.num_pos) for c in (dense, sparse, element)] == [
+        (0, (1.0,)),
+        (1, (4.0,)),
+        (2, (4.0,)),
+    ]
+    features = basis.get_component_features(dense, StatsMachine(sf, dict(stats)))
+    # The binding allocates the level once, and the copy reads it in order.
+    assert features.shape[0] == 2
+    assert tuple(features[1, -4:] > 0) == (True, False, False, False)
+
+
 def test_format_costs_sum_the_union_of_each_block():
     i = Field("i")
     a, b, c, out = (HardAlias(name) for name in ("a", "b", "c", "out"))

@@ -20,6 +20,7 @@ import numpy as np
 
 from finch.algebra import Tensor
 from finch.autoschedule.cost_models import (
+    Affine,
     ByKind,
     ElementLevelOption,
     LevelBasis,
@@ -35,9 +36,10 @@ from finch.tensor import ElementLevel
 from scripts.generate_format_data import examples, load, path
 from scripts.time_format_data import reformat
 
+# Each kind of level adds a constant to the cost of each of its rows.
 BASIS = ByKind(
     {
-        option.kind: LevelBasis(type(option))
+        option.kind: Affine(LevelBasis(type(option)))
         for option in (*LEVEL_OPTIONS, ElementLevelOption())
     }
 )

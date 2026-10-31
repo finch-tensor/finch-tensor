@@ -9,7 +9,7 @@
 #SBATCH --nodes=1
 #SBATCH --exclusive
 #SBATCH --time=08:00:00
-#SBATCH --array=0-7
+#SBATCH --array=0-31
 #SBATCH --output=time-format-data-%A_%a.log
 #SBATCH --mail-type=FAIL
 

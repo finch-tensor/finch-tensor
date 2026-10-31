@@ -13,6 +13,7 @@ from finch.algebra import TensorFType
 from finch.autoschedule.cost_models import (
     FLOPS_COST_MODEL,
     LOOP_COST_MODEL,
+    Affine,
     ByKind,
     Concat,
     CostModel,
@@ -79,6 +80,8 @@ def random_programs(rng, n_features, n_programs=40):
         ),
         Stratify(PigeonBasis(), 0, [0.3, 0.7]),
         Stratify(Quadratic(TransposeBasis()), 0, [0.5]),
+        Affine(PigeonBasis()),
+        Affine(Stratify(PigeonBasis(), 0, [0.5])),
     ],
 )
 def test_linear_model_fits_program_runtimes(rng, basis):

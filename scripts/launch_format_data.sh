@@ -15,7 +15,7 @@ set -euo pipefail
 usage="usage: $0 [--account A] [--chunks N] [--repeat N] DIR \
 [generate_format_data options]"
 account=
-chunks=8
+chunks=32
 repeat=5
 while [[ $# -gt 0 ]]; do
   case $1 in

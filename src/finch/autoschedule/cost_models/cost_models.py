@@ -265,6 +265,29 @@ class Quadratic(RowMap[C]):
         return np.einsum("ij,ik->ijk", rows, rows).reshape(len(rows), -1)
 
 
+class Affine(RowMap[C]):
+    """
+    The features of each row of a basis followed by a 1, so a linear model of
+    them adds a constant to the cost of each row.
+    """
+
+    @property
+    def n_features(self) -> int:
+        return self.basis.n_features + 1
+
+    @property
+    def ridge(self) -> np.ndarray:
+        return np.append(self.basis.ridge, 1.0)
+
+    @property
+    def constraints(self) -> np.ndarray:
+        constraints = self.basis.constraints
+        return np.hstack([constraints, np.zeros((len(constraints), 1))])
+
+    def transform(self, rows: np.ndarray) -> np.ndarray:
+        return np.hstack([rows, np.ones((len(rows), 1))])
+
+
 class KNearest(RowMap[C]):
     """
     The weights of the k landmark rows nearest each row of a basis by
