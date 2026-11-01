@@ -1,3 +1,4 @@
+import gc
 import math
 from collections import OrderedDict
 
@@ -36,6 +37,7 @@ from finch.autoschedule.tensor_stats import (
     VPStatsFactory,
 )
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
+from finch.autoschedule.tensor_stats.memo_stats import MemoStatsFactory
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -1070,6 +1072,92 @@ def test_exact_embedding():
     assert emb_r[0] == pytest.approx(emb[1])
     assert emb_r[1] == pytest.approx(emb[0])
     assert emb_r[2] == pytest.approx(emb[2])
+
+
+# ─────────────────────────────── MemoStats tests ────────────────────────────────
+
+
+def _random_sparse(rng, *shape):
+    return (rng.random(shape) < 0.3) * (rng.random(shape) + 1.0)
+
+
+@pytest.mark.parametrize(
+    "inner", [ExactStatsFactory, DCStatsFactory, UniformStatsFactory]
+)
+def test_memo_matches_inner(inner):
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
+    rng = np.random.default_rng(0)
+    A, B, C, D = (ft.asarray(_random_sparse(rng, 4, 4)) for _ in range(4))
+    ab = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(
+            Literal(ffuncs.mul), (Table(Literal(A), (i, j)), Table(Literal(B), (j, k)))
+        ),
+        (j,),
+    )
+    cd = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(
+            Literal(ffuncs.mul), (Table(Literal(C), (i, m)), Table(Literal(D), (m, k)))
+        ),
+        (m,),
+    )
+    node = MapJoin(Literal(ffuncs.add), (ab, cd))
+
+    expected = insert_statistics(inner(), node, OrderedDict(), False, {})
+    stats = insert_statistics(MemoStatsFactory(inner()), node, OrderedDict(), False, {})
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        expected.estimate_non_fill_values()
+    )
+    assert stats.estimate_non_fill_values((i,)) == pytest.approx(
+        expected.estimate_non_fill_values((i,))
+    )
+
+
+def test_memo_computes_each_expression_once():
+    class CountingFactory(ExactStatsFactory):
+        def __init__(self):
+            super().__init__()
+            self.aggregates = 0
+
+        def aggregate(self, *args):
+            self.aggregates += 1
+            return super().aggregate(*args)
+
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
+    A, B, C = np.ones((2, 10)), np.ones((10, 3)), np.ones((3, 4))
+    inner = CountingFactory()
+    factory = MemoStatsFactory(inner)
+    a = factory(ft.asarray(A), (i, j))
+    b = factory(ft.asarray(B), (j, k))
+    c = factory(ft.asarray(C), (k, m))
+
+    def matmul(x, y, idx):
+        return factory.aggregate(
+            ffuncs.add, None, (idx,), factory.mapjoin(ffuncs.mul, x, y)
+        )
+
+    ab_c = matmul(matmul(a, b, j), c, k)
+    assert inner.aggregates == 2
+    again = matmul(matmul(a, b, j), c, k)
+    assert inner.aggregates == 2
+    assert again.inner is ab_c.inner
+    assert ab_c.estimate_non_fill_values() == np.count_nonzero(A @ B @ C)
+
+
+def test_memo_leaf_cache_is_weak():
+    factory = MemoStatsFactory()
+    tensor = ft.asarray(np.eye(3))
+    stats = factory(tensor, (Field("i"), Field("j")))
+    relabeled = factory(tensor, (Field("k"), Field("l")))
+    assert len(factory.leaves) == 1
+    assert relabeled.estimate_non_fill_values() == 3
+
+    del tensor, stats, relabeled
+    gc.collect()
+    assert not factory.leaves
 
 
 # ─────────────────────────────── DummyStats tests ────────────────────────────────

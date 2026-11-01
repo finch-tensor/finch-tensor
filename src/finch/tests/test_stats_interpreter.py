@@ -12,6 +12,7 @@ from finch.autoschedule.tensor_stats import (
 )
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finch.autoschedule.tensor_stats.logic_to_stats import insert_statistics
+from finch.autoschedule.tensor_stats.memo_stats import MemoStatsFactory
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.autoschedule.tensor_stats.stats_interpreter import (
     StatsInterpreter,
@@ -40,6 +41,7 @@ from finch.finch_logic import (
         (DCStatsFactory, 1),  # Degree bounds conservatively count any scalar as one.
         (UniformStatsFactory, 0),
         (ExactStatsFactory, 0),
+        (MemoStatsFactory, 1),  # A memo of DC statistics, as above.
         (SamplingStatsFactory, 0),
     ],
 )
@@ -79,7 +81,8 @@ def test_fill_table_statistics(use_interpreter, factory_cls, expected_nnz, fill_
 
 @pytest.mark.parametrize("use_interpreter", [False, True])
 @pytest.mark.parametrize(
-    "factory_cls", [DCStatsFactory, UniformStatsFactory, ExactStatsFactory]
+    "factory_cls",
+    [DCStatsFactory, UniformStatsFactory, ExactStatsFactory, MemoStatsFactory],
 )
 @pytest.mark.parametrize("op", [ffuncs.add, ffuncs.overwrite])
 def test_elementwise_updates_join_their_operands(use_interpreter, factory_cls, op):
