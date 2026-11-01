@@ -331,12 +331,44 @@ class Full(NotationTree, NotationExpression):
         return [self.val, *self.shape]
 
 
+class Protocol(NotationNode):
+    """
+    Notation AST node representing how a loop visits an index of a tensor it
+    reads, as in Finch.jl.
+    """
+
+
+@dataclass(eq=True, frozen=True)
+class DefaultProtocol(Protocol):
+    """Lets the tensor choose how the loop visits the index."""
+
+
+@dataclass(eq=True, frozen=True)
+class Walk(Protocol):
+    """Steps through the indices which the tensor stores."""
+
+
+@dataclass(eq=True, frozen=True)
+class Gallop(Protocol):
+    """Skips ahead to the next index which every galloped tensor stores."""
+
+
+@dataclass(eq=True, frozen=True)
+class Follow(Protocol):
+    """Looks up each index which the loop visits."""
+
+
 @dataclass(eq=True, frozen=True)
 class Read(AccessMode):
     """
     Notation AST node representing a read-only access mode for a tensor.
     This mode allows reading the value of a tensor without modifying it.
+    Attributes:
+        protocols: The protocol of each index of the access, or none to let
+            the tensor choose every protocol.
     """
+
+    protocols: tuple[Protocol, ...] = ()
 
     @property
     def children(self):
@@ -847,6 +879,14 @@ class NotationPrinterContext(Context):
             case Assign(Variable(var_n, var_t), val):
                 self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
                 return None
+            case DefaultProtocol():
+                return "default"
+            case Walk():
+                return "walk"
+            case Gallop():
+                return "gallop"
+            case Follow():
+                return "follow"
             case Dimension(tns, r):
                 tns_e = self(tns)
                 r_e = self(r)
@@ -857,7 +897,14 @@ class NotationPrinterContext(Context):
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]
                 match mode:
-                    case Read():
+                    case Read(protocols):
+                        if protocols:
+                            idxs_e = [
+                                idx
+                                if proto == DefaultProtocol()
+                                else f"{self(proto)}({idx})"
+                                for idx, proto in zip(idxs_e, protocols, strict=True)
+                            ]
                         return f"read({tns_e}, {idxs_e})"
                     case Update(op):
                         op_e = self(op)

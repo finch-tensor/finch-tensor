@@ -37,6 +37,19 @@ from .stages import CompilerForm, FormattedForm, LogicNotationLowerer
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_NOTATION)
 
 
+def lower_protocol(proto: lgc.Protocol) -> ntn.Protocol:
+    match proto:
+        case lgc.DefaultProtocol():
+            return ntn.DefaultProtocol()
+        case lgc.Walk():
+            return ntn.Walk()
+        case lgc.Gallop():
+            return ntn.Gallop()
+        case lgc.Follow():
+            return ntn.Follow()
+    raise ValueError(f"Unrecognized protocol: {proto}")
+
+
 class PointwiseContext:
     def __init__(self, ctx: NotationContext):
         self.ctx = ctx
@@ -56,14 +69,22 @@ class PointwiseContext:
                     ),
                 )
             case lgc.Table(lgc.Alias() as var, idxs):
+                stored = self.ctx.stored_idxs(var.unfused, idxs)
+                match var:
+                    case lgc.ProtocolAlias(_, protocols):
+                        mode = ntn.Read(
+                            tuple(
+                                lower_protocol(proto)
+                                for proto in protocols[len(idxs) - len(stored) :]
+                            )
+                        )
+                    case _:
+                        mode = ntn.Read()
                 return ntn.Unwrap(
                     ntn.Access(
                         self.ctx.slots[var.unfused],
-                        ntn.Read(),
-                        tuple(
-                            loops[idx]
-                            for idx in self.ctx.stored_idxs(var.unfused, idxs)
-                        ),
+                        mode,
+                        tuple(loops[idx] for idx in stored),
                     )
                 )
             case lgc.Literal(val):
@@ -647,7 +668,7 @@ def enforce_lifecycles(root: ntn.NotationStatement) -> ntn.NotationStatement:
         reads: list[tuple[Any, ntn.AccessMode | None, ntn.AccessMode]] = [
             (x.tns, read, read)
             for x in PostOrderDFS(stmt)
-            if isinstance(x, ntn.Access) and x.mode == read
+            if isinstance(x, ntn.Access) and isinstance(x.mode, ntn.Read)
         ]
         match stmt:
             case ntn.Increment(ntn.Access(tns, mode, _), _):

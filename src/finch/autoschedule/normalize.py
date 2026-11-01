@@ -14,6 +14,7 @@ from finch.finch_logic import (
     LogicNode,
     Plan,
     Produces,
+    ProtocolAlias,
     Query,
     QueryInto,
     Relabel,
@@ -62,6 +63,10 @@ def normalize_names(
                 renamed = rule_0(alias)
                 assert isinstance(renamed, HardAlias)
                 return FusedAlias(renamed, n)
+            case ProtocolAlias(alias, protocols):
+                renamed = rule_0(alias)
+                assert isinstance(renamed, HardAlias | FusedAlias)
+                return ProtocolAlias(renamed, protocols)
             case Alias(name):
                 if name in renames:
                     return HardAlias(renames[name])

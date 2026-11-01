@@ -444,9 +444,35 @@ class Field(LogicNode, NamedTerm):
         return self.name
 
 
+class Protocol(LogicNode):
+    """
+    How a loop visits a field of a table it reads, as in Finch.jl.
+    """
+
+
+@dataclass(eq=True, frozen=True)
+class DefaultProtocol(Protocol):
+    """Lets the tensor choose how the loop visits the field."""
+
+
+@dataclass(eq=True, frozen=True)
+class Walk(Protocol):
+    """Steps through the indices which the tensor stores."""
+
+
+@dataclass(eq=True, frozen=True)
+class Gallop(Protocol):
+    """Skips ahead to the next index which every galloped tensor stores."""
+
+
+@dataclass(eq=True, frozen=True)
+class Follow(Protocol):
+    """Looks up each index which the loop visits."""
+
+
 @dataclass(eq=True, frozen=True)
 class Alias(LogicNode, NamedTerm):
-    """Shared base for hard and fused aliases referring to tensors."""
+    """Shared base for hard, fused, and protocol aliases referring to tensors."""
 
     name: str
 
@@ -540,6 +566,39 @@ class FusedAlias(Alias):
         return self.n
 
 
+@dataclass(eq=True, frozen=True, init=False)
+class ProtocolAlias(Alias):
+    """A view of an alias whose table reads each of its fields with a protocol.
+
+    The protocols follow the fields of the table, and only apply to reads.
+    """
+
+    __match_args__ = ("alias", "protocols")
+    name: str = field(init=False, repr=False)
+    alias: HardAlias | FusedAlias
+    protocols: tuple[Protocol, ...]
+
+    def __init__(self, alias: HardAlias | FusedAlias, protocols: tuple[Protocol, ...]):
+        match alias:
+            case ProtocolAlias():
+                raise ValueError("ProtocolAlias must wrap an alias without protocols")
+            case HardAlias() | FusedAlias():
+                pass
+            case _:
+                raise TypeError("ProtocolAlias must wrap a HardAlias or FusedAlias")
+        object.__setattr__(self, "name", alias.name)
+        object.__setattr__(self, "alias", alias)
+        object.__setattr__(self, "protocols", tuple(protocols))
+
+    @property
+    def unfused(self) -> Alias:
+        return self.alias.unfused
+
+    @property
+    def nfused(self) -> int:
+        return self.alias.nfused
+
+
 @dataclass(eq=True, frozen=True)
 class Table(LogicTree, LogicExpression):
     """
@@ -556,7 +615,12 @@ class Table(LogicTree, LogicExpression):
 
     def __post_init__(self):
         match self.tns:
-            case FusedAlias(_, n) if n > len(self.idxs):
+            case ProtocolAlias(_, protocols) if len(protocols) != len(self.idxs):
+                raise ValueError("A table needs one protocol for each field")
+        match self.tns:
+            case FusedAlias(_, n) | ProtocolAlias(FusedAlias(_, n), _) if n > len(
+                self.idxs
+            ):
                 raise ValueError("The fused dimension count exceeds the table rank")
 
     @property
@@ -1162,10 +1226,30 @@ class LogicPrinterContext(Context):
                 return str(name)
             case FusedAlias(alias, n):
                 return f"FusedAlias({self(alias)}, {n})"
+            case DefaultProtocol():
+                return "default"
+            case Walk():
+                return "walk"
+            case Gallop():
+                return "gallop"
+            case Follow():
+                return "follow"
+            case ProtocolAlias(alias, protocols):
+                names = ", ".join(self(proto) for proto in protocols)
+                return f"ProtocolAlias({self(alias)}, ({names}))"
             case Alias(name):
                 return str(name)
             case Table(tns, idxs):
                 idxs_e = [self(idx) for idx in idxs]
+                match tns:
+                    case ProtocolAlias(alias, protocols):
+                        idxs_e = [
+                            idx
+                            if proto == DefaultProtocol()
+                            else f"{self(proto)}({idx})"
+                            for idx, proto in zip(idxs_e, protocols, strict=True)
+                        ]
+                        tns = alias
                 match tns:
                     case FusedAlias(alias, n):
                         return (

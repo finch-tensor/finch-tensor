@@ -63,6 +63,9 @@ def _start_julia() -> tuple[Any, Any]:
     for pkg in _JULIA_PACKAGES:
         Main.seval(f"using {pkg}")
 
+    # Finch.jl's follow protocol for sparse lists refers to scansearch and
+    # SubFiber unqualified, in the module which defines the kernel.
+    Main.seval("using Finch: SubFiber, scansearch")
     Main.seval("first_arg(x, y...) = x")
     Main.include(str(Path(__file__).with_name("buffers.jl")))
 
