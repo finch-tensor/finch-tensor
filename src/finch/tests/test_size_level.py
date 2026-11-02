@@ -28,8 +28,7 @@ import numpy as np
 
 import finch as fl
 from finch.algebra import StaticFillFType
-from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
-from finch.autoschedule.tensor_stats import DCStatsFactory
+from finch.autoschedule.tensor_stats import DCStatsFactory, StatsInterpreter
 from finch.finch_logic import Field, Literal, Table
 from finch.tensor.level.dense_level import DenseLevelFType
 from finch.tensor.level.element_level import ElementLevelFType
@@ -58,13 +57,7 @@ def fields_2d():
 def dc_stats(matrix_4x4, fields_2d):
     factory = DCStatsFactory()
     node = Table(Literal(fl.asarray(matrix_4x4)), fields_2d)
-    stats = insert_statistics(
-        stats_factory=factory,
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(factory)(node, OrderedDict())
     return stats, factory
 
 

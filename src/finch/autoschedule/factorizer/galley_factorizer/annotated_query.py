@@ -13,7 +13,7 @@ from finch.algebra import (
 )
 from finch.algebra.algebra import FinchOperator
 from finch.autoschedule.cost_models import CostModel, FlopsCostModel
-from finch.autoschedule.tensor_stats.logic_to_stats import insert_statistics
+from finch.autoschedule.tensor_stats import StatsInterpreter
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -727,7 +727,7 @@ class AnnotatedQuery(Generic[TS]):
 
         alias_expr = query.lhs.tns
         assert isinstance(alias_expr, Alias)
-        insert_statistics(self.stats_factory, query, self.bindings, False, {})
+        StatsInterpreter(self.stats_factory)(query, self.bindings)
 
         alias_table = Table(alias_expr, query.lhs.idxs)
         transforms: dict[Path, Callable[[LogicNode], LogicNode | None]] = {

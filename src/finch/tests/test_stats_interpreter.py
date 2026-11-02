@@ -11,7 +11,6 @@ from finch.autoschedule.tensor_stats import (
     VPStatsFactory,
 )
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
-from finch.autoschedule.tensor_stats.logic_to_stats import insert_statistics
 from finch.autoschedule.tensor_stats.memo_stats import MemoStatsFactory
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.autoschedule.tensor_stats.stats_interpreter import (
@@ -34,7 +33,6 @@ from finch.finch_logic import (
 )
 
 
-@pytest.mark.parametrize("use_interpreter", [False, True])
 @pytest.mark.parametrize(
     "factory_cls,expected_nnz",
     [
@@ -54,7 +52,7 @@ from finch.finch_logic import (
         DynamicFillFType(ftype((np.float64(0), np.intp(0)))),
     ],
 )
-def test_fill_table_statistics(use_interpreter, factory_cls, expected_nnz, fill_type):
+def test_fill_table_statistics(factory_cls, expected_nnz, fill_type):
     factory = factory_cls()
     fields = (Field("i"), Field("j"))
     alias = HardAlias("a")
@@ -62,12 +60,7 @@ def test_fill_table_statistics(use_interpreter, factory_cls, expected_nnz, fill_
     source.fill_type = fill_type
     bindings: dict[Alias, NumericStats] = {alias: source}
     node = FillTable(alias)
-    if use_interpreter:
-        result = StatsInterpreter(factory)(node, bindings)
-    else:
-        cache = {}
-        result = insert_statistics(factory, node, bindings, False, cache)
-        assert cache[node] is result
+    result = StatsInterpreter(factory)(node, bindings)
 
     assert isinstance(result, NumericStats)
     assert result.index_order == ()
@@ -79,13 +72,12 @@ def test_fill_table_statistics(use_interpreter, factory_cls, expected_nnz, fill_
     assert source.estimate_non_fill_values() == 6
 
 
-@pytest.mark.parametrize("use_interpreter", [False, True])
 @pytest.mark.parametrize(
     "factory_cls",
     [DCStatsFactory, UniformStatsFactory, ExactStatsFactory, MemoStatsFactory],
 )
 @pytest.mark.parametrize("op", [ffuncs.add, ffuncs.overwrite])
-def test_elementwise_updates_join_their_operands(use_interpreter, factory_cls, op):
+def test_elementwise_updates_join_their_operands(factory_cls, op):
     # An update which reduces no fields is the mapjoin of its operands, whatever
     # the fill means to its operator.
     i = Field("i")
@@ -95,10 +87,7 @@ def test_elementwise_updates_join_their_operands(use_interpreter, factory_cls, o
     b_stats = factory(ft.asarray(np.array([0.0, 1.0, 0.0, 0.0])), (i,))
     update = QueryInto(Table(out, (i,)), Literal(op), Table(b, (i,)))
     bindings: dict[Alias, NumericStats] = {a: a_stats, b: b_stats, out: a_stats}
-    if use_interpreter:
-        stats = StatsInterpreter(factory)(update, bindings)
-    else:
-        stats = insert_statistics(factory, update, bindings, replace=False, cache={})
+    stats = StatsInterpreter(factory)(update, bindings)
     assert isinstance(stats, NumericStats)
     expected = factory.mapjoin(op, a_stats, b_stats)
     assert stats.estimate_non_fill_values() == pytest.approx(
@@ -107,15 +96,11 @@ def test_elementwise_updates_join_their_operands(use_interpreter, factory_cls, o
     assert stats.estimate_non_fill_values() < 4
 
 
-@pytest.mark.parametrize("use_interpreter", [False, True])
-def test_fill_table_statistics_requires_binding(use_interpreter):
+def test_fill_table_statistics_requires_binding():
     factory = DCStatsFactory()
     node = FillTable(HardAlias("missing"))
     with pytest.raises(ValueError, match="alias"):
-        if use_interpreter:
-            StatsInterpreter(factory)(node, {})
-        else:
-            insert_statistics(factory, node, {}, False, {})
+        StatsInterpreter(factory)(node, {})
 
 
 @pytest.mark.parametrize(
