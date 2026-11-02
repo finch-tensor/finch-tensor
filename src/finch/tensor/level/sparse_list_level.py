@@ -206,12 +206,11 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
             expr = """finch
             q = ptr_s[pos]
             q_stop = ptr_s[pos + 1]
+            i_stop = 0
+            i_last = 0 - 1
             if (q < q_stop)
                 i_stop = idx_s[q]
                 i_last = idx_s[q_stop - 1]
-            else
-                i_stop = 1
-                i_last = 0
             end
             """
             return parse_assembly(expr, tmp_locals)
@@ -220,8 +219,10 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
             start = ctx.ctx(ext.get_start())
 
             code = f"""finch
-            if (idx_s[q] < {start})
-              q = scansearch(idx_s, {start}, q, q_stop - 1)
+            if (q < q_stop)
+              if (idx_s[q] < {start})
+                q = scansearch(idx_s, {start}, q, q_stop - 1)
+              end
             end
             """
 

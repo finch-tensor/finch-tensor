@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import partial, reduce
+from functools import partial
 from typing import Any
 
 from finch import finch_assembly as asm
@@ -16,6 +16,10 @@ class Looplet(ABC):
     @property
     @abstractmethod
     def pass_request(self): ...
+
+    def truncate(self, ctx, idx, ext):
+        """Restrict the looplet to `ext`, a sub-extent of the one it covers."""
+        return self
 
 
 @dataclass
@@ -67,36 +71,32 @@ class SwitchPass(LoopletPass):
         return 7
 
     def __call__(self, ctx: LoopletContext, idx, ext: SymbolicExtent, body):
-        conditions: list[asm.Call] = []
-
-        def switch_node_if(node):
+        # Lower one switch at a time, the remaining ones are lowered
+        # recursively within each branch.
+        for node in PostOrderDFS(body):
             match node:
-                case ntn.Access(tns, mode, (j, *idxs)):
-                    if j == idx and isinstance(tns, Switch):
-                        conditions.append(tns.cond)
-                        return ntn.Access(tns.if_true, mode, (j, *idxs))
+                case ntn.Access(Switch() as switch, _, (j, *_)) if j == idx:
+                    break
+
+        def switch_node(node, branch):
+            match node:
+                case ntn.Access(tns, mode, (j, *idxs)) if j == idx and tns == switch:
+                    return ntn.Access(branch, mode, (j, *idxs))
             return None
 
-        def switch_node_else(node):
-            match node:
-                case ntn.Access(tns, mode, (j, *idxs)):
-                    if j == idx and isinstance(tns, Switch):
-                        return ntn.Access(tns.if_false, mode, (j, *idxs))
-            return None
-
-        body_if = PostWalk(switch_node_if)(body)
         ctx_2 = ctx.scope()
-        ctx_2(ext, body_if)
+        ctx_2(ext, PostWalk(partial(switch_node, branch=switch.if_true))(body))
 
-        cond = reduce(lambda x, y: asm.Call(asm.L(ffuncs.and_), (x, y)), conditions)
-
-        body_else = PostWalk(switch_node_else)(body)
         ctx_3 = ctx.scope()
-        ctx_3(ext, body_else)
+        ctx_3(ext, PostWalk(partial(switch_node, branch=switch.if_false))(body))
 
         ctx.exec(
             asm.Block(
-                (asm.IfElse(cond, asm.Block(ctx_2.emit()), asm.Block(ctx_3.emit())),)
+                (
+                    asm.IfElse(
+                        switch.cond, asm.Block(ctx_2.emit()), asm.Block(ctx_3.emit())
+                    ),
+                )
             )
         )
 
@@ -132,15 +132,6 @@ class StepperPass(LoopletPass):
         body,
     ) -> None:
 
-        def stepper_body(ctx, node: ntn.NotationNode):
-            match node:
-                case ntn.Access(Stepper() as st, mode, (j, *idxs)) if j == idx:
-                    return ntn.Access(
-                        st.chunk,  # type: ignore[arg-type]
-                        mode,
-                        (j, *idxs),
-                    )
-
         steppers: list[Stepper] = []
 
         for node in PostOrderDFS(body):
@@ -149,59 +140,79 @@ class StepperPass(LoopletPass):
                     ctx.exec(st.seek(ctx, ext))
                     steppers.append(st)
 
-        full_body = Rewrite(PostWalk(lambda node: stepper_body(ctx, node)))(body)
-
-        final_cond = asm.Call(
-            asm.L(ffuncs.lt),
-            (
-                asm.Call(
-                    asm.L(ffuncs.min), tuple(ctx.ctx(s.stop(ctx)) for s in steppers)
-                ),
-                ctx.ctx(ext.get_end()),
-            ),
-        )
-
-        stepper_blocks = []
-
         idx_start = ntn.Variable(ctx.freshen("i_start"), idx.result_type)
         ctx.exec(asm.Assign(ctx.ctx(idx_start), ctx.ctx(ext.get_start())))
 
-        for stepper in steppers:
-            cond = asm.Call(
-                asm.L(ffuncs.eq),
-                (
-                    asm.Call(
-                        asm.L(ffuncs.min), tuple(ctx.ctx(s.stop(ctx)) for s in steppers)
-                    ),
-                    ctx.ctx(stepper.stop(ctx)),
-                ),
-            )
-            ctx_2 = ctx.scope()
-            ext_2 = SymbolicExtent(
-                idx_start,
-                ntn.Call(ntn.L(ffuncs.add), (stepper.stop(ctx), ext.get_unit())),
-            )
-            ctx_2(ext_2, full_body)
-            stepper_block = asm.If(
-                cond,
-                asm.Block(
-                    (
-                        *ctx_2.emit(),
-                        asm.Assign(
-                            ctx.ctx(idx_start),
-                            asm.Call(
-                                asm.L(ffuncs.add),
-                                (ctx.ctx(stepper.stop(ctx)), ctx.ctx(ext_2.get_unit())),
+        ctx_2 = ctx.scope()
+        for st in steppers:
+            ctx_2.exec(st.preamble(ctx_2))
+
+        # Each iteration covers one phase, which ends at the nearest stepper
+        # stop (or at the end of the extent).
+        phase_stop = ntn.Variable(ctx.freshen("phase_stop"), idx.result_type)
+        ctx_2.exec(
+            asm.Assign(
+                ctx_2.ctx(phase_stop),
+                ctx_2.ctx(
+                    ntn.Call(
+                        ntn.L(ffuncs.min),
+                        (
+                            ext.get_end(),
+                            *(
+                                ntn.Call(
+                                    ntn.L(ffuncs.add), (st.stop(ctx_2), ext.get_unit())
+                                )
+                                for st in steppers
                             ),
                         ),
-                        stepper.next(ctx),
-                        stepper.preamble(ctx),
                     )
                 ),
             )
-            stepper_blocks.append(stepper_block)
+        )
+        ext_2 = SymbolicExtent(idx_start, phase_stop)
 
-        ctx.exec(asm.WhileLoop(final_cond, asm.Block(tuple(stepper_blocks))))
+        # Steppers which reach the end of the phase take their full chunk and
+        # advance, the others are truncated to the phase.
+        def stepper_body(node: ntn.NotationNode):
+            match node:
+                case ntn.Access(Stepper() as st, mode, (j, *idxs)) if j == idx:
+                    stop = ntn.Call(ntn.L(ffuncs.add), (st.stop(ctx_2), ext.get_unit()))
+                    full_chunk = Thunk(
+                        body=lambda ctx, ext: st.chunk,
+                        epilogue=lambda ctx, idx: st.next(ctx),
+                    )
+                    truncated_chunk = st.chunk.truncate(  # type: ignore[union-attr]
+                        ctx_2,
+                        idx,
+                        SymbolicExtent(
+                            idx_start,
+                            ntn.Call(ntn.L(ffuncs.min), (phase_stop, st.stop(ctx_2))),
+                        ),
+                    )
+                    return ntn.Access(
+                        Switch(
+                            asm.Call(
+                                asm.L(ffuncs.eq),
+                                (ctx_2.ctx(stop), ctx_2.ctx(phase_stop)),
+                            ),
+                            full_chunk,
+                            truncated_chunk,
+                        ),
+                        mode,
+                        (j, *idxs),
+                    )
+
+        ctx_2(ext_2, Rewrite(PostWalk(stepper_body))(body))
+        ctx_2.exec(asm.Assign(ctx_2.ctx(idx_start), ctx_2.ctx(phase_stop)))
+
+        ctx.exec(
+            asm.WhileLoop(
+                asm.Call(
+                    asm.L(ffuncs.lt), (ctx.ctx(idx_start), ctx.ctx(ext.get_end()))
+                ),
+                asm.Block(ctx_2.emit()),
+            )
+        )
 
 
 @dataclass
@@ -214,40 +225,13 @@ class Sequence(Looplet):
     def pass_request(self):
         return SequencePass()
 
-    def truncate(
-        self,
-        ctx: LoopletContext,
-        current_ext: SymbolicExtent,
-        remaining_ext: SymbolicExtent,
-    ):
-        if prove(
-            ntn.Call(
-                ntn.L(ffuncs.ge),
-                (
-                    ntn.Call(
-                        ntn.L(ffuncs.sub),
-                        (current_ext.get_end(), current_ext.get_unit()),
-                    ),
-                    remaining_ext.get_end(),
-                ),
-            )
-        ):
-            return Run(self.head)
-        if prove(
-            ntn.Call(
-                ntn.L(ffuncs.eq),
-                (current_ext.get_end(), remaining_ext.get_end()),
-            )
-        ):
-            return self
-        return Switch(
-            asm.Call(
-                asm.L(ffuncs.lt),
-                (ctx.ctx(remaining_ext.get_end()), ctx.ctx(current_ext.get_end())),
-            ),
-            self,
-            Run(self.head),
-        )
+    def truncate(self, ctx: LoopletContext, idx, ext: SymbolicExtent):
+        split = self.split(ctx, ext)
+        if prove(ntn.Call(ntn.L(ffuncs.ge), (split, ext.get_end()))):
+            return self.head(ctx, idx)
+        if prove(ntn.Call(ntn.L(ffuncs.le), (split, ext.get_start()))):
+            return self.tail(ctx, idx)
+        return self
 
 
 class SequencePass(LoopletPass):

@@ -138,3 +138,59 @@ def test_asm_sparse_elemwise(file_regression, caplog, numba_compiler):
     file_regression.check(
         reset_name_counts(str(handler.records[0].msg)), extension=".txt"
     )
+
+
+def _sparse_list(arr: np.ndarray) -> SparseListLevel:
+    """Store the last dimension of `arr` in a sparse list level, CSR style."""
+    rows = arr.reshape(-1, arr.shape[-1])
+    ptr, idx = [0], list[int]()
+    for row in rows:
+        idx.extend(np.flatnonzero(row))
+        ptr.append(len(idx))
+    elem_ftype = element(
+        arr.dtype.type(0), ftype(arr.dtype.type), ftype(np.intp), NumpyBufferFType
+    )
+    return SparseListLevel(
+        ElementLevel(elem_ftype, NumpyBuffer(rows[rows != 0])),
+        np.intp(arr.shape[-1]),
+        NumpyBuffer(np.array(ptr, dtype=np.intp)),
+        NumpyBuffer(np.array(idx, dtype=np.intp)),
+    )
+
+
+def _sparse_tensor(arr: np.ndarray) -> FiberTensor:
+    match arr.shape:
+        case (_,):
+            return FiberTensor(_sparse_list(arr))
+        case (m, _):
+            return FiberTensor(DenseLevel(_sparse_list(arr), np.intp(m)))
+    raise ValueError(arr.shape)
+
+
+@pytest.mark.usefixtures("numba_compiler")
+@pytest.mark.parametrize(
+    ("ft_op", "np_op"),
+    [
+        (ft.add, np.add),
+        (ft.subtract, np.subtract),
+        (ft.multiply, np.multiply),
+    ],
+)
+def test_sparse_sparse_elementwise(ft_op, np_op, rng):
+    cases = [
+        # empty rows next to stored ones
+        (np.array([[1, 2], [0, 0]]), np.array([[0, 0], [3, 0]])),
+        (np.array([[0], [1], [0], [5], [8]]), np.zeros((5, 1), dtype=int)),
+        # stepping past the last stored index of one of the operands
+        (np.array([5, 0, 3, 0]), np.array([0, 0, 1, 0])),
+        (np.array([5, 0, 3, 0]), np.array([6, 0, 8, 2])),
+        (np.array([0, 0, 0, 0, 0, 5]), np.array([0, 2, 0, 7, 0, 0])),
+    ]
+    for _ in range(10):
+        shape = tuple(rng.integers(1, 7, 2))
+        a, b = (rng.integers(1, 9, shape) * (rng.random(shape) < 0.4) for _ in range(2))
+        cases += [(a, b), (a[0], b[0])]
+
+    for a, b in cases:
+        res = ft_op(_sparse_tensor(a), _sparse_tensor(b))
+        np.testing.assert_array_equal(res.to_numpy(), np_op(a, b))
