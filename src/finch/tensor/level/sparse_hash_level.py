@@ -453,6 +453,9 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
     def level_default_protocols(self):
         return (ntn.Walk(), *self.lvl_t.level_default_protocols())
 
+    def level_protocols(self):
+        return ((ntn.Walk(), ntn.Follow()), *self.lvl_t.level_protocols())
+
     def construct(self, shape: tuple[Any, ...], *, pos: int) -> "SparseHashLevel":
         lvl = self.lvl_t.construct(shape=shape[1:], pos=0)
         return SparseHashLevel(

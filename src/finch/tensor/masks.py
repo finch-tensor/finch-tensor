@@ -176,6 +176,9 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
         # The mask walks its body within the triangle.
         return (ntn.Walk(), *self.body.level_default_protocols()[1:])
 
+    def level_protocols(self):
+        return ((ntn.Walk(),), *self.body.level_protocols()[1:])
+
 
 @dataclass
 class LoTriMask(Level):

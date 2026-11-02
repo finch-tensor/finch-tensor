@@ -26,7 +26,7 @@ from finch.autoschedule.util import fuse_loop_order, push_fields
 from finch.codegen import CCompiler, MLIRCompiler, NumbaCompiler
 from finch.compile import CompilerMode, NotationCompiler, make_extent
 from finch.symbolic import PostOrderDFS
-from finch.tensor import dense, element, fiber_tensor
+from finch.tensor import dense, element, fiber_tensor, sparse_list
 from finch.tensor.masks import LoTriMaskFType
 from finch.tensor.patterns import EyeTensor
 
@@ -349,3 +349,16 @@ def test_protocolize_states_the_default_protocols_of_levels():
         *with_workspaces(program, *bindings.values())
     )
     np.testing.assert_array_equal(result.to_numpy(), data_a @ data_b)
+
+
+def test_tensors_support_protocols_in_each_dimension():
+    csr = fiber_tensor(dense(sparse_list(element(0.0), ftype(np.intp))))
+    walk = (ntn.Walk(), ntn.Gallop(), ntn.Follow())
+    assert csr.protocols() == ((ntn.Follow(),), walk)
+    assert ft.asarray(np.ones((2, 3))).ftype.protocols() == ((ntn.Follow(),),) * 2
+    # A mask is looked up in its outer dimensions, and walked in its inner one.
+    assert EyeTensor((3, 3)).ftype.protocols() == ((ntn.Follow(),), (ntn.Walk(),))
+    tril = fiber_tensor(
+        dense(LoTriMaskFType(sparse_list(element(0.0), ftype(np.intp))))
+    )
+    assert tril.protocols() == ((ntn.Follow(),), (ntn.Walk(),))

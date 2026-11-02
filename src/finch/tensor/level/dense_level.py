@@ -125,6 +125,9 @@ class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
     def level_default_protocols(self):
         return (ntn.Follow(), *self.lvl_t.level_default_protocols())
 
+    def level_protocols(self):
+        return ((ntn.Follow(),), *self.lvl_t.level_protocols())
+
     def level_lower_dim(self, ctx, obj, r):
         if r == 0:
             return asm.GetAttr(obj, asm.Literal("dimension"))

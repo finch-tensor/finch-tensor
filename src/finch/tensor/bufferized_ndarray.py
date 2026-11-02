@@ -488,6 +488,9 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
     def default_protocols(self):
         return self.lvl_t.level_default_protocols()
 
+    def protocols(self):
+        return self.lvl_t.level_protocols()
+
     def lower_dim(self, ctx, obj, r):
         return self.lvl_t.level_lower_dim(ctx, ctx(obj.lvl), r)
 
@@ -784,6 +787,9 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
     def level_default_protocols(self):
         # Each index of the array is looked up.
         return (ntn.Follow(),) * self.ndim
+
+    def level_protocols(self):
+        return ((ntn.Follow(),),) * self.ndim
 
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl):
         for r in range(self.ndim):

@@ -341,6 +341,9 @@ class PatternTensorFType(TensorFType):
         # innermost one.
         return (ntn.Follow(),) * (self.ndim - 1) + (ntn.Walk(),) if self.ndim else ()
 
+    def protocols(self):
+        return tuple((proto,) for proto in self.default_protocols())
+
     def from_numpy(self, arr):
         raise NotImplementedError
 

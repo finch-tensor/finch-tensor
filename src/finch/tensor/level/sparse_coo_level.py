@@ -129,6 +129,9 @@ class SparseCOOLevelFType(ImmutableStructFType, MultiDimensionLevelFType):
     def level_default_protocols(self):
         return (ntn.Walk(),) * self.coo_ndim + self.lvl_t.level_default_protocols()
 
+    def level_protocols(self):
+        return ((ntn.Walk(),),) * self.coo_ndim + self.lvl_t.level_protocols()
+
     def construct(self, shape: tuple[Any, ...], *, pos: int) -> "SparseCOOLevel":
         if len(shape) < self.coo_ndim:
             raise ValueError(

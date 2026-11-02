@@ -48,6 +48,13 @@ class TensorFType(FType, ABC, Generic[FT]):
         """
         return ()
 
+    def protocols(self) -> tuple[tuple[Protocol, ...], ...]:
+        """
+        The protocols which a loop can read each dimension of the tensor with,
+        or none if it reads them only with the default.
+        """
+        return ()
+
     @property
     def shape(self) -> tuple[int, ...]:
         raise TypeError("TensorFType does not have a shape.")
