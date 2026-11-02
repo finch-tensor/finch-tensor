@@ -1,0 +1,70 @@
+ENTRY_0: #succs=[gvn_2]
+
+EXIT_1: #succs=[]
+
+gvn_2: #succs=[gvn_4, gvn_5]
+    [16] a: finch.int64 = a 	# a = %0
+    [17] b: finch.int64 = b 	# b = %1
+    [18] n: finch.int64 = n 	# n = %2
+    [0] s: finch.int64 = add(a, b) 	# s = %3
+    [1] c: finch.int64 = a 	# c = %0
+    [2] d: finch.int64 = add(c, b) 	# d = %3
+    [3] x: finch.int64 = 0 	# x = %8
+
+gvn_3: #succs=[EXIT_1]
+
+gvn_4: #succs=[gvn_6]
+    [11] assert(lt(a, b)) 	# lt(a, b) = %10
+    [4] x: finch.int64 = mul(s, 2) 	# x = %9
+
+gvn_5: #succs=[gvn_6]
+    [12] assert(not_(lt(a, b))) 	# not_(lt(a, b)) = %13
+    [5] x: finch.int64 = mul(d, 2) 	# x = %9
+
+gvn_6: #succs=[gvn_7, gvn_8]
+    [6] acc: finch.int64 = 0 	# acc = %8
+    j: finch.int64 = 0 	# j = %8
+
+gvn_7: #succs=[gvn_7, gvn_8]
+    [14] assert(lt(j, n)) 	# lt(j, n) = %17
+    [13] i: finch.int64 = j 	# i = %16
+    [7] e: finch.int64 = add(a, b) 	# e = %3
+    [8] acc: finch.int64 = add(acc, mul(e, i)) 	# acc = %15
+    j: finch.int64 = add(j, 1) 	# j = %16
+
+gvn_8: #succs=[gvn_3]
+    [15] assert(not_(lt(j, n))) 	# not_(lt(j, n)) = %24
+    [9] y: finch.int64 = mul(add(a, b), 2) 	# y = %9
+    [10] return add(acc, y) 	# add(acc, y) = %27
+
+gvn_9: #succs=[gvn_3]
+
+value numbers:
+%0 = a
+%1 = b
+%2 = n
+%3 = add(%0, %1)
+%4 = s
+%5 = c
+%6 = add(%5, %1)
+%7 = d
+%8 = np.int64(0)
+%9 = x
+%10 = lt(%0, %1)
+%11 = np.int64(2)
+%12 = mul(%4, %11)
+%13 = not_(%10)
+%14 = mul(%7, %11)
+%15 = acc
+%16 = j
+%17 = lt(%16, %2)
+%18 = i
+%19 = e
+%20 = mul(%19, %18)
+%21 = add(%15, %20)
+%22 = np.int64(1)
+%23 = add(%16, %22)
+%24 = not_(%17)
+%25 = mul(%3, %11)
+%26 = y
+%27 = add(%15, %26)
