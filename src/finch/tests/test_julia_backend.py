@@ -479,7 +479,7 @@ def test_compile_julia_pattern_lowering(file_regression):
 def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
     _requires_julia_backend()
     from finch.autoschedule import default_schedulers
-    from finch.autoschedule.factorizer.caching import CachingFactorizer
+    from finch.autoschedule.factor_cache import FactorCacheEvaluator
     from finch.autoschedule.tensor_stats import SamplingStatsFactory
     from finch.compile_jl.compiler import (
         FinchJLCompiler,
@@ -521,7 +521,7 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
     monkeypatch.setattr(
         default_schedulers,
         "CACHING_SCHEDULER",
-        LogicNormalizer(CachingFactorizer(scheduler)),
+        LogicNormalizer(FactorCacheEvaluator(scheduler)),
     )
     i, j = Field("i"), Field("j")
     data = np.arange(35, dtype=DTYPE).reshape(5, 7) % 3

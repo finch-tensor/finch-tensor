@@ -5,7 +5,7 @@ import numpy as np
 import finch as ft
 from finch import ffuncs
 from finch.autoschedule import INTERPRET_NOTATION, LogicNormalizer
-from finch.autoschedule.factorizer.caching import CachingFactorizer, query_key
+from finch.autoschedule.factor_cache import FactorCacheEvaluator, query_key
 from finch.finch_logic import (
     Aggregate,
     Field,
@@ -48,7 +48,7 @@ def _inputs():
 
 def test_caching_factorizer_computes_programs():
     (_, j, k, _), (A, B, C), (a, b, c) = _inputs()
-    scheduler = LogicNormalizer(CachingFactorizer(INTERPRET_NOTATION))
+    scheduler = LogicNormalizer(FactorCacheEvaluator(INTERPRET_NOTATION))
     result = scheduler(_matmul(_matmul(a, b, j), c, k))
     assert np.allclose(result.tns.to_numpy(), A @ B @ C)
 
@@ -61,14 +61,14 @@ def test_caching_factorizer_reuses_queries():
     plus = MapJoin(Literal(ffuncs.add), (ab, Table(Literal(ft.asarray(D)), (i, k))))
 
     alone = CountingEvaluator(INTERPRET_NOTATION)
-    scheduler = LogicNormalizer(CachingFactorizer(alone))
+    scheduler = LogicNormalizer(FactorCacheEvaluator(alone))
     assert np.allclose(scheduler(plus).tns.to_numpy(), A @ B + D)
     calls = alone.calls
     scheduler(plus)
     assert alone.calls == calls
 
     shared = CountingEvaluator(INTERPRET_NOTATION)
-    scheduler = LogicNormalizer(CachingFactorizer(shared))
+    scheduler = LogicNormalizer(FactorCacheEvaluator(shared))
     scheduler(ab)
     before = shared.calls
     assert np.allclose(scheduler(plus).tns.to_numpy(), A @ B + D)
@@ -77,7 +77,7 @@ def test_caching_factorizer_reuses_queries():
 
 def test_caching_factorizer_drops_results_with_their_inputs():
     (_, j, _, _), _, (a, b, _) = _inputs()
-    factorizer = CachingFactorizer(INTERPRET_NOTATION)
+    factorizer = FactorCacheEvaluator(INTERPRET_NOTATION)
     result = LogicNormalizer(factorizer)(_matmul(a, b, j))
     assert factorizer.cache
     del a, b, result

@@ -50,7 +50,7 @@ from finch.symbolic import (
 )
 from finch.symbolic.simplification import annihilate
 
-from .galley_factorizer.galley_optimize import GalleyLogicFactorizer
+from .factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
 
 
 @dataclass(frozen=True)
@@ -154,7 +154,7 @@ def query_key(rhs: LogicExpression, idxs: tuple[Field, ...]) -> LogicExpression:
     return cast(LogicExpression, expr)
 
 
-class CachingFactorizer(UnvalidatedForm, LogicEvaluator):
+class FactorCacheEvaluator(UnvalidatedForm, LogicEvaluator):
     """
     Factors a program with a child factorizer, which defaults to Galley keeping
     loop nests shallow, then evaluates each query it produces with a child

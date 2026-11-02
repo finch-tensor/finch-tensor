@@ -23,7 +23,7 @@ from finch.finch_notation.interpreter import NotationInterpreter
 
 from .compiler import CompilerFormLowerer, LogicCompiler
 from .executor import LogicExecutor
-from .factorizer.caching import CachingFactorizer
+from .factor_cache import FactorCacheEvaluator
 from .factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
 from .factorizer.optimize import DefaultLogicFactorizer
 from .formatter import DefaultLogicFormatter, FDFormatter, GalleyFormatter
@@ -205,7 +205,7 @@ NON_RECURSIVE_SCHEDULER = LogicNormalizer(
 
 # Statistics which evaluate kernels, as exact and sampling statistics do, cache
 # the result of each query for as long as the tensors it reads.
-CACHING_SCHEDULER = LogicNormalizer(CachingFactorizer(NON_RECURSIVE_SCHEDULER))
+CACHING_SCHEDULER = LogicNormalizer(FactorCacheEvaluator(NON_RECURSIVE_SCHEDULER))
 
 # Accept already ordered, concordant statistics plans and use dense outputs.
 NON_RECURSIVE_STANDARD_SCHEDULER = LogicNormalizer(
