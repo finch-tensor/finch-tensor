@@ -18,7 +18,11 @@ from .dead_code_elimination import (
     AssemblyDeadCodeEliminationTransform,
     assembly_dead_code_elimination,
 )
-from .global_value_numbering import AssemblyGlobalValueNumbering
+from .global_value_numbering import (
+    AssemblyGlobalValueNumbering,
+    AssemblyGlobalValueNumberingTransform,
+    assembly_global_value_numbering,
+)
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .liveness import AssemblyLiveVariables
 from .nodes import (
@@ -72,6 +76,7 @@ __all__ = [
     "AssemblyDeadCodeEliminationTransform",
     "AssemblyExpression",
     "AssemblyGlobalValueNumbering",
+    "AssemblyGlobalValueNumberingTransform",
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
     "AssemblyKernel",
@@ -120,6 +125,7 @@ __all__ = [
     "assembly_dataflow_analyze",
     "assembly_dataflow_run",
     "assembly_dead_code_elimination",
+    "assembly_global_value_numbering",
     "element_type",
     "get_vars_in_expr",
     "length_type",
