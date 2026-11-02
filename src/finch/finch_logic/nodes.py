@@ -472,7 +472,7 @@ class Follow(Protocol):
 
 @dataclass(eq=True, frozen=True)
 class Alias(LogicNode, NamedTerm):
-    """Shared base for hard, fused, and protocol aliases referring to tensors."""
+    """Shared base for hard and fused aliases referring to tensors."""
 
     name: str
 
@@ -566,39 +566,6 @@ class FusedAlias(Alias):
         return self.n
 
 
-@dataclass(eq=True, frozen=True, init=False)
-class ProtocolAlias(Alias):
-    """A view of an alias whose table reads each of its fields with a protocol.
-
-    The protocols follow the fields of the table, and only apply to reads.
-    """
-
-    __match_args__ = ("alias", "protocols")
-    name: str = field(init=False, repr=False)
-    alias: HardAlias | FusedAlias
-    protocols: tuple[Protocol, ...]
-
-    def __init__(self, alias: HardAlias | FusedAlias, protocols: tuple[Protocol, ...]):
-        match alias:
-            case ProtocolAlias():
-                raise ValueError("ProtocolAlias must wrap an alias without protocols")
-            case HardAlias() | FusedAlias():
-                pass
-            case _:
-                raise TypeError("ProtocolAlias must wrap a HardAlias or FusedAlias")
-        object.__setattr__(self, "name", alias.name)
-        object.__setattr__(self, "alias", alias)
-        object.__setattr__(self, "protocols", tuple(protocols))
-
-    @property
-    def unfused(self) -> Alias:
-        return self.alias.unfused
-
-    @property
-    def nfused(self) -> int:
-        return self.alias.nfused
-
-
 @dataclass(eq=True, frozen=True)
 class Table(LogicTree, LogicExpression):
     """
@@ -608,25 +575,25 @@ class Table(LogicTree, LogicExpression):
     Attributes:
         tns: The tensor object.
         idxs: The fields indexing the tensor.
+        protocols: How a loop visits each field of the table when it reads it,
+            or none to let the tensor choose every protocol.
     """
 
     tns: Literal | Alias
     idxs: tuple[Field, ...]
+    protocols: tuple[Protocol, ...] = ()
 
     def __post_init__(self):
         match self.tns:
-            case ProtocolAlias(_, protocols) if len(protocols) != len(self.idxs):
-                raise ValueError("A table needs one protocol for each field")
-        match self.tns:
-            case FusedAlias(_, n) | ProtocolAlias(FusedAlias(_, n), _) if n > len(
-                self.idxs
-            ):
+            case FusedAlias(_, n) if n > len(self.idxs):
                 raise ValueError("The fused dimension count exceeds the table rank")
+        if self.protocols and len(self.protocols) != len(self.idxs):
+            raise ValueError("A table needs one protocol for each field")
 
     @property
     def children(self):
         """Returns the children of the node."""
-        return [self.tns, *self.idxs]
+        return [self.tns, *self.idxs, *self.protocols]
 
     def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
@@ -653,8 +620,15 @@ class Table(LogicTree, LogicExpression):
         raise NotImplementedError("Cannot resolve value of Tables")
 
     @classmethod
-    def from_children(cls, tns, *idxs):
-        return cls(tns, idxs)
+    def from_children(cls, tns, *children):
+        idxs, protocols = [], []
+        for child in children:
+            match child:
+                case Field():
+                    idxs.append(child)
+                case Protocol():
+                    protocols.append(child)
+        return cls(tns, tuple(idxs), tuple(protocols))
 
 
 @dataclass(eq=True, frozen=True)
@@ -1234,22 +1208,15 @@ class LogicPrinterContext(Context):
                 return "gallop"
             case Follow():
                 return "follow"
-            case ProtocolAlias(alias, protocols):
-                names = ", ".join(self(proto) for proto in protocols)
-                return f"ProtocolAlias({self(alias)}, ({names}))"
             case Alias(name):
                 return str(name)
-            case Table(tns, idxs):
+            case Table(tns, idxs, protocols):
                 idxs_e = [self(idx) for idx in idxs]
-                match tns:
-                    case ProtocolAlias(alias, protocols):
-                        idxs_e = [
-                            idx
-                            if proto == DefaultProtocol()
-                            else f"{self(proto)}({idx})"
-                            for idx, proto in zip(idxs_e, protocols, strict=True)
-                        ]
-                        tns = alias
+                if protocols:
+                    idxs_e = [
+                        idx if proto == DefaultProtocol() else f"{self(proto)}({idx})"
+                        for idx, proto in zip(idxs_e, protocols, strict=True)
+                    ]
                 match tns:
                     case FusedAlias(alias, n):
                         return (

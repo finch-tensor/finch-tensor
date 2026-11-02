@@ -23,7 +23,6 @@ from finch.finch_logic import (
     MapJoin,
     Plan,
     Produces,
-    ProtocolAlias,
     Query,
     QueryInto,
     Reorder,
@@ -108,8 +107,8 @@ class AliasedForm(Form):
                     validate(body, (*fuses, (idx, next(fuse_ids))))
                     if not fuses:
                         FusedForm.validate_inputs(node, bindings, stats, stats_factory)
-                case Query(Table(ProtocolAlias() as lhs, _), _) | QueryInto(
-                    Table(ProtocolAlias() as lhs, _), _, _
+                case Query(Table(_, _, (_, *_)) as lhs, _) | QueryInto(
+                    Table(_, _, (_, *_)) as lhs, _, _
                 ):
                     raise ValueError(f"{lhs} has protocols, which only apply to reads.")
                 case Query(Table(Alias() as lhs, _), rhs):
@@ -130,9 +129,6 @@ class AliasedForm(Form):
                 case Query(lhs, _) | QueryInto(lhs, _, _):
                     raise ValueError(f"Query must write to a Table of an Alias: {lhs}")
                 case Alias() as var:
-                    match var:
-                        case ProtocolAlias(alias, _):
-                            var = alias
                     view = views.get(var.unfused)
                     if view is None:
                         raise ValueError(
@@ -534,16 +530,10 @@ class FusedForm(Form):
                     match node:
                         case Alias() as var:
                             reads.add(var.unfused)
-                        case Table(
-                            (HardAlias() as tns) | ProtocolAlias(HardAlias() as tns, _),
-                            arg_idxs,
-                        ) if idx in arg_idxs:
+                        case Table(HardAlias() as tns, arg_idxs) if idx in arg_idxs:
                             reads_idx = extent = True
                             shared.add(tns)
-                        case Table(
-                            FusedAlias(tns, n) | ProtocolAlias(FusedAlias(tns, n), _),
-                            arg_idxs,
-                        ) if idx in arg_idxs:
+                        case Table(FusedAlias(tns, n), arg_idxs) if idx in arg_idxs:
                             reads_idx = True
                             if idx in arg_idxs[n:]:
                                 shared.add(tns)

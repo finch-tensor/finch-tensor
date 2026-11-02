@@ -21,7 +21,6 @@ from finch.finch_logic import (
     MapJoin,
     Plan,
     Produces,
-    ProtocolAlias,
     Query,
     QueryInto,
     Relabel,
@@ -128,9 +127,6 @@ class StatsMachine(Generic[TS]):
                 return stats
 
             case Table(tns, idxs):
-                match tns:
-                    case ProtocolAlias(alias, _):
-                        tns = alias
                 if isinstance(tns, Literal):
                     tensor = self.stats_factory(tns.val, idxs)
                 elif isinstance(tns, Alias):

@@ -68,18 +68,14 @@ class PointwiseContext:
                         for arg in args
                     ),
                 )
-            case lgc.Table(lgc.Alias() as var, idxs):
+            case lgc.Table(lgc.Alias() as var, idxs, protocols):
                 stored = self.ctx.stored_idxs(var.unfused, idxs)
-                match var:
-                    case lgc.ProtocolAlias(_, protocols):
-                        mode = ntn.Read(
-                            tuple(
-                                lower_protocol(proto)
-                                for proto in protocols[len(idxs) - len(stored) :]
-                            )
-                        )
-                    case _:
-                        mode = ntn.Read()
+                mode = ntn.Read(
+                    tuple(
+                        lower_protocol(proto)
+                        for proto in protocols[len(idxs) - len(stored) :]
+                    )
+                )
                 return ntn.Unwrap(
                     ntn.Access(
                         self.ctx.slots[var.unfused],

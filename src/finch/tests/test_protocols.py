@@ -11,11 +11,12 @@ from finch import finch_notation as ntn
 from finch.algebra import TensorFType, ffuncs, ftype
 from finch.autoschedule import CompilerFormLowerer, LogicCapture, NotationGenerator
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
+from finch.autoschedule.loop_orderer.loop_ordering import concordize
 from finch.autoschedule.normalize import normalize_names
 from finch.autoschedule.stages import CompilerForm
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsInterpreter
-from finch.autoschedule.util import fuse_loop_order
+from finch.autoschedule.util import fuse_loop_order, push_fields
 from finch.codegen import CCompiler, MLIRCompiler, NumbaCompiler
 from finch.compile import CompilerMode, NotationCompiler, make_extent
 from finch.symbolic import PostOrderDFS
@@ -24,53 +25,30 @@ from .test_sparse_update import dense_values, run_copy, tensors
 from .utils import with_workspaces
 
 
-def test_protocol_alias_node():
+def test_table_protocols():
     a = lgc.HardAlias("a")
-    protocols = (lgc.DefaultProtocol(), lgc.Walk())
-    view = lgc.ProtocolAlias(a, protocols)
-    assert view.alias == a
-    assert view.name == a.name
-    assert view.unfused == a
-    assert view.nfused == 0
-    assert view == lgc.ProtocolAlias(a, protocols)
-    assert view != lgc.ProtocolAlias(a, (lgc.Follow(), lgc.Walk()))
-    assert view != a
-    assert eval(repr(view), vars(lgc)) == view
-    assert str(view) == "ProtocolAlias(a, (default, walk))"
     i, j = lgc.Field("i"), lgc.Field("j")
-    assert str(lgc.Table(view, (i, j))) == "a[i, walk(j)]"
-    fused = lgc.ProtocolAlias(lgc.FusedAlias(a, 1), (lgc.Gallop(), lgc.Follow()))
-    assert fused.unfused == a
-    assert fused.nfused == 1
-    assert str(lgc.Table(fused, (i, j))) == "a(gallop(i))[follow(j)]"
-
-
-def test_invalid_protocol_alias():
-    a = lgc.HardAlias("a")
-    i = lgc.Field("i")
-    with pytest.raises(TypeError, match="wrap a HardAlias or FusedAlias"):
-        lgc.ProtocolAlias("a", (lgc.Walk(),))  # ty: ignore[invalid-argument-type]
-    with pytest.raises(ValueError, match="without protocols"):
-        lgc.ProtocolAlias(
-            lgc.ProtocolAlias(a, (lgc.Walk(),)),  # ty: ignore[invalid-argument-type]
-            (lgc.Walk(),),
-        )
+    protocols = (lgc.DefaultProtocol(), lgc.Walk())
+    table = lgc.Table(a, (i, j), protocols)
+    assert lgc.Table(a, (i, j)).protocols == ()
+    assert table != lgc.Table(a, (i, j))
+    assert eval(repr(table), vars(lgc)) == table
+    assert str(table) == "a[i, walk(j)]"
+    # Rewrites rebuild a table from its children, protocols included.
+    assert table.make_term(table.head(), *table.children) == table
+    fused = lgc.Table(lgc.FusedAlias(a, 1), (i, j), (lgc.Gallop(), lgc.Follow()))
+    assert str(fused) == "a(gallop(i))[follow(j)]"
     with pytest.raises(ValueError, match="one protocol for each field"):
-        lgc.Table(lgc.ProtocolAlias(a, (lgc.Walk(), lgc.Walk())), (i,))
-    with pytest.raises(ValueError, match="table rank"):
-        lgc.Table(lgc.ProtocolAlias(lgc.FusedAlias(a, 2), (lgc.Walk(),)), (i,))
+        lgc.Table(a, (i,), (lgc.Walk(), lgc.Walk()))
 
 
-def test_protocol_alias_normalization_and_stats():
+def test_table_protocols_survive_normalization_and_stats():
     i, j = lgc.Field("i"), lgc.Field("j")
     a, out = lgc.HardAlias("a"), lgc.HardAlias("out")
     protocols = (lgc.DefaultProtocol(), lgc.Walk())
     plan = lgc.Plan(
         (
-            lgc.Query(
-                lgc.Table(out, (i, j)),
-                lgc.Table(lgc.ProtocolAlias(a, protocols), (i, j)),
-            ),
+            lgc.Query(lgc.Table(out, (i, j)), lgc.Table(a, (i, j), protocols)),
             lgc.Produces((out,)),
         )
     )
@@ -79,10 +57,8 @@ def test_protocol_alias_normalization_and_stats():
     query = renamed.bodies[0]
     assert isinstance(query, lgc.Query)
     assert isinstance(query.rhs, lgc.Table)
-    view = query.rhs.tns
-    assert isinstance(view, lgc.ProtocolAlias)
-    assert view.protocols == protocols
-    assert view.alias in bindings
+    assert query.rhs.protocols == protocols
+    assert query.rhs.tns in bindings
     factory = DenseStatsFactory()
     stats = factory(ft.asarray(np.ones((2, 3))), (i, j))
     results = StatsInterpreter(factory)(plan, {a: stats})
@@ -91,24 +67,54 @@ def test_protocol_alias_normalization_and_stats():
     assert result.index_order == (i, j)
 
 
+def test_rewrites_keep_table_protocols():
+    i, j, k, m = map(lgc.Field, "ijkm")
+    a, b = lgc.HardAlias("a"), lgc.HardAlias("b")
+    protocols = (lgc.Walk(), lgc.Follow())
+    # Relabeling renames the fields of a table, which keep their protocols.
+    relabeled = push_fields(lgc.Relabel(lgc.Table(a, (i, j), protocols), (k, m)))
+    assert relabeled == lgc.Table(a, (k, m), protocols)
+    # A swizzled read permutes the protocols along with its fields.
+    read = lgc.Aggregate(
+        lgc.Literal(ffuncs.overwrite),
+        lgc.Literal(0),
+        lgc.Table(a, (i, j), protocols),
+        (),
+    )
+    plan = lgc.Plan(
+        (
+            lgc.Query(lgc.Table(a, (i, j)), lgc.Table(lgc.Literal(0), (i, j))),
+            fuse_loop_order(lgc.Query(lgc.Table(b, (j, i)), read), (j, i)),
+            lgc.Produces((b,)),
+        )
+    )
+    swizzled = [
+        node.protocols
+        for node in PostOrderDFS(concordize(plan, bindings={}))
+        if isinstance(node, lgc.Table) and node.protocols
+    ]
+    assert swizzled == [(lgc.Follow(), lgc.Walk())]
+
+
 def test_protocols_only_apply_to_reads():
     i = lgc.Field("i")
     a, out = lgc.HardAlias("a"), lgc.HardAlias("out")
+    walk = (lgc.Walk(),)
     ftypes: dict[lgc.Alias, TensorFType] = {
         a: ftype(ft.asarray(np.ones(2))),
         out: ftype(ft.asarray(np.ones(2))),
     }
 
-    def validate(lhs, rhs):
-        query = fuse_loop_order(
-            lgc.Query(lgc.Table(lhs, (i,)), lgc.Table(rhs, (i,))), (i,)
+    def validate(lhs_protocols, rhs_protocols):
+        query = lgc.Query(
+            lgc.Table(out, (i,), lhs_protocols), lgc.Table(a, (i,), rhs_protocols)
         )
-        plan = lgc.Plan((query, lgc.Produces((out,))))
+        plan = lgc.Plan((fuse_loop_order(query, (i,)), lgc.Produces((out,))))
         CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
 
-    validate(out, lgc.ProtocolAlias(a, (lgc.Walk(),)))
+    validate((), walk)
     with pytest.raises(ValueError, match="only apply to reads"):
-        validate(lgc.ProtocolAlias(out, (lgc.Walk(),)), a)
+        validate(walk, ())
 
 
 @pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
@@ -128,8 +134,8 @@ def test_protocol_lowering(compiler, protocol, lowered):
     product = lgc.MapJoin(
         lgc.Literal(ffuncs.mul),
         (
-            lgc.Table(lgc.ProtocolAlias(a, (lgc.DefaultProtocol(), protocol)), (i, j)),
-            lgc.Table(lgc.ProtocolAlias(b, (lgc.Follow(),)), (j,)),
+            lgc.Table(a, (i, j), (lgc.DefaultProtocol(), protocol)),
+            lgc.Table(b, (j,), (lgc.Follow(),)),
         ),
     )
     query = lgc.Query(

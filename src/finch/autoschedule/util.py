@@ -77,8 +77,8 @@ def push_relabels(root):
                 reidx_dict = dict(zip(idxs_1, idxs_2, strict=True))
                 idxs_4 = tuple(reidx_dict.get(idx, idx) for idx in idxs_3)
                 return Reorder(Relabel(arg, idxs_4), idxs_2)
-            case Relabel(Table(arg, _), idxs):
-                return Table(arg, idxs)
+            case Relabel(Table(arg, _, protocols), idxs):
+                return Table(arg, idxs, protocols)
             case Relabel(Literal() | FillTable() as scalar, _):
                 return scalar
 

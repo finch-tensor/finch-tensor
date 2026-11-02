@@ -818,11 +818,8 @@ def test_compile_julia_protocols(protocol):
     product = lgc.MapJoin(
         lgc.Literal(ffuncs.mul),
         (
-            lgc.Table(
-                lgc.ProtocolAlias(A, (lgc.DefaultProtocol(), protocols[protocol])),
-                (i, j),
-            ),
-            lgc.Table(lgc.ProtocolAlias(B, (lgc.Follow(),)), (j,)),
+            lgc.Table(A, (i, j), (lgc.DefaultProtocol(), protocols[protocol])),
+            lgc.Table(B, (j,), (lgc.Follow(),)),
         ),
     )
     rhs = lgc.Aggregate(lgc.Literal(ffuncs.add), lgc.Literal(DTYPE(0)), product, (j,))
