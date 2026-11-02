@@ -115,6 +115,10 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
         )
 
     def level_unfurl(self, ctx, fiber: ntn.Fiber, ext, mode, proto, pos):
+        # The mask walks the triangle itself, so its body reads with its default.
+        match proto:
+            case ntn.Walk():
+                proto = ntn.DefaultProtocol()
         tns = fiber
         level = tns.lvl
 
@@ -167,6 +171,10 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
 
     def level_format_properties(self, n: int) -> list[FormatProperty]:
         raise NotImplementedError
+
+    def level_default_protocols(self):
+        # The mask walks its body within the triangle.
+        return (ntn.Walk(), *self.body.level_default_protocols()[1:])
 
 
 @dataclass

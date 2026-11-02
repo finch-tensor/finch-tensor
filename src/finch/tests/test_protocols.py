@@ -9,7 +9,13 @@ import finch.finch_logic as lgc
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import TensorFType, ffuncs, ftype
-from finch.autoschedule import CompilerFormLowerer, LogicCapture, NotationGenerator
+from finch.autoschedule import (
+    CompilerFormLowerer,
+    LogicCapture,
+    LogicProtocolizer,
+    NotationGenerator,
+    protocolize,
+)
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
 from finch.autoschedule.loop_orderer.loop_ordering import concordize
 from finch.autoschedule.normalize import normalize_names
@@ -20,6 +26,9 @@ from finch.autoschedule.util import fuse_loop_order, push_fields
 from finch.codegen import CCompiler, MLIRCompiler, NumbaCompiler
 from finch.compile import CompilerMode, NotationCompiler, make_extent
 from finch.symbolic import PostOrderDFS
+from finch.tensor import dense, element, fiber_tensor
+from finch.tensor.masks import LoTriMaskFType
+from finch.tensor.patterns import EyeTensor
 
 from .test_sparse_update import dense_values, run_copy, tensors
 from .utils import with_workspaces
@@ -289,3 +298,54 @@ def test_unsupported_level_protocols(format_, protocol):
     program = coiterate_program(x, x, z, ffuncs.mul, ((protocol,), walks(format_)))
     with pytest.raises(NotImplementedError, match=f"the {protocol} protocol"):
         NotationCompiler(loader)(program)
+
+
+def test_protocolize_states_the_default_protocols_of_levels():
+    loader = asm.AssemblyInterpreter()
+    i, j = lgc.Field("i"), lgc.Field("j")
+    a, b, y = lgc.HardAlias("a"), lgc.HardAlias("b"), lgc.HardAlias("y")
+    data_a = np.array([[0, 2, 0], [0, 0, 0], [3, 0, 4]])
+    data_b = np.array([1, 5, 7])
+    bindings = {a: stored(loader, "DS", data_a), b: ft.asarray(data_b)}
+
+    def plan(read_a, read_b):
+        product = lgc.MapJoin(lgc.Literal(ffuncs.mul), (read_a, read_b))
+        query = lgc.Query(
+            lgc.Table(y, (i,)),
+            lgc.Aggregate(lgc.Literal(ffuncs.add), lgc.Literal(0), product, (j,)),
+        )
+        return lgc.Plan((fuse_loop_order(query, (i, j)), lgc.Produces((y,))))
+
+    ftypes: dict[lgc.Alias, TensorFType] = {
+        var: tns.ftype for var, tns in bindings.items()
+    }
+    assert ftypes[a].default_protocols() == (ntn.Follow(), ntn.Walk())
+    assert ftypes[b].default_protocols() == (ntn.Follow(),)
+    # A mask is looked up in its outer dimensions, and walked in its inner one.
+    assert EyeTensor((3, 3)).ftype.default_protocols() == (ntn.Follow(), ntn.Walk())
+    tril = fiber_tensor(
+        dense(LoTriMaskFType(dense(element(np.int64(0)))))
+    ).default_protocols()
+    assert tril == (ntn.Follow(), ntn.Walk())
+    # The dense levels follow, and the sparse level walks. A protocol which a
+    # read gives is kept, and the table a query writes takes none.
+    follow_walk = (lgc.Follow(), lgc.Walk())
+    read_b = lgc.Table(b, (j,), (lgc.Follow(),))
+    assert protocolize(plan(lgc.Table(a, (i, j)), lgc.Table(b, (j,))), ftypes) == plan(
+        lgc.Table(a, (i, j), follow_walk), read_b
+    )
+    gallop = (lgc.DefaultProtocol(), lgc.Gallop())
+    assert protocolize(
+        plan(lgc.Table(a, (i, j), gallop), lgc.Table(b, (j,))), ftypes
+    ) == plan(lgc.Table(a, (i, j), (lgc.Follow(), lgc.Gallop())), read_b)
+    capture = LogicCapture()
+    DefaultLogicFormatter(LogicProtocolizer(CompilerFormLowerer(capture)))(
+        plan(lgc.Table(a, (i, j)), lgc.Table(b, (j,))), ftypes, {}, None
+    )
+    assert lgc.Table(a, (i, j), follow_walk) in PostOrderDFS(capture.last_prgm)
+    program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
+    bindings[y] = capture.last_bindings[y].construct((3,))
+    (result,) = NotationCompiler(loader)(program).main(
+        *with_workspaces(program, *bindings.values())
+    )
+    np.testing.assert_array_equal(result.to_numpy(), data_a @ data_b)

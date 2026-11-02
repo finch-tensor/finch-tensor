@@ -359,8 +359,11 @@ class FinchJLGenerator:
             case ntn.Access(tns, mode, idxs):
                 tns_str = self.generate_julia(tns, nestingLvl)
                 idx_strs = [self.generate_julia(idx, nestingLvl) for idx in idxs]
-                match mode:
-                    case ntn.Read(protocols) if protocols:
+                match mode, tns.result_type:
+                    # Finch.jl reads its masks with their default protocols only.
+                    case _, PatternTensorFType():
+                        pass
+                    case ntn.Read(protocols), _ if protocols:
                         idx_strs = [
                             _protocol_str(proto, idx)
                             for idx, proto in zip(idx_strs, protocols, strict=True)

@@ -155,6 +155,9 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
     def level_format_properties(self, n):
         return self.lvl_t.level_format_properties(n + 1)
 
+    def level_default_protocols(self):
+        return (ntn.Walk(), *self.lvl_t.level_default_protocols())
+
     def level_lower_dim(self, ctx, obj, r):
         if r == 0:
             return asm.GetAttr(obj, asm.Literal("dimension"))

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 
+from finch import finch_notation as ntn
 from finch.algebra import (
     AbstractFill,
     FType,
@@ -124,6 +125,9 @@ class SparseCOOLevelFType(ImmutableStructFType, MultiDimensionLevelFType):
 
     def level_format_properties(self, n):
         return self.lvl_t.level_format_properties(n)
+
+    def level_default_protocols(self):
+        return (ntn.Walk(),) * self.coo_ndim + self.lvl_t.level_default_protocols()
 
     def construct(self, shape: tuple[Any, ...], *, pos: int) -> "SparseCOOLevel":
         if len(shape) < self.coo_ndim:

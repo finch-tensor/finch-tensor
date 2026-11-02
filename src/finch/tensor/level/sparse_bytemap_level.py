@@ -100,6 +100,9 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
     def level_format_properties(self, n):
         return self.lvl_t.level_format_properties(n + 1)
 
+    def level_default_protocols(self):
+        return (ntn.Walk(), *self.lvl_t.level_default_protocols())
+
     def construct(self, shape: tuple[Any, ...], *, pos: int) -> "SparseByteMapLevel":
         dimension = self.dimension_type(shape[0])
         child_pos = int(pos) * int(dimension)

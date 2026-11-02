@@ -395,6 +395,9 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
     def level_format_properties(self) -> list[FormatProperty]:
         return self.lvl_t.level_format_properties(0)
 
+    def default_protocols(self):
+        return self.lvl_t.level_default_protocols()
+
     def unfurl(self, ctx, tns, ext, mode, proto):
         tns = ctx.resolve(tns)
         return self.lvl_t.level_unfurl(ctx, tns, ext, mode, proto, ctx(tns.pos))

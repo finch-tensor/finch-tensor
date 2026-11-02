@@ -336,6 +336,11 @@ class PatternTensorFType(TensorFType):
     def level_format_properties(self) -> list[FormatProperty]:
         return self._tensor_type._level_format_properties(self.ndim)
 
+    def default_protocols(self):
+        # A pattern is looked up in its outer dimensions, and walked in its
+        # innermost one.
+        return (ntn.Follow(),) * (self.ndim - 1) + (ntn.Walk(),) if self.ndim else ()
+
     def from_numpy(self, arr):
         raise NotImplementedError
 
