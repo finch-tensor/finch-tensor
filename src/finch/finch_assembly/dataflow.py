@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from typing import Any, TypeVar
 
 import numpy as np
@@ -29,11 +29,21 @@ from .cfg_builder import (
 )
 from .nodes import (
     AssemblyNode,
+    AssemblyStatement,
     Assign,
+    Block,
+    BufferLoop,
     Call,
+    ForLoop,
+    Function,
     GetAttr,
+    If,
+    IfElse,
     Literal,
+    Module,
+    SetAttr,
     Variable,
+    WhileLoop,
 )
 from .utils import get_vars_in_expr
 
@@ -101,6 +111,79 @@ def root_of(node: AssemblyNode) -> AssemblyNode:
     return node
 
 
+class ScopedRewriter:
+    """
+    walks a numbered program tracking the variables in scope, and rewrites each
+    numbered statement with `rewrite`. scopes follow the strictest backend: the
+    type checker scopes every block and the interpreter every body, and a
+    variable is declared by its first assignment.
+    """
+
+    def __init__(self) -> None:
+        self.scopes: list[dict[str, Variable]] = []
+
+    def __call__(self, node: AssemblyNode) -> AssemblyNode:
+        match node:
+            case Module(funcs):
+                return Module(tuple(self.function(func) for func in funcs))
+            case Function():
+                return self.function(node)
+            case AssemblyStatement():
+                return self.statement(node)
+        return node
+
+    def function(self, func: Function) -> Function:
+        return Function(func.name, func.args, self.scoped(func.body, func.args))
+
+    def scoped(
+        self, body: AssemblyStatement, decls: Sequence[Variable] = ()
+    ) -> AssemblyStatement:
+        self.scopes.append({var.name: var for var in decls})
+        try:
+            match body:
+                case Block(bodies):
+                    return Block(self.block(bodies))
+            kept = self.block((body,))
+            match kept:
+                case (AssemblyStatement() as stmt,):
+                    return stmt
+            return Block(kept)
+        finally:
+            self.scopes.pop()
+
+    def block(self, bodies: Sequence) -> tuple:
+        return tuple(self.statement(stmt) for stmt in bodies)
+
+    def statement(self, node):
+        match node:
+            case Block():
+                return self.scoped(node)
+            case If(cond, body):
+                return If(cond, self.scoped(body))
+            case IfElse(cond, body, else_body):
+                return IfElse(cond, self.scoped(body), self.scoped(else_body))
+            case WhileLoop(cond, body):
+                return WhileLoop(cond, self.scoped(body))
+            case ForLoop(var, start, end, body):
+                return ForLoop(var, start, end, self.scoped(body, (var,)))
+            case BufferLoop(buf, var, body):
+                return BufferLoop(buf, var, self.scoped(body, (var,)))
+            case NumberedStatement(stmt, sid):
+                result = NumberedStatement(self.rewrite(stmt, sid), sid)
+                # an assignment declares its variable only after it runs
+                match stmt:
+                    case Assign(Variable(name, _) as var, _) if not self.visible(name):
+                        self.scopes[-1][name] = var
+                return result
+        return node
+
+    def visible(self, name: str) -> bool:
+        return any(name in scope for scope in self.scopes)
+
+    def rewrite(self, stmt: AssemblyStatement, sid: int) -> AssemblyStatement:
+        return stmt
+
+
 def assembly_dataflow_analyze(
     node: AssemblyNode, analysis_cls: type[AnalysisT]
 ) -> tuple[AnalysisT, AssemblyNode]:
@@ -139,41 +222,35 @@ def assembly_copy_propagation(node: AssemblyNode) -> AssemblyNode:
         AssemblyNode: The optimized FinchAssembly node.
     """
 
-    def apply(pre_node: AssemblyNode, ctx: AssemblyCopyPropagation) -> AssemblyNode:
-        lattice: dict[tuple[int, str], str] = ctx.collect_copy_replacements()
+    return assembly_dataflow_run(
+        node,
+        AssemblyCopyPropagation,
+        lambda pre_node, ctx: _CopyRewriter(ctx)(pre_node),
+    )
 
-        # Replace variables in a statement according to the collected replacements.
-        def replace_vars(target: AssemblyNode, sid: int):
-            def rw_var(n: AssemblyNode):
-                match n:
-                    case Variable(name, vtype):
-                        key = (sid, name)
-                        if key in lattice:
-                            return Variable(lattice[key], vtype)
 
-                return None
+class _CopyRewriter(ScopedRewriter):
+    def __init__(self, ctx: "AssemblyCopyPropagation"):
+        super().__init__()
+        self.replacements = ctx.collect_copy_replacements()
 
-            return Rewrite(PostWalk(rw_var))(target)
-
-        # Rewrite each numbered statement to replace variables.
-        def rw(x: AssemblyNode):
-            match x:
-                case NumberedStatement(stmt, sid):
-                    match stmt:
-                        # if Assign, replace vars only on rhs to avoid replacing lhs
-                        case Assign(lhs, rhs):
-                            rhs = replace_vars(rhs, sid)
-                            new_stmt = Assign(lhs, rhs)
-                            return NumberedStatement(new_stmt, sid)
-                        case _:
-                            new_stmt = replace_vars(stmt, sid)
-                            return NumberedStatement(new_stmt, sid)
-
+    def rewrite(self, stmt: AssemblyStatement, sid: int) -> AssemblyStatement:
+        def rename(node: AssemblyNode) -> AssemblyNode | None:
+            match node:
+                # the source of a copy may be declared in a scope that ended
+                case Variable(name, type_) if self.visible(
+                    new := self.replacements.get((sid, name), "")
+                ):
+                    return Variable(new, type_)
             return None
 
-        return Rewrite(PostWalk(rw))(pre_node)
-
-    return assembly_dataflow_run(node, AssemblyCopyPropagation, apply)
+        rename_all = Rewrite(PostWalk(rename))
+        match stmt:
+            case Assign(lhs, rhs):
+                return Assign(lhs, rename_all(rhs))
+            case SetAttr(obj, attr, val):
+                return SetAttr(obj, attr, rename_all(val))
+        return rename_all(stmt)
 
 
 class AbstractAssemblyDataflow(DataFlowAnalysis):
@@ -255,7 +332,7 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
             target = target.stmt
 
         match target:
-            case Assign(_, rhs):
+            case Assign(_, rhs) | SetAttr(_, _, rhs):
                 target = rhs
 
         copies = state["copies"]
@@ -317,6 +394,16 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
                     # Ensure all recorded copies remain consistent with current defs.
                     new_state["copies"] = self._prune_inconsistent_copies(defs, copies)
                     copies = new_state["copies"]
+                case SetAttr(obj, _, _):
+                    # mlir rebinds the root of the target, so it gets a new value
+                    match root_of(obj):
+                        case Variable(name, _):
+                            defs[name] = sid
+                            new_state["copies"] = copies = {
+                                dst: copy
+                                for dst, copy in copies.items()
+                                if name not in (dst, copy[0])
+                            }
                 case _:
                     continue
 
