@@ -1,3 +1,5 @@
+import gc
+
 import numpy as np
 
 import finch as ft
@@ -71,6 +73,17 @@ def test_caching_factorizer_reuses_queries():
     before = shared.calls
     assert np.allclose(scheduler(plus).tns.to_numpy(), A @ B + D)
     assert shared.calls - before < calls
+
+
+def test_caching_factorizer_drops_results_with_their_inputs():
+    (_, j, _, _), _, (a, b, _) = _inputs()
+    factorizer = CachingFactorizer(INTERPRET_NOTATION)
+    result = LogicNormalizer(factorizer)(_matmul(a, b, j))
+    assert factorizer.cache
+    del a, b, result
+    gc.collect()
+    assert not factorizer.cache
+    assert not factorizer.readers
 
 
 def _tables(*idxs):

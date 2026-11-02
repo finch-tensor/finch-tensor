@@ -1,4 +1,6 @@
+import weakref
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import cast
 
 from finch.algebra import (
@@ -49,6 +51,14 @@ from finch.symbolic import (
 from finch.symbolic.simplification import annihilate
 
 from .galley_factorizer.galley_optimize import GalleyLogicFactorizer
+
+
+@dataclass(frozen=True)
+class TensorRef:
+    """A tensor in a query key, by identity, without keeping it alive."""
+
+    id: int
+
 
 # Of two operators which distribute over each other, the first is distributed
 # over the second, so that the second is outermost, as and is in CNF.
@@ -152,8 +162,9 @@ class CachingFactorizer(UnvalidatedForm, LogicEvaluator):
     it computes. A query which reads cached results can hit the cache too.
 
     Results are cached by the identity of the tensors they read, so a tensor
-    must not change while its results are cached, and they stay cached as long
-    as the factorizer. The results of a program may be shared with the cache.
+    must not change while its results are cached. A result is dropped when a
+    tensor it read dies, so cached results live as long as their inputs. The
+    results of a program may be shared with the cache.
     """
 
     def __init__(
@@ -174,6 +185,18 @@ class CachingFactorizer(UnvalidatedForm, LogicEvaluator):
             DenseStatsFactory() if stats_factory is None else stats_factory
         )
         self.cache: dict[LogicNode, Tensor] = {}
+        # The keys which read each tensor, by id, to drop when it dies.
+        self.readers: dict[int, list[LogicNode]] = {}
+
+    def _ref(self, tns: Tensor) -> TensorRef:
+        if id(tns) not in self.readers:
+            self.readers[id(tns)] = []
+            weakref.finalize(tns, self._forget, id(tns))
+        return TensorRef(id(tns))
+
+    def _forget(self, ref: int) -> None:
+        for key in self.readers.pop(ref, ()):
+            self.cache.pop(key, None)
 
     def lower(self, prgm: LogicNode, bindings: dict[Alias, Tensor] | None = None):
         if isinstance(prgm, LogicExpression):
@@ -205,7 +228,7 @@ class CachingFactorizer(UnvalidatedForm, LogicEvaluator):
         def read(node: LogicNode) -> LogicNode | None:
             match node:
                 case Table(Alias() as alias, idxs):
-                    return Table(Literal(results[alias]), idxs)
+                    return Table(Literal(self._ref(results[alias])), idxs)
                 case FillTable(Alias() as alias):
                     return Literal(results[alias].fill_value)
             return None
@@ -214,20 +237,35 @@ class CachingFactorizer(UnvalidatedForm, LogicEvaluator):
         assert isinstance(factored, Plan)
         for body in factored.bodies:
             match body:
+                # Galley starts a pointwise result from its fill, as the
+                # evaluator does itself.
+                case Query(lhs, Aggregate(Literal(ffuncs.overwrite), _, arg, ())):
+                    body = Query(lhs, arg)
+            match body:
+                case Query(
+                    Table(Alias() as alias, idxs), Table(Alias() as src, src_idxs)
+                ) if idxs == src_idxs:
+                    results[alias] = results[src]
                 case Query(Table(Alias() as alias, idxs), rhs):
                     key = query_key(
                         cast(LogicExpression, Rewrite(PostWalk(read))(rhs)), idxs
                     )
-                    if key not in self.cache:
-                        reads = {
-                            var: results[var]
-                            for var in PostOrderDFS(rhs)
-                            if isinstance(var, Alias)
-                        }
-                        (self.cache[key],) = self.evaluator(
-                            Plan((body, Produces((alias,)))), reads
-                        )
-                    results[alias] = self.cache[key]
+                    if key in self.cache:
+                        results[alias] = self.cache[key]
+                        continue
+                    reads = {
+                        var: results[var]
+                        for var in PostOrderDFS(rhs)
+                        if isinstance(var, Alias)
+                    }
+                    (results[alias],) = self.evaluator(
+                        Plan((body, Produces((alias,)))), reads
+                    )
+                    # A result which is one of its inputs would keep itself alive.
+                    if all(results[alias] is not tns for tns in reads.values()):
+                        self.cache[key] = results[alias]
+                        for tns in reads.values():
+                            self.readers[self._ref(tns).id].append(key)
                 case Produces(args):
                     if isinstance(prgm, LogicExpression):
                         return TableValue(results[cast(Alias, args[0])], prgm.fields())
