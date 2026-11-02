@@ -804,6 +804,15 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
                 for r in range(1, self.ndim)
             ),
         )
+        match proto:
+            case ntn.DefaultProtocol() | ntn.Walk():
+                pass
+            case ntn.Follow():
+                return self._level_unfurl_follow(ctx, fiber, pos, full)
+            case _:
+                raise NotImplementedError(
+                    f"SparseHashLevelFType does not support the {proto} protocol."
+                )
         bindings = {
             "r": hl.var("r"),
             "r_stop": hl.var("r_stop"),
@@ -887,6 +896,69 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
                 tail=lambda ctx, idx: lplt.Run(full),
             ),
         )
+
+    def _level_unfurl_follow(self, ctx, fiber, pos, full):
+        lvl = ctx(fiber.lvl)
+        p_t, d_t = self.position_type, self.dimension_type
+
+        def lookup(ctx, idx):
+            hl = _SparseHashLowering(self, ctx, lvl)
+            p, i, q = hl.var("p", p_t), hl.var("i", d_t), hl.var("q", p_t)
+            found = hl.var("found", ftypes.bool_)
+            hashing, x = hl.key_hash(p, i)
+            finding, h, _ = hl.find(p, i, x)
+            # A table without slots holds no keys, and can't be probed.
+            ctx.exec(
+                asm.Block(
+                    (
+                        *hl.parse(
+                            """
+                            p = to_pos(pos)
+                            i = to_idx(idx)
+                            found = false
+                            q = zero_pos
+                            """,
+                            p=p,
+                            i=i,
+                            q=q,
+                            found=found,
+                            pos=pos,
+                            idx=ctx.ctx(idx),
+                        ),
+                        asm.If(
+                            hl.expr("n_ctrl > 0"),
+                            asm.Block(
+                                (
+                                    *hashing,
+                                    *finding,
+                                    *hl.parse(
+                                        """
+                                        if (tbl_ctrl[h] != EMPTY)
+                                            found = true
+                                            q = tbl[h]
+                                        end
+                                        """,
+                                        h=h,
+                                        q=q,
+                                        found=found,
+                                    ),
+                                )
+                            ),
+                        ),
+                    )
+                )
+            )
+            return lplt.Switch(
+                found,
+                lplt.Run(
+                    ntn.Fiber(
+                        ntn.Child(fiber.lvl), ntn.Value(q, p_t), (*fiber.idxs, idx)
+                    )
+                ),
+                lplt.Run(full),
+            )
+
+        return lplt.Lookup(lookup)
 
     def _lower_scansearch(self, hl, bindings, x):
         """

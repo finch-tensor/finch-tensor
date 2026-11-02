@@ -206,6 +206,13 @@ class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
         proto,
         pos: asm.AssemblyExpression,
     ):
+        match proto:
+            case ntn.DefaultProtocol() | ntn.Follow():
+                pass
+            case _:
+                raise NotImplementedError(
+                    f"DenseLevelFType does not support the {proto} protocol."
+                )
         tns = fiber
         level = tns.lvl
         lvl = ctx(level)

@@ -312,6 +312,17 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
                 for r in range(1, self.ndim)
             ),
         )
+        match proto:
+            case ntn.DefaultProtocol() | ntn.Walk():
+                step = lplt.Stepper
+            case ntn.Gallop():
+                step = lplt.Jumper
+            case ntn.Follow():
+                return self._level_unfurl_follow(ctx, fiber, pos, full)
+            case _:
+                raise NotImplementedError(
+                    f"SparseListLevelFType does not support the {proto} protocol."
+                )
         tmp_locals = locals()
 
         def thunk_preamble(ctx, idx):
@@ -402,7 +413,7 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         return lplt.Thunk(
             preamble=thunk_preamble,
             body=lambda ctx, ext: lplt.Sequence(
-                head=lambda ctx, idx: lplt.Stepper(
+                head=lambda ctx, idx: step(
                     preamble=lambda ctx: asm.IfElse(
                         asm.Call(asm.L(ffuncs.lt), (q, q_stop)),
                         asm.Block((asm.Assign(i_stop, asm.Load(idx_s, q)),)),
@@ -440,6 +451,68 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
                 tail=lambda ctx, idx: lplt.Run(full),
             ),
         )
+
+    def _level_unfurl_follow(self, ctx, fiber, pos, full):
+        lvl_asm = ctx(fiber.lvl)
+        p_t = self.position_type
+
+        def lookup(ctx, idx):
+            names = {
+                name: asm.Variable(ctx.freshen(name), p_t)
+                for name in ("q", "q_stop", "m")
+            }
+            found = asm.Variable(ctx.freshen("found"), ftypes.bool_)
+            # Bisect the fiber for the first index which is at least idx. Loads
+            # only happen in bounds, since the assembly has no short circuits.
+            code = """finch
+            q = ptr_s[pos]
+            q_stop = ptr_s[pos + 1]
+            hi = q_stop
+            while (q < hi)
+              m = hi - q
+              m = m >> 1
+              m = q + m
+              if (idx_s[m] < i)
+                q = m + 1
+              else
+                hi = m
+              end
+            end
+            found = false
+            if (q < q_stop)
+              if (idx_s[q] == i)
+                found = true
+              end
+            end
+            """
+            ctx.exec(
+                parse_assembly(
+                    code,
+                    names
+                    | {
+                        "hi": asm.Variable(ctx.freshen("hi"), p_t),
+                        "found": found,
+                        "ptr_s": asm.GetAttr(lvl_asm, asm.Literal("ptr")),
+                        "idx_s": asm.GetAttr(lvl_asm, asm.Literal("idx")),
+                        "pos": pos,
+                        "i": ctx.ctx(idx),
+                    },
+                    position_type=p_t,
+                )
+            )
+            return lplt.Switch(
+                found,
+                lplt.Run(
+                    ntn.Fiber(
+                        ntn.Child(fiber.lvl),
+                        ntn.Value(names["q"], p_t),
+                        (*fiber.idxs, idx),
+                    )
+                ),
+                lplt.Run(full),
+            )
+
+        return lplt.Lookup(lookup)
 
     def level_unfurl_update(self, ctx, fiber, ext, mode, proto, pos):
         lvl = ctx(fiber.lvl)
