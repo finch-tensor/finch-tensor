@@ -44,7 +44,6 @@ MLIR_PIPELINE = (
     "expand-strided-metadata,"
     "convert-scf-to-cf,"
     "convert-cf-to-llvm,"
-    "convert-math-to-llvm,"
     "convert-arith-to-llvm,"
     "finalize-memref-to-llvm,"
     "convert-func-to-llvm,"
@@ -798,7 +797,7 @@ def mlir_division(
             return emit(f"arith.divf {x}, {y} : {t}")
         case ffuncs._FloorDivFType() if is_float:
             quotient = emit(f"arith.divf {x}, {y} : {t}")
-            return emit(f"math.floor {quotient} : {t}")
+            return emit(f"llvm.intr.floor({quotient}) : ({t}) -> {t}")
         case ffuncs._TrueDivFType() | ffuncs._FloorDivFType():
             return emit(f"{mlir_function_name(op_type, result_type)} {x}, {y} : {t}")
     rem = emit(f"{mlir_function_name(op_type, result_type)} {x}, {y} : {t}")
