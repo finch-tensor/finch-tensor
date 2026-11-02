@@ -10,36 +10,9 @@ of the variable at the root of its target, so it adds to the reaching ones.
 from collections import defaultdict
 from collections.abc import Iterable
 
-from finch.symbolic import PostOrderDFS
-
 from .cfg_builder import NumberedStatement
-from .dataflow import AbstractAssemblyDataflow
-from .nodes import AssemblyNode, Assign, GetAttr, SetAttr, Variable
-
-
-def _reads(stmt: AssemblyNode) -> list[str]:
-    """names of the variables a statement reads, in order"""
-    match stmt:
-        case NumberedStatement(stmt, _):
-            pass
-    match stmt:
-        case Assign(_, rhs):
-            stmt = rhs
-    names: list[str] = []
-    for node in PostOrderDFS(stmt):
-        match node:
-            case Variable(name, _) if name not in names:
-                names.append(name)
-    return names
-
-
-def _root_name(node: AssemblyNode) -> str | None:
-    match node:
-        case GetAttr(obj, _):
-            return _root_name(obj)
-        case Variable(name, _):
-            return name
-    return None
+from .dataflow import AbstractAssemblyDataflow, root_of, variables_read
+from .nodes import AssemblyNode, Assign, SetAttr, Variable
 
 
 class AssemblyReachingDefinitions(AbstractAssemblyDataflow):
@@ -65,9 +38,9 @@ class AssemblyReachingDefinitions(AbstractAssemblyDataflow):
                 case NumberedStatement(Assign(Variable(name, _), _), sid):
                     state[name] = frozenset((sid,))
                 case NumberedStatement(SetAttr(obj, _, _), sid):
-                    name = _root_name(obj)
-                    if name is not None:
-                        state[name] = state.get(name, frozenset()) | {sid}
+                    match root_of(obj):
+                        case Variable(name, _):
+                            state[name] = state.get(name, frozenset()) | {sid}
         return state
 
     def use_def_chains(self) -> dict[tuple[int, str], frozenset[int]]:
@@ -75,7 +48,7 @@ class AssemblyReachingDefinitions(AbstractAssemblyDataflow):
         return {
             (stmt.sid, name): state.get(name, frozenset())
             for stmt, state in self.statement_states()
-            for name in _reads(stmt)
+            for name in variables_read(stmt)
         }
 
     def def_use_chains(self) -> dict[int, frozenset[int]]:
@@ -89,5 +62,5 @@ class AssemblyReachingDefinitions(AbstractAssemblyDataflow):
     def get_lattice_value(self, state, stmt) -> list[tuple[str, object]]:
         return [
             (name, "{" + ", ".join(map(str, sorted(state.get(name, ())))) + "}")
-            for name in _reads(stmt)
+            for name in variables_read(stmt)
         ]

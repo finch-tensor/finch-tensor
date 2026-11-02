@@ -37,6 +37,8 @@ class FinchOperatorFType(CallableFType, ABC):
     is_associative: bool = False
     is_commutative: bool = False
     is_idempotent: bool = False
+    # a pure call doesn't mutate its arguments or have other effects
+    is_pure: bool = False
     arity: int | float = 2
 
     def is_distributive(self, other: "FinchOperatorFType") -> bool:

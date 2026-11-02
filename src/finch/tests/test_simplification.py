@@ -30,7 +30,7 @@ from finch.finch_logic.simplification import simplify_logic, unwrap_literal
 from finch.finch_notation.interpreter import NotationInterpreter
 from finch.symbolic import UnvalidatedForm
 from finch.symbolic.rewriters import Chain, Fixpoint, PostWalk, Rewrite
-from finch.symbolic.simplification import simplify_rules
+from finch.symbolic.simplification import simplify_rules, try_evaluate
 from finch.symbolic.term import CallTerm
 
 x = ntn.Variable("x", int64)
@@ -485,3 +485,20 @@ def test_annihilator_empties_the_loop_body():
     runtime_code, runtime_out, arr = _assembly_for(lambda x, arr: x * Scalar(0))
     np.testing.assert_array_equal(runtime_out, arr * 0)
     assert "mul(load(" in runtime_code
+
+
+def test_try_evaluate_declines_runtime_failures():
+    def lit(val):
+        return asm.Literal(val)
+
+    folded = try_evaluate(lit(ffuncs.add), (lit(np.int32(1)), lit(np.int32(2))))
+    assert folded is not None
+    assert folded == lit(np.int32(3))
+    assert type(folded.val) is np.int32
+    for op, args in [
+        (ffuncs.pow, (np.int64(2), np.int64(-1))),
+        (ffuncs.add, (np.int64(2**63 - 1), np.int64(1))),
+        (ffuncs.truediv, (np.float64(1.0), np.float64(0.0))),
+        (ffuncs.mul, (2**62, 4)),
+    ]:
+        assert try_evaluate(lit(op), tuple(lit(arg) for arg in args)) is None
