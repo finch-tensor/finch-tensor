@@ -2790,6 +2790,18 @@ def test_disjoint_join_dc_card(fill3, expected_nnz):
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
 
 
+@pytest.mark.parametrize("factory", [DCStatsFactory, ExactStatsFactory])
+def test_aggregate_does_not_bound_joins_over_reduced_fields(factory):
+    sf = factory()
+    i, j = Field("i"), Field("j")
+    # Every degree of a single entry is 1, but its projection onto i says
+    # nothing about the j of a tensor it joins.
+    entry = sf(ft.asarray(np.diag([1.0, 0.0, 0.0, 0.0])), (i, j))
+    row = sf.aggregate(ffuncs.or_, False, (j,), sf.support(entry))
+    full = sf.support(sf(ft.asarray(np.ones((4, 4))), (i, j)))
+    assert sf.mapjoin(ffuncs.and_, row, full).estimate_non_fill_values() == 4
+
+
 @pytest.mark.parametrize(
     "dims, dcs, reduce_indices, expected_nnz",
     [

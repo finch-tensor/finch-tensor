@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from finch.algebra import (
     ffuncs,
+    is_annihilator,
     is_associative,
     is_commutative,
     is_distributive,
     is_dynamic,
+    is_idempotent,
     is_identity,
 )
 from finch.finch_logic import (
@@ -117,7 +119,8 @@ def _push_aggregate_up(expr: LogicExpression) -> LogicExpression | None:
     """
     Rewrite: MapJoin(op, args_1, Aggregate(agg_op, agg_init, agg_arg), args_2)
          -> Aggregate(agg_op, agg_init, MapJoin(op, args_1, agg_arg, args_2))
-    when op distributes over agg_op. Pushes aggregates outward so reduction
+    when op distributes over agg_op, agg_init annihilates op, and no other
+    argument uses a reduced index. Pushes aggregates outward so reduction
     indices are no longer nested.
     """
     match expr:
@@ -128,6 +131,9 @@ def _push_aggregate_up(expr: LogicExpression) -> LogicExpression | None:
                     and isinstance(arg.op, Literal)
                     and isinstance(arg.init, Literal)
                     and is_distributive(mj_op.ftype, arg.op.val.ftype)
+                    and is_annihilator(mj_op.ftype, arg.init.val)
+                    and not set(arg.idxs)
+                    & set(MapJoin(expr.op, args[:i] + args[i + 1 :]).fields())
                 ):
                     new_args = args[:i] + (arg.arg,) + args[i + 1 :]
                     return Aggregate(
@@ -142,8 +148,10 @@ def _merge_adjacent_aggregates(expr: LogicExpression) -> LogicExpression | None:
     """
     Rewrite: Aggregate(op, init, Aggregate(op, init, arg, idxs1), idxs2)
          -> Aggregate(op, init, arg, idxs1 + idxs2)
-    when op is associative and commutative. Flattens nested same-op aggregates
-    so all reduction indices share the same root; neither is a parent of the other.
+    when op is associative and commutative, and init is an identity of op or op
+    is idempotent, so init isn't joined more than once. Flattens nested same-op
+    aggregates so all reduction indices share the same root; neither is a parent
+    of the other.
     """
     match expr:
         case Aggregate(
@@ -152,7 +160,11 @@ def _merge_adjacent_aggregates(expr: LogicExpression) -> LogicExpression | None:
             Aggregate(Literal(inner_op), Literal(inner_init), arg, idxs1),
             idxs2,
         ) if op == inner_op and init == inner_init:
-            if is_associative(op.ftype) and is_commutative(op.ftype):
+            if (
+                is_associative(op.ftype)
+                and is_commutative(op.ftype)
+                and (is_identity(op.ftype, init) or is_idempotent(op.ftype))
+            ):
                 return Aggregate(expr.op, expr.init, arg, idxs1 + idxs2)
             return None
         case _:
