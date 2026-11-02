@@ -49,14 +49,19 @@ class MemoStatsFactory(
         # Tensors are unhashable, so a leaf is cached by id until its tensor dies.
         self.leaves: dict[int, Any] = {}
         self.memo: WeakKeyDictionary[LogicNode, Any] = WeakKeyDictionary()
+        self.estimates: WeakKeyDictionary[LogicNode, dict[frozenset[Field], float]] = (
+            WeakKeyDictionary()
+        )
 
     def _memo(
         self, base: BaseTensorStats, expr: LogicExpression, method, *args
     ) -> MemoStats:
-        # The inner statistic of expr is `method(*args)`, computed only once.
+        # The inner statistic of expr is `method(*args)`, computed only once,
+        # and so are its estimates.
         if expr not in self.memo:
             self.memo[expr] = method(*args)
-        return MemoStats(base, expr, self.memo[expr])
+            self.estimates[expr] = {}
+        return MemoStats(base, expr, self.memo[expr], self.estimates[expr])
 
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> MemoStats:
         base = super().__call__(tensor, fields)
@@ -138,13 +143,23 @@ class MemoStatsFactory(
 
 
 class MemoStats(NumericStats):
-    def __init__(self, base: BaseTensorStats, expr: LogicExpression, inner: Any):
+    def __init__(
+        self,
+        base: BaseTensorStats,
+        expr: LogicExpression,
+        inner: Any,
+        estimates: dict[frozenset[Field], float],
+    ):
         super().__init__(base)
         self.expr = expr
         self.inner = inner
+        self.estimates = estimates
 
     def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
-        return self.inner.estimate_non_fill_values(over)
+        over = frozenset(over)
+        if over not in self.estimates:
+            self.estimates[over] = self.inner.estimate_non_fill_values(over)
+        return self.estimates[over]
 
     def get_embedding(self) -> np.ndarray:
         return self.inner.get_embedding()

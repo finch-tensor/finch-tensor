@@ -1012,6 +1012,25 @@ def test_memo_computes_each_expression_once():
     assert ab_c.estimate_non_fill_values() == np.count_nonzero(A @ B @ C)
 
 
+def test_memo_computes_each_estimate_once():
+    i, j = Field("i"), Field("j")
+    factory = MemoStatsFactory()
+    stats = factory(ft.asarray(np.eye(4)), (i, j))
+    again = factory.relabel(stats, (i, j))
+    calls = []
+    estimate = again.inner.estimate_non_fill_values
+
+    def counting(over=()):
+        calls.append(frozenset(over))
+        return estimate(over)
+
+    again.inner.estimate_non_fill_values = counting
+    for _ in range(3):
+        assert factory.relabel(stats, (i, j)).estimate_non_fill_values((j, i)) == 1
+    assert again.estimate_non_fill_values((i, j)) == 1
+    assert calls == [frozenset({i, j})]
+
+
 def test_memo_leaf_cache_is_weak():
     factory = MemoStatsFactory()
     tensor = ft.asarray(np.eye(3))
