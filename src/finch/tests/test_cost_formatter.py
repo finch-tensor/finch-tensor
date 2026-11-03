@@ -4,7 +4,8 @@ import numpy as np
 
 import finch as fl
 from finch import ffuncs
-from finch.algebra import DynamicFillFType, StaticFillFType
+from finch.algebra import DynamicFillFType, StaticFillFType, TensorFType
+from finch.autoschedule import CompilerFormLowerer, NotationGenerator
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.cost_models import (
     ByKind,
@@ -17,6 +18,7 @@ from finch.autoschedule.cost_models import (
     Quadratic,
     SparseByteMapLevelOption,
     SparseHashLevelOption,
+    SparseListLevelOption,
     allowed_options,
     write_protocols,
 )
@@ -31,7 +33,11 @@ from finch.autoschedule.formatter.smart_formatter import (
     CostFormatter,
     IterCostFormatter,
     StorageCostFormatter,
+    WorkspaceCostFormatter,
+    add_workspace,
+    workspace_depth,
 )
+from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.tensor_stats import (
     BaseTensorStats,
     DCStatsFactory,
@@ -40,6 +46,9 @@ from finch.autoschedule.tensor_stats import (
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.tensor_stats.uniform_stats import UniformStats
 from finch.autoschedule.util import fuse_loop_order
+from finch.codegen import NumbaCompiler
+from finch.compile import NotationCompiler
+from finch.finch_assembly import AssemblySimplify, LowerPackedStructSlots
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -47,6 +56,7 @@ from finch.finch_logic import (
     Extrude,
     Field,
     Follow,
+    Fuse,
     FusedAlias,
     HardAlias,
     Laminate,
@@ -249,7 +259,7 @@ def test_bytemap_allocates_its_children_densely():
     assert option.next_num_pos(stats, factory, 0, 1, ()) == 4
     np.testing.assert_allclose(
         option.get_storage_features(stats, factory, 0, 1, 8, pos_size, 8, ()),
-        [1, 4, 3.5, (2 + 3.5) * pos_size],
+        [1, 4, 3.5, (2 + 3.5) * pos_size, 3.5],
     )
 
 
@@ -587,16 +597,16 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
     }
     basis = ByKind(bases)
     cost = LinearCostModel(
-        ByKind({kind: Quadratic(sub) for kind, sub in bases.items()}), np.ones(72)
+        ByKind({kind: Quadratic(sub) for kind, sub in bases.items()}), np.ones(85)
     )
     formats: dict[Alias, list[LevelOption]] = {
         b: [DenseLevelOption(), ElementLevelOption()]
     }
     features = basis.get_features(plan, formats, stats, sf)
     # Allocation, write, and lookup rows for both the dense and element levels.
-    assert features.shape == (6, 12)
-    np.testing.assert_array_equal(features[1:3, 2:6], [[0, 0, 3, 0], [0, 3, 0, 0]])
-    np.testing.assert_array_equal(features[4:6, 8:12], [[0, 0, 3, 0], [0, 3, 0, 0]])
+    assert features.shape == (6, 13)
+    np.testing.assert_array_equal(features[1:3, 3:7], [[0, 0, 3, 0], [0, 3, 0, 0]])
+    np.testing.assert_array_equal(features[4:6, 9:13], [[0, 0, 3, 0], [0, 3, 0, 0]])
     expected = sum(row.sum() ** 2 for row in features)
     assert cost.predict_cost(plan, formats, stats, sf) == expected
     machine = StatsMachine(sf, dict(stats))
@@ -611,7 +621,7 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
             (1, (3,), ElementLevelOption()),
         )
     )
-    assert cost.get_features(Plan(()), {}, {}, sf).shape == (0, 72)
+    assert cost.get_features(Plan(()), {}, {}, sf).shape == (0, 85)
     assert cost.predict_cost(Plan(()), {}, {}, sf) == 0.0
     formatter = CostFormatter(cost_model=cost, options=(DenseLevelOption(),))
     fmt = formatter.get_tensor_ftype(
@@ -646,3 +656,192 @@ def test_format_selection_uses_custom_model():
 
     assert isinstance(choose(linear).lvl_t, fl.DenseLevelFType)
     assert isinstance(choose(nonlinear).lvl_t, fl.SparseHashLevelFType)
+
+
+def _matmul(c, a, b, loop_order):
+    # c[i, k] = sum_j a[i, j] * b[j, k], looping over loop_order.
+    i, j, k = Field("i"), Field("j"), Field("k")
+    rhs = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k)))),
+        (j,),
+    )
+    return Plan(
+        (fuse_loop_order(Query(Table(c, (i, k)), rhs), loop_order), Produces((c,)))
+    ), rhs
+
+
+def _block_matmul(n, m):
+    # Every row of a reads the same m rows of b, so the n * m * m products land
+    # on only n * m entries of the output.
+    data_a = np.zeros((n, n))
+    data_a[:, :m] = 1
+    data_b = np.zeros((n, n))
+    data_b[:m, :m] = np.arange(1, m * m + 1).reshape(m, m)
+    return data_a, data_b
+
+
+def test_workspace_depth_counts_the_fields_written_in_order():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
+
+    # The j loop makes the writes to c scatter at k, but not at i.
+    assert workspace_depth(_matmul(c, a, b, (i, j, k))[0], c) == 1
+    assert workspace_depth(_matmul(c, a, b, (j, i, k))[0], c) == 0
+    assert workspace_depth(_matmul(c, a, b, (i, k, j))[0], c) is None
+
+    # An alias which is updated after its definition has no workspace.
+    define, _ = _matmul(c, a, b, (i, j, k))
+    update = fuse_loop_order(
+        QueryInto(Table(c, (i, k)), Literal(ffuncs.add), Table(a, (i, k))), (i, k)
+    )
+    plan = Plan((define.bodies[0], update, Produces((c,))))
+    assert workspace_depth(plan, c) is None
+
+
+def test_add_workspace_copies_each_slice_after_its_query():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, c, w = (HardAlias(name) for name in "abcw")
+    plan, rhs = _matmul(c, a, b, (i, j, k))
+    fused = FusedAlias(w, 1)
+
+    staged = add_workspace(plan, c, 1, w)
+
+    assert staged == Plan(
+        (
+            Fuse(
+                i,
+                Plan(
+                    (
+                        fuse_loop_order(Query(Table(fused, (i, k)), rhs), (j, k)),
+                        Fuse(k, Query(Table(c, (i, k)), Table(fused, (i, k)))),
+                    )
+                ),
+            ),
+            Produces((c,)),
+        )
+    )
+    tensor = fl.asarray(np.ones((2, 2)))
+    bindings: dict[Alias, TensorFType] = {a: tensor.ftype, b: tensor.ftype}
+    assert isinstance(staged, Plan)
+    LoopOrderedForm.validate_inputs(staged, bindings, {}, DCStatsFactory())
+
+    # Without a field written in order, the workspace holds all of c.
+    plan, rhs = _matmul(c, a, b, (j, i, k))
+    full = FusedAlias(w, 0)
+    assert add_workspace(plan, c, 0, w) == Plan(
+        (
+            fuse_loop_order(Query(Table(full, (i, k)), rhs), (j, i, k)),
+            fuse_loop_order(Query(Table(c, (i, k)), Table(full, (i, k))), (i, k)),
+            Produces((c,)),
+        )
+    )
+
+
+def test_sparse_list_levels_reject_scatter_writes():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, c, w = (HardAlias(name) for name in "abcw")
+    plan, _ = _matmul(c, a, b, (i, j, k))
+    staged = add_workspace(plan, c, 1, w)
+    options = [SparseListLevelOption()]
+
+    # The query scatters into the columns of c, but the copy writes them in
+    # order, and both write the rows of c in order.
+    assert allowed_options(c, 1, plan, options) == []
+    assert allowed_options(c, 1, staged, options) == options
+    assert allowed_options(c, 0, plan, options) == options
+
+
+@pytest.mark.parametrize(
+    "option, expected",
+    [
+        (DenseLevelOption(), [1, 4, 16]),
+        (SparseByteMapLevelOption(), [1, 4, 1, 3 * np.dtype(np.intp).itemsize, 4]),
+    ],
+)
+def test_workspace_levels_reset_each_slice(option, expected):
+    t, i = Field("t"), Field("i")
+    a, scratch = HardAlias("a"), HardAlias("scratch")
+    fused = FusedAlias(scratch, 1)
+    sf = DCStatsFactory()
+    stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.eye(4)), (t, i))}
+    copy = fuse_loop_order(Query(Table(fused, (t, i)), Table(a, (t, i))), (t, i))
+    plan = Plan((copy, Produces((fused,))))
+    basis = LevelBasis(type(option))
+    machine = StatsMachine(sf, dict(stats))
+    choice = LevelChoice(plan, scratch, 0, (1.0,), option, np.dtype(np.intp).itemsize)
+
+    # Each of the 4 slices of the diagonal is reset before it is written.
+    features = basis.get_component_features(choice, machine)
+    np.testing.assert_allclose(features[0, : len(option.feature_names)], expected)
+
+
+def _workspace_format(data_a, data_b):
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
+    tensor_a, tensor_b = fl.asarray(data_a), fl.asarray(data_b)
+    sf = DCStatsFactory()
+    stats: dict[Alias, TensorStats] = {
+        a: sf(tensor_a, (i, j)),
+        b: sf(tensor_b, (j, k)),
+    }
+    capture = LogicCapture()
+    plan, _ = _matmul(c, a, b, (i, j, k))
+    WorkspaceCostFormatter(CompilerFormLowerer(capture))(
+        plan, {a: tensor_a.ftype, b: tensor_b.ftype}, stats, sf
+    )
+    return plan, capture
+
+
+def test_workspace_cost_formatter_accumulates_rows_in_a_workspace():
+    i, k = Field("i"), Field("k")
+    c = HardAlias("c")
+    data_a, data_b = _block_matmul(64, 2)
+    _, capture = _workspace_format(data_a, data_b)
+
+    match capture.last_prgm:
+        case Plan(
+            (
+                Fuse(
+                    _,
+                    Plan(
+                        (
+                            Fuse(_, Fuse(_, Query(Table(FusedAlias(ws, 1), _), _))),
+                            Fuse(_, Query(Table(lhs, (i_, k_)), Table(view, _))),
+                        )
+                    ),
+                ),
+                Produces(_),
+            )
+        ):
+            assert (lhs, i_, k_, view) == (c, i, k, FusedAlias(ws, 1))
+        case prgm:
+            raise AssertionError(f"Expected a workspace for each row: {prgm}")
+    # The workspace takes the scattered writes, and the copy fills a sorted list
+    # in order.
+    fmt = capture.last_bindings[ws]
+    assert isinstance(fmt.lvl_t, fl.SparseByteMapLevelFType)
+    fmt = capture.last_bindings[c]
+    assert isinstance(fmt.lvl_t, fl.DenseLevelFType)
+    assert isinstance(fmt.lvl_t.lvl_t, fl.SparseListLevelFType)
+
+    program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
+    bindings = [
+        fl.asarray(data_a),
+        fl.asarray(data_b),
+        capture.last_bindings[ws].construct((0,)),
+        capture.last_bindings[c].construct((0, 0)),
+    ]
+    compiler = NotationCompiler(
+        NumbaCompiler(), ctx_transforms=(LowerPackedStructSlots(), AssemblySimplify())
+    )
+    (result,) = compiler(program).main(*bindings)
+    np.testing.assert_array_equal(result.to_scipy().toarray(), data_a @ data_b)
+
+
+def test_workspace_cost_formatter_writes_dense_outputs_directly():
+    rng = np.random.default_rng(0)
+    data_a, data_b = rng.random((8, 8)), rng.random((8, 8))
+    plan, capture = _workspace_format(data_a, data_b)
+    assert capture.last_prgm == plan

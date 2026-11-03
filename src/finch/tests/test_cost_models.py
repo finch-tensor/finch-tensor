@@ -162,7 +162,7 @@ def test_stratify_fits_separate_coefficients_per_regime(rng):
                     "sparse_hash": LevelBasis(SparseHashLevelOption),
                 }
             ),
-            np.arange(14),
+            np.arange(15),
         ),
     ],
 )
@@ -211,6 +211,7 @@ def test_feature_names_compose():
     assert ByKind({"dense": LevelBasis(DenseLevelOption)}).feature_names == (
         "dense.positions",
         "dense.slots",
+        "dense.reset_slots",
         "dense.walks",
         "dense.lookups",
         "dense.sequential_writes",
