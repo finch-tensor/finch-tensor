@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Self, TypeVar
 
 from finch import finch_assembly as asm
+from finch import finch_notation as ntn
 from finch.algebra import (
     AbstractFill,
     AbstractFillFType,
@@ -191,6 +192,20 @@ class LevelFType(FType, ABC):
         this dimension constrains dimensions further inside the fiber tree.
         """
         ...
+
+    def level_default_protocols(self) -> tuple[ntn.Protocol, ...]:
+        """
+        The protocol which a loop reads each dimension of the fibers in the
+        structure with, when the access gives none.
+        """
+        return (ntn.DefaultProtocol(),) * self.ndim
+
+    def level_protocols(self) -> tuple[tuple[ntn.Protocol, ...], ...]:
+        """
+        The protocols which a loop can read or write each dimension of the
+        fibers in the structure with.
+        """
+        return ((ntn.DefaultProtocol(),),) * self.ndim
 
 
 LT = TypeVar("LT", bound=LevelFType)

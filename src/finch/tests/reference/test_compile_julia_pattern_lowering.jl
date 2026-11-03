@@ -10,7 +10,7 @@ eval(let
         v2 .= 0.0
         for v11 = 1:v5
             for v12 = 1:v6
-                v2[v12,v11] <<Finch.initwrite(0.0)>>= (Float64(v0[v12,v11]) + v1[v12,v11])
+                v2[extrude(v12),extrude(v11)] <<Finch.initwrite(0.0)>>= (Float64(v0[v12,v11]) + v1[v12,v11])
             end
         end
         return v2
@@ -29,7 +29,7 @@ eval(let
         v2 .= 0.0
         for v11 = 1:v5
             for v12 = 1:v6
-                v2[v12,v11] <<Finch.initwrite(0.0)>>= (Float64(v0[v12,v11]) + v1[v12,v11])
+                v2[extrude(v12),extrude(v11)] <<Finch.initwrite(0.0)>>= (Float64(v0[v12,v11]) + v1[v12,v11])
             end
         end
         return v2
@@ -48,7 +48,7 @@ eval(let
         v2 .= 0.0
         for v11 = 1:v5
             for v12 = 1:v6
-                v2[v12,v11] <<Finch.initwrite(0.0)>>= (Float64(v0[v12,v11]) + v1[v12,v11])
+                v2[extrude(v12),extrude(v11)] <<Finch.initwrite(0.0)>>= (Float64(v0[v12,v11]) + v1[v12,v11])
             end
         end
         return v2
@@ -67,7 +67,7 @@ eval(let
         v2 .= 0.0
         for v11 = 1:v5
             for v12 = 1:v6
-                v2[v12,v11] <<Finch.initwrite(0.0)>>= (Float64(v0[v12,v11]) + v1[v12,v11])
+                v2[extrude(v12),extrude(v11)] <<Finch.initwrite(0.0)>>= (Float64(v0[v12,v11]) + v1[v12,v11])
             end
         end
         return v2
@@ -84,7 +84,7 @@ eval(let
     Finch.@finch_kernel function main(v0,v1,v2,v4)
         v2 .= 0
         for v7 = 1:v4
-            v2[v7] <<Finch.initwrite(0)>>= (Bool(v0[v7]) + v1[v7])
+            v2[extrude(v7)] <<Finch.initwrite(0)>>= (Bool(v0[v7]) + v1[v7])
         end
         return v2
     end
@@ -106,7 +106,7 @@ eval(let
             for v20 = 1:v8
                 for v21 = 1:v9
                     for v22 = 1:v10
-                        v2[v22,v21,v20,v19] <<Finch.initwrite(0)>>= (Bool(v0[v22,v21,v20,v19]) + v1[v22,v21,v20,v19])
+                        v2[extrude(v22),extrude(v21),extrude(v20),extrude(v19)] <<Finch.initwrite(0)>>= (Bool(v0[v22,v21,v20,v19]) + v1[v22,v21,v20,v19])
                     end
                 end
             end
@@ -127,7 +127,7 @@ eval(let
         v2 .= 0
         for v11 = 1:v5
             for v12 = 1:v6
-                v2[v12,v11] <<Finch.initwrite(0)>>= (Bool(v0[v12,v11]) + v1[v12,v11])
+                v2[extrude(v12),extrude(v11)] <<Finch.initwrite(0)>>= (Bool(v0[v12,v11]) + v1[v12,v11])
             end
         end
         return v2
@@ -146,7 +146,7 @@ eval(let
         v2 .= 0
         for v11 = 1:v5
             for v12 = 1:v6
-                v2[v12,v11] <<Finch.initwrite(0)>>= (Bool(v0[v12,v11]) + v1[v12,v11])
+                v2[extrude(v12),extrude(v11)] <<Finch.initwrite(0)>>= (Bool(v0[v12,v11]) + v1[v12,v11])
             end
         end
         return v2
@@ -163,7 +163,7 @@ eval(let
     Finch.@finch_kernel function main(v0,v1,v2,v3)
         v2 .= 0
         for v6 = 1:v3
-            v2[v6] <<Finch.initwrite(0)>>= (Bool(v0[]) + v1[v6])
+            v2[extrude(v6)] <<Finch.initwrite(0)>>= (Bool(v0[]) + v1[v6])
         end
         return v2
     end
@@ -179,7 +179,7 @@ eval(let
     Finch.@finch_kernel function main(v0,v1,v2,v4)
         v2 .= 0
         for v7 = 1:v4
-            v2[v7] <<Finch.initwrite(0)>>= (Bool(v0[v7]) + v1[v7])
+            v2[extrude(v7)] <<Finch.initwrite(0)>>= (Bool(v0[v7]) + v1[v7])
         end
         return v2
     end
@@ -197,7 +197,7 @@ eval(let
         v2 .= 0
         for v11 = 1:v5
             for v12 = 1:v6
-                v2[v12,v11] <<Finch.initwrite(0)>>= (Int64(v0[v12,v11]) + v1[v12,v11])
+                v2[extrude(v12),extrude(v11)] <<Finch.initwrite(0)>>= (Int64(v0[v12,v11]) + v1[v12,v11])
             end
         end
         return v2

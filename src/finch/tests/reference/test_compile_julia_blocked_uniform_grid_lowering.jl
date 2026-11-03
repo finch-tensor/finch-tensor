@@ -18,7 +18,7 @@ eval(let
             for v19 = 1:v6
                 for v20 = 1:v10
                     for v21 = 1:v7
-                        v3[v20,v18] += ((v0[v21,v19] != 0) * Int64(v1[v19,v18]) * Int64(v2[v21,v20]))
+                        v3[laminate(v20),extrude(v18)] += ((v0[v21,v19] != 0) * Int64(v1[v19,v18]) * Int64(v2[v21,v20]))
                     end
                 end
             end
@@ -26,13 +26,13 @@ eval(let
         v4 .= 0
         for v23 = 1:v8
             for v24 = 1:v9
-                v4[v23] += Int64(v1[v24,v23])
+                v4[extrude(v23)] += Int64(v1[v24,v23])
             end
         end
         v5 .= 0
         for v26 = 1:v10
             for v27 = 1:v11
-                v5[v26] += Int64(v2[v27,v26])
+                v5[extrude(v26)] += Int64(v2[v27,v26])
             end
         end
         return v3,v4,v5

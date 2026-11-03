@@ -795,6 +795,11 @@ def lower_looplets(
         match node:
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
+                    match mode:
+                        case ntn.Read((proto, *_)) | ntn.Update(_, (proto, *_)):
+                            pass
+                        case _:
+                            proto = ntn.DefaultProtocol()
                     tns = ctx_2.resolve(tns)
                     key = (tns, mode)
                     if key in unfurled:
@@ -817,12 +822,12 @@ def lower_looplets(
                                 )
                             )
                         )
-                    match tns:
-                        case ntn.Full(val, (_, *shape)) if mode == ntn.Read():
+                    match tns, mode:
+                        case ntn.Full(val, (_, *shape)), ntn.Read():
                             tns_2 = looplets.Run(ntn.Full(val, tuple(shape)))
                         case _:
                             tns_2 = tns.result_type.unfurl(
-                                ctx_2, tns, ext, mode, proto=None
+                                ctx_2, tns, ext, mode, proto=proto
                             )
                     unfurled[key] = ntn.Looplet(tns_2, tns.result_type)
                     return ntn.Access(unfurled[key], mode, (j, *idxs))

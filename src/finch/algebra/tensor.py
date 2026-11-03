@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 import numpy as np
 import scipy.sparse as sps
@@ -10,6 +10,9 @@ import scipy.sparse as sps
 from .devices import normalize_device, serial
 from .fill import AbstractFill, AbstractFillFType, DynamicFill, StaticFill, is_static
 from .ftypes import FType, FTyped
+
+if TYPE_CHECKING:
+    from finch.finch_notation import Protocol
 
 
 def to_numpy(x):
@@ -36,6 +39,21 @@ class TensorFType(FType, ABC, Generic[FT]):
     def ndim(self) -> int:
         """Number of dimensions of the tensor."""
         return len(self.shape_type)
+
+    def default_protocols(self) -> tuple[Protocol, ...]:
+        """
+        The protocol which a loop reads each dimension of the tensor with, when
+        the access gives none, or none if the tensor reads every dimension the
+        same way under any protocol.
+        """
+        return ()
+
+    def protocols(self) -> tuple[tuple[Protocol, ...], ...]:
+        """
+        The protocols which a loop can read each dimension of the tensor with,
+        or none if it reads them only with the default.
+        """
+        return ()
 
     @property
     def shape(self) -> tuple[int, ...]:
