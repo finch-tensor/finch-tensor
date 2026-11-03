@@ -11,9 +11,11 @@ from finch.autoschedule.cost_models import (
     Sum,
     TransposeCostModel,
 )
-from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
-from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
+from finch.autoschedule.tensor_stats.stats_interpreter import (
+    StatsInterpreter,
+    StatsMachine,
+)
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -252,9 +254,7 @@ class BFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
                 case _:
                     raise Exception(f"Invalid node: {query} in BFSLoopOrderer")
 
-            insert_statistics(
-                stats_factory, query, stats_bindings, replace=False, cache={}
-            )
+            StatsInterpreter(stats_factory)(query, stats_bindings)
 
         return Plan(tuple(new_queries + [prgm.bodies[-1]]))
 
@@ -305,9 +305,7 @@ class DFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
                 case _:
                     raise Exception(f"Invalid node: {query} in DFSLoopOrderer")
 
-            insert_statistics(
-                stats_factory, query, stats_bindings, replace=False, cache={}
-            )
+            StatsInterpreter(stats_factory)(query, stats_bindings)
 
         return Plan(tuple(new_queries + [prgm.bodies[-1]]))
 
@@ -358,8 +356,6 @@ class BruteForceLoopOrderer(AbstractLoopOrderer, Generic[NS]):
                 case _:
                     raise Exception(f"Invalid node: {query} in BruteForceLoopOrderer")
 
-            insert_statistics(
-                stats_factory, query, stats_bindings, replace=False, cache={}
-            )
+            StatsInterpreter(stats_factory)(query, stats_bindings)
 
         return Plan(tuple(new_queries + [prgm.bodies[-1]]))

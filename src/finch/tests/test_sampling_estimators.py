@@ -148,16 +148,14 @@ def test_sampling_histogram_reads_stored_counts(monkeypatch, sparse):
     fields = (Field("i"), Field("j"))
     stats = SamplingStatsFactory()(tensor, fields)
     stats.sketch = Table(Literal(tensor), fields)
-    scheduler = default_schedulers.NON_RECURSIVE_SCHEDULER
+    scheduler = default_schedulers.CACHING_SCHEDULER
     calls = []
 
     def counted_scheduler(plan):
         calls.append(plan)
         return scheduler(plan)
 
-    monkeypatch.setattr(
-        default_schedulers, "NON_RECURSIVE_SCHEDULER", counted_scheduler
-    )
+    monkeypatch.setattr(default_schedulers, "CACHING_SCHEDULER", counted_scheduler)
     assert stats.scan(needs_freq=True) == (10002, 3, 2, {1: 2, 10000: 1})
     assert not calls
 

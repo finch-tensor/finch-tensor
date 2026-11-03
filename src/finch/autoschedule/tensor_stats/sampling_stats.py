@@ -45,12 +45,12 @@ def mask_table(field: Field, mask: RandomMaskTensor) -> Table:
 
 
 def compute_sketch(sketch: LogicExpression) -> Table:
-    from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
+    from finch.autoschedule.default_schedulers import CACHING_SCHEDULER
 
     fields = sketch.fields()
     out = HardAlias("sketch_out")
     prgm = Plan((Query(Table(out, fields), sketch), Produces((out,))))
-    (result,) = NON_RECURSIVE_SCHEDULER(prgm)
+    (result,) = CACHING_SCHEDULER(prgm)
     return Table(Literal(result), fields)
 
 
@@ -661,7 +661,7 @@ class SamplingStats(NumericStats):
         return self.scan_cache
 
     def coverage_correction(self) -> float:
-        from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
+        from finch.autoschedule.default_schedulers import CACHING_SCHEDULER
 
         _, d_n_raw, _, _ = self.scan(needs_freq=False)
         coverage = 1.0
@@ -681,7 +681,7 @@ class SamplingStats(NumericStats):
                     (field,),
                 ),
             )
-            (count,) = NON_RECURSIVE_SCHEDULER(Plan((query, Produces((out,)))))
+            (count,) = CACHING_SCHEDULER(Plan((query, Produces((out,)))))
             actual_fraction = float(np.asarray(count)[()]) / size
             if actual_fraction <= 0:
                 continue

@@ -7,7 +7,7 @@ import numpy as np
 import finch as fl
 import finch.algebra.ffuncs as ffuncs
 from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
-from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
+from finch.autoschedule.tensor_stats import StatsInterpreter
 from finch.autoschedule.tensor_stats.sampling_stats import (
     SamplingStatsFactory,
     _dgood1,
@@ -47,7 +47,6 @@ def materialize(sketch):
 
 
 def test_verify_sketch_computation(n=20, density=0.4, sample_prob=0.5, seed=0):
-
     rs = np.random.default_rng(seed)
     A = (rs.random((n, n)) < density).astype(float)
     B = (rs.random((n, n)) < density).astype(float)
@@ -132,30 +131,9 @@ def test_mapjoin():
     ta = Table(Literal(fl.asarray(data_a)), (i, j))
     tb = Table(Literal(fl.asarray(data_b)), (j, k))
 
-    cache = {}
     stats_factory = SamplingStatsFactory()
-    insert_statistics(
-        stats_factory=stats_factory,
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=stats_factory,
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
-    stats = insert_statistics(
-        stats_factory=stats_factory,
-        node=node_mul,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    stats = StatsInterpreter(stats_factory)(node_mul, OrderedDict())
 
     true_nnz = float(np.count_nonzero(data_a[:, :, None] * data_b[None, :, :]))
     assert stats.estimate_non_fill_values() == pytest.approx(true_nnz, abs=1.0)
@@ -173,7 +151,6 @@ def test_aggregate():
     ta = Table(Literal(fl.asarray(data_a)), (i, j))
     tb = Table(Literal(fl.asarray(data_b)), (j, k))
 
-    cache = {}
     stats_factory = SamplingStatsFactory(estimator="schlosser")
     node = Aggregate(
         op=Literal(ffuncs.add),
@@ -181,13 +158,7 @@ def test_aggregate():
         arg=MapJoin(Literal(ffuncs.mul), (ta, tb)),
         idxs=(j,),
     )
-    stats = insert_statistics(
-        stats_factory=stats_factory,
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    stats = StatsInterpreter(stats_factory)(node, OrderedDict())
 
     print(materialize(stats.sketch))
     true_nnz = float(

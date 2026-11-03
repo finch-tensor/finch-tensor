@@ -14,7 +14,7 @@ from finch.algebra import (
     is_idempotent,
     is_identity,
 )
-from finch.autoschedule.default_schedulers import get_default_scheduler
+from finch.autoschedule.default_schedulers import CACHING_SCHEDULER
 from finch.finch_logic import (
     Aggregate,
     Field,
@@ -120,7 +120,7 @@ class ExactStats(NumericStats):
         fixed = tuple(idx for idx in self.expr.fields() if idx in fields)
         if fixed:
             expr = Aggregate(Literal(ffuncs.max), Literal(np.intp(0)), expr, fixed)
-        result = get_default_scheduler()(expr)
+        result = CACHING_SCHEDULER(expr)
         if not isinstance(result, TableValue):
             raise TypeError("estimate_non_fill_value expected a TableValue instance")
 

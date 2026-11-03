@@ -128,7 +128,7 @@ def test_deeper_nesting():
 # --- TEST 7: expand_dims + sum over singleton (extra axis padding) ---
 def test_expand_dims_sum_singleton():
     """
-    Exercises extra axis padding in logic_to_stats: sum(expand_dims(A, 2), axis=2).
+    Exercises extra axis padding in StatsInterpreter: sum(expand_dims(A, 2), axis=2).
     """
     A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
 
