@@ -123,6 +123,54 @@ def test_full_run_annihilator():
     assert ntn.LoopletSimplify.simplify(term) is None
 
 
+@pytest.mark.parametrize(
+    "op, val, dropped",
+    [
+        (ffuncs.add, 0.0, True),
+        (ffuncs.mul, 1.0, True),
+        (ffuncs.max, -np.inf, True),
+        (ffuncs.add, 1.0, False),
+        (ffuncs.overwrite, 0.0, False),
+    ],
+)
+def test_increments_by_the_identity_are_dropped(op, val, dropped):
+    tns = ntn.Variable("A", ftype(np.float64))
+    i = ntn.Variable("i", ftype(np.intp))
+    lhs = ntn.Access(tns, ntn.Update(ntn.Literal(op)), (i,))
+    full = ntn.Full(ntn.Literal(val))
+    run = ntn.Unwrap(
+        ntn.Access(ntn.Looplet(Run(full), full.result_type), ntn.Read(), ())
+    )
+    for rhs in (ntn.Literal(val), run):
+        expected = ntn.Block(()) if dropped else None
+        assert ntn.LoopletSimplify.simplify(ntn.Increment(lhs, rhs)) == expected
+
+    # A dynamic fill may not be the identity, so its increment is kept.
+    dynamic = ntn.Unwrap(
+        ntn.Access(
+            Run(ntn.Full(ntn.Variable("value", ftype(np.float64)))),  # ty: ignore[invalid-argument-type]
+            ntn.Read(),
+            (),
+        )
+    )
+    assert ntn.LoopletSimplify.simplify(ntn.Increment(lhs, dynamic)) is None
+
+
+def test_loops_without_bodies_are_dropped():
+    i = ntn.Variable("i", ftype(np.intp))
+    tns = ntn.Variable("A", ftype(np.float64))
+    lhs = ntn.Access(tns, ntn.Update(ntn.Literal(ffuncs.add)), (i,))
+    ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(0), ntn.Literal(3)))
+    loop = ntn.Loop(i, ext, ntn.Increment(lhs, ntn.Literal(0.0)))
+    assert ntn.LoopletSimplify()(loop) == ntn.Block(())
+    body = ntn.Increment(lhs, ntn.Literal(1.0))
+    match ntn.LoopletSimplify()(ntn.Loop(i, ext, body)):
+        case ntn.Loop(_, _, kept):
+            assert kept == body
+        case term:
+            raise AssertionError(f"Expected the loop to be kept: {term}")
+
+
 def test_full_scalar():
     full = ntn.Full(ntn.Literal(np.int64(4)))
     interpreter = ntn.NotationInterpreter()
