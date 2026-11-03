@@ -915,6 +915,23 @@ class CContext(Context):
                     f"\n{feed}}}"
                 )
                 return None
+            case asm.ParallelForLoop(asm.Variable(_, _) as var, start, end, body):
+                var_t = self.ctype_name(c_type(var.result_type))
+                var_2 = self(var)
+                start = self(start)
+                end = self(end)
+                ctx_2 = self.subblock()
+                ctx_2(body)
+                ctx_2.types[var.name] = var.result_type
+                body_code = ctx_2.emit()
+                self.exec(
+                    f"{feed}#pragma omp parallel for\n"
+                    f"{feed}for ({var_t} {var_2} = {start}; "
+                    f"{var_2} < {end}; {var_2}++) {{\n"
+                    f"{body_code}"
+                    f"\n{feed}}}"
+                )
+                return None
             case asm.BufferLoop(buf, asm.Variable(_, t) as var, body):
                 if not isinstance(buf.result_type, BufferFType):
                     raise TypeError(f"Expected buffer type, got: {buf.result_type}")

@@ -39,6 +39,9 @@ from .nodes import (
     Variable,
     WhileLoop,
 )
+from .nodes import (
+    ParallelForLoop as ParallelForLoop,
+)
 from .parser import parse_assembly
 from .simplification import AssemblySimplify
 from .stages import (

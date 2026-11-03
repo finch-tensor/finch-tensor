@@ -400,6 +400,29 @@ class ForLoop(AssemblyTree, AssemblyStatement):
 
 
 @dataclass(eq=True, frozen=True)
+class ParallelForLoop(AssemblyTree, AssemblyStatement):
+    """
+    Represents a par for loop that iterates over a range of values concurrently.
+
+    Attributes:
+        var: The loop variable.
+        start: The starting value of range.
+        end: The ending value of the range.
+        body: The body of the loop to execute.
+    """
+
+    var: Variable
+    start: AssemblyExpression
+    end: AssemblyExpression
+    body: AssemblyStatement
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.var, self.start, self.end, self.body]
+
+
+@dataclass(eq=True, frozen=True)
 class BufferLoop(AssemblyTree, AssemblyStatement):
     """
     Represents a loop that iterates over the elements of a buffer.
@@ -682,6 +705,17 @@ class AssemblyPrinterContext(Context):
                 ctx_2(body)
                 body_code = ctx_2.emit()
                 self.exec(f"{feed}for {var_2} in range({start}, {end}):\n{body_code}")
+                return None
+            case ParallelForLoop(var, start, end, body):
+                var_2 = self(var)
+                start = self(start)
+                end = self(end)
+                ctx_2 = self.subblock()
+                ctx_2(body)
+                body_code = ctx_2.emit()
+                self.exec(
+                    f"{feed}parfor {var_2} in range({start}, {end}):\n{body_code}"
+                )
                 return None
             case BufferLoop(buf, var, body):
                 var_2 = self(var)
