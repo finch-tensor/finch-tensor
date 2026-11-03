@@ -29,6 +29,7 @@ from .nodes import (
     Literal,
     Load,
     Module,
+    ParallelForLoop,
     Repack,
     Resize,
     Return,
@@ -38,9 +39,6 @@ from .nodes import (
     Unpack,
     Variable,
     WhileLoop,
-)
-from .nodes import (
-    ParallelForLoop as ParallelForLoop,
 )
 from .parser import parse_assembly
 from .simplification import AssemblySimplify
@@ -90,6 +88,7 @@ __all__ = [
     "LowerPackedStructSlots",
     "Module",
     "NumberedStatement",
+    "ParallelForLoop",
     "Repack",
     "Resize",
     "Return",
