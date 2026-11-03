@@ -188,6 +188,47 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
                 tbl[q] = absent
             end
         end
+        """
+        exec_block(
+            ctx, parse_assembly(expr, locals() | self._bindings(tns), position_type=l_t)
+        )
+        child = asm.GetAttr(tns, asm.Literal("lvl"))
+        if self.lvl_t.supports_reassembly:
+            # The child holds the fill wherever this level wasn't written, so
+            # only the cleared positions are reset, instead of declaring it.
+            bindings = self._bindings(tns)
+            n_tbl = bindings["n_tbl"]
+            one = ctx.block()
+            one.exec(
+                asm.Assign(
+                    q, asm.Call(bindings["to_len"], (asm.Load(bindings["srt"], r),))
+                )
+            )
+            self.lvl_t.level_lower_assemble(
+                one,
+                child,
+                q,
+                asm.Call(asm.Literal(ffuncs.add), (q, asm.Literal(l_t(1)))),
+            )
+            every = ctx.block()
+            self.lvl_t.level_lower_assemble(every, child, asm.Literal(l_t(0)), n_tbl)
+            many = asm.Call(
+                asm.Literal(ffuncs.gt),
+                (
+                    asm.Call(asm.Literal(ffuncs.mul), (n_dirty, asm.Literal(l_t(16)))),
+                    n_tbl,
+                ),
+            )
+            ctx.exec(
+                asm.IfElse(
+                    many,
+                    asm.Block(tuple(every.emit())),
+                    asm.ForLoop(
+                        r, asm.Literal(l_t(0)), n_dirty, asm.Block(tuple(one.emit()))
+                    ),
+                )
+            )
+        expr = """finch
         tns.qos_fill = zero
         tns.dimension = dimension
         dim = to_len(tns.dimension)
@@ -211,9 +252,9 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
         exec_block(
             ctx, parse_assembly(expr, locals() | self._bindings(tns), position_type=l_t)
         )
-        child = asm.GetAttr(tns, asm.Literal("lvl"))
-        child_pos = asm.Call(asm.Literal(ffuncs.mul), (pos, dim))
-        self.lvl_t.level_lower_declare(ctx, child, init, op, shape[1:], child_pos)
+        if not self.lvl_t.supports_reassembly:
+            child_pos = asm.Call(asm.Literal(ffuncs.mul), (pos, dim))
+            self.lvl_t.level_lower_declare(ctx, child, init, op, shape[1:], child_pos)
         self.lvl_t.level_lower_assemble(ctx, child, tbl_len, q_stop)
 
     def level_lower_assemble(self, ctx, lvl, start, stop):
