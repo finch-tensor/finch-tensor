@@ -159,7 +159,10 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         return (ntn.Walk(), *self.lvl_t.level_default_protocols())
 
     def level_protocols(self):
-        return ((ntn.Walk(), ntn.Gallop(), ntn.Follow()), *self.lvl_t.level_protocols())
+        return (
+            (ntn.Walk(), ntn.Gallop(), ntn.Follow(), ntn.Extrude()),
+            *self.lvl_t.level_protocols(),
+        )
 
     def level_lower_dim(self, ctx, obj, r):
         if r == 0:
@@ -521,6 +524,14 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         return lplt.Lookup(lookup)
 
     def level_unfurl_update(self, ctx, fiber, ext, mode, proto, pos):
+        # A list appends each index after the last.
+        match proto:
+            case ntn.DefaultProtocol() | ntn.Extrude():
+                pass
+            case _:
+                raise NotImplementedError(
+                    f"SparseListLevelFType does not support the {proto} protocol."
+                )
         lvl = ctx(fiber.lvl)
         child = asm.GetAttr(lvl, asm.Literal("lvl"))
         p_t = self.position_type

@@ -8,9 +8,11 @@ from finch.algebra.utils import intersect, is_subsequence, setdiff, with_subsequ
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    Extrude,
     Field,
     FillTable,
     Fuse,
+    Laminate,
     Literal,
     LogicExpression,
     LogicNode,
@@ -18,6 +20,7 @@ from finch.finch_logic import (
     MapJoin,
     Plan,
     Produces,
+    Protocol,
     Query,
     QueryInto,
     Relabel,
@@ -30,6 +33,24 @@ from finch.symbolic import Chain, Fixpoint, PostOrderDFS, PostWalk, PreWalk, Rew
 def reorder_to(ex: LogicExpression, idxs: tuple[Field, ...]) -> LogicExpression:
     """`ex` with its fields in the order `idxs`."""
     return ex if ex.fields() == idxs else Reorder(ex, idxs)
+
+
+def write_protocols(
+    idxs: tuple[Field, ...], loop_order: tuple[Field, ...], nfused: int = 0
+) -> tuple[Protocol, ...]:
+    """
+    The protocol which a query under loop_order writes each stored level of a
+    table of idxs with, whose first nfused fields are fused. A level is reached
+    at the last loop over a field of the levels from the root to it. Where the
+    loops up to it are those fields in storage order, each index of the level
+    is written once, in order, so it's extruded, and otherwise it's laminated.
+    """
+    protocols: list[Protocol] = []
+    for depth in range(nfused, len(idxs)):
+        order = idxs[: depth + 1]
+        loops = loop_order[: max(map(loop_order.index, order)) + 1]
+        protocols.append(Extrude() if loops == order else Laminate())
+    return tuple(protocols)
 
 
 def fuse_loop_order(

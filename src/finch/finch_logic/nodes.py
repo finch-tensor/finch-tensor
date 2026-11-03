@@ -446,7 +446,7 @@ class Field(LogicNode, NamedTerm):
 
 class Protocol(LogicNode):
     """
-    How a loop visits a field of a table it reads, as in Finch.jl.
+    How a loop visits a field of a table it reads or writes, as in Finch.jl.
     """
 
 
@@ -468,6 +468,16 @@ class Gallop(Protocol):
 @dataclass(eq=True, frozen=True)
 class Follow(Protocol):
     """Looks up each index which the loop visits."""
+
+
+@dataclass(eq=True, frozen=True)
+class Extrude(Protocol):
+    """Writes each index once, in order."""
+
+
+@dataclass(eq=True, frozen=True)
+class Laminate(Protocol):
+    """Writes indices in any order, and any number of times."""
 
 
 @dataclass(eq=True, frozen=True)

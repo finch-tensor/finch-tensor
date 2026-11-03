@@ -454,7 +454,10 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
         return (ntn.Walk(), *self.lvl_t.level_default_protocols())
 
     def level_protocols(self):
-        return ((ntn.Walk(), ntn.Follow()), *self.lvl_t.level_protocols())
+        return (
+            (ntn.Walk(), ntn.Gallop(), ntn.Follow(), ntn.Extrude(), ntn.Laminate()),
+            *self.lvl_t.level_protocols(),
+        )
 
     def construct(self, shape: tuple[Any, ...], *, pos: int) -> "SparseHashLevel":
         lvl = self.lvl_t.construct(shape=shape[1:], pos=0)
@@ -812,7 +815,9 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
         )
         match proto:
             case ntn.DefaultProtocol() | ntn.Walk():
-                pass
+                step = lplt.Stepper
+            case ntn.Gallop():
+                step = lplt.Jumper
             case ntn.Follow():
                 return self._level_unfurl_follow(ctx, fiber, pos, full)
             case _:
@@ -884,7 +889,7 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
         return lplt.Thunk(
             preamble=thunk_preamble,
             body=lambda ctx, ext: lplt.Sequence(
-                head=lambda ctx, idx: lplt.Stepper(
+                head=lambda ctx, idx: step(
                     preamble=stepper_preamble,
                     stop=lambda ctx: ntn.Variable(i_stop.name, d_t),
                     chunk=lplt.Sequence(
@@ -1013,6 +1018,13 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
         )
 
     def level_unfurl_update(self, ctx, fiber, ext, mode, proto, pos):
+        match proto:
+            case ntn.DefaultProtocol() | ntn.Extrude() | ntn.Laminate():
+                pass
+            case _:
+                raise NotImplementedError(
+                    f"SparseHashLevelFType does not support the {proto} protocol."
+                )
         lvl = ctx(fiber.lvl)
         child = asm.GetAttr(lvl, asm.Literal("lvl"))
         p_t, d_t = self.position_type, self.dimension_type

@@ -334,7 +334,7 @@ class Full(NotationTree, NotationExpression):
 class Protocol(NotationNode):
     """
     Notation AST node representing how a loop visits an index of a tensor it
-    reads, as in Finch.jl.
+    reads or writes, as in Finch.jl.
     """
 
 
@@ -356,6 +356,16 @@ class Gallop(Protocol):
 @dataclass(eq=True, frozen=True)
 class Follow(Protocol):
     """Looks up each index which the loop visits."""
+
+
+@dataclass(eq=True, frozen=True)
+class Extrude(Protocol):
+    """Writes each index once, in order."""
+
+
+@dataclass(eq=True, frozen=True)
+class Laminate(Protocol):
+    """Writes indices in any order, and any number of times."""
 
 
 @dataclass(eq=True, frozen=True)
@@ -385,13 +395,20 @@ class Update(AccessMode, NotationTree):
     value of a tensor, use the ops `algebra.overwrite` or `algebra.init_write`.
     Attributes:
         op: The operation used to update the value of the tensor.
+        protocols: The protocol of each index of the access, or none to let
+            the tensor choose every protocol.
     """
 
     op: NotationExpression
+    protocols: tuple[Protocol, ...] = ()
+
+    @classmethod
+    def from_children(cls, op, *protocols):
+        return cls(op, protocols)
 
     @property
     def children(self):
-        return [self.op]
+        return [self.op, *self.protocols]
 
 
 @dataclass(eq=True, frozen=True)
@@ -887,6 +904,10 @@ class NotationPrinterContext(Context):
                 return "gallop"
             case Follow():
                 return "follow"
+            case Extrude():
+                return "extrude"
+            case Laminate():
+                return "laminate"
             case Dimension(tns, r):
                 tns_e = self(tns)
                 r_e = self(r)
@@ -897,14 +918,15 @@ class NotationPrinterContext(Context):
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]
                 match mode:
-                    case Read(protocols):
-                        if protocols:
-                            idxs_e = [
-                                idx
-                                if proto == DefaultProtocol()
-                                else f"{self(proto)}({idx})"
-                                for idx, proto in zip(idxs_e, protocols, strict=True)
-                            ]
+                    case Read(protocols) | Update(_, protocols) if protocols:
+                        idxs_e = [
+                            idx
+                            if proto == DefaultProtocol()
+                            else f"{self(proto)}({idx})"
+                            for idx, proto in zip(idxs_e, protocols, strict=True)
+                        ]
+                match mode:
+                    case Read():
                         return f"read({tns_e}, {idxs_e})"
                     case Update(op):
                         op_e = self(op)

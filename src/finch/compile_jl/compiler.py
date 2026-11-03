@@ -171,6 +171,10 @@ def _protocol_str(proto: ntn.Protocol, idx: str) -> str:
             return f"gallop({idx})"
         case ntn.Follow():
             return f"follow({idx})"
+        case ntn.Extrude():
+            return f"extrude({idx})"
+        case ntn.Laminate():
+            return f"laminate({idx})"
     raise NotImplementedError(f"Unrecognized protocol: {proto}")
 
 
@@ -363,7 +367,7 @@ class FinchJLGenerator:
                     # Finch.jl reads its masks with their default protocols only.
                     case _, PatternTensorFType():
                         pass
-                    case ntn.Read(protocols), _ if protocols:
+                    case ntn.Read(protocols) | ntn.Update(_, protocols), _ if protocols:
                         idx_strs = [
                             _protocol_str(proto, idx)
                             for idx, proto in zip(idx_strs, protocols, strict=True)

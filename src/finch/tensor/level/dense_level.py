@@ -126,7 +126,10 @@ class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
         return (ntn.Follow(), *self.lvl_t.level_default_protocols())
 
     def level_protocols(self):
-        return ((ntn.Follow(),), *self.lvl_t.level_protocols())
+        return (
+            (ntn.Follow(), ntn.Extrude(), ntn.Laminate()),
+            *self.lvl_t.level_protocols(),
+        )
 
     def level_lower_dim(self, ctx, obj, r):
         if r == 0:
@@ -212,8 +215,10 @@ class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
         proto,
         pos: asm.AssemblyExpression,
     ):
-        match proto:
-            case ntn.DefaultProtocol() | ntn.Follow():
+        match mode, proto:
+            case ntn.Read(), ntn.DefaultProtocol() | ntn.Follow():
+                pass
+            case ntn.Update(), ntn.DefaultProtocol() | ntn.Extrude() | ntn.Laminate():
                 pass
             case _:
                 raise NotImplementedError(

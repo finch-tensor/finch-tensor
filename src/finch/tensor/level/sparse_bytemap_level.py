@@ -104,7 +104,10 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
         return (ntn.Walk(), *self.lvl_t.level_default_protocols())
 
     def level_protocols(self):
-        return ((ntn.Walk(), ntn.Gallop(), ntn.Follow()), *self.lvl_t.level_protocols())
+        return (
+            (ntn.Walk(), ntn.Gallop(), ntn.Follow(), ntn.Extrude(), ntn.Laminate()),
+            *self.lvl_t.level_protocols(),
+        )
 
     def construct(self, shape: tuple[Any, ...], *, pos: int) -> "SparseByteMapLevel":
         dimension = self.dimension_type(shape[0])
@@ -527,6 +530,13 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
         return lplt.Lookup(lookup)
 
     def level_unfurl_update(self, ctx, fiber, ext, mode, proto, pos):
+        match proto:
+            case ntn.DefaultProtocol() | ntn.Extrude() | ntn.Laminate():
+                pass
+            case _:
+                raise NotImplementedError(
+                    f"SparseByteMapLevelFType does not support the {proto} protocol."
+                )
         lvl = ctx(fiber.lvl)
         p_t = self.position_type
         bindings = self._bindings(lvl) | {

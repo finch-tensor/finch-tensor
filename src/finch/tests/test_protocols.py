@@ -22,7 +22,7 @@ from finch.autoschedule.normalize import normalize_names
 from finch.autoschedule.stages import CompilerForm
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsInterpreter
-from finch.autoschedule.util import fuse_loop_order, push_fields
+from finch.autoschedule.util import fuse_loop_order, push_fields, write_protocols
 from finch.codegen import CCompiler, MLIRCompiler, NumbaCompiler
 from finch.compile import CompilerMode, NotationCompiler, make_extent
 from finch.symbolic import PostOrderDFS
@@ -171,8 +171,9 @@ def test_protocol_lowering(compiler, protocol, lowered):
     np.testing.assert_array_equal(result.to_numpy(), data_a @ data_b)
 
 
-def coiterate_program(x, y, z, op, protocols):
-    """z = op(x, y), reading x and y with their protocols."""
+def coiterate_program(x, y, z, op, protocols, write=()):
+    """z = op(x, y), reading x and y with their protocols, and writing z with
+    the protocols of write."""
     args = tuple(
         ntn.Variable(f"{name}_tns", tns.ftype)
         for name, tns in zip("xyz", (x, y, z), strict=True)
@@ -185,7 +186,7 @@ def coiterate_program(x, y, z, op, protocols):
     )
     overwrite = ntn.Literal(ffuncs.overwrite)
     body: ntn.NotationStatement = ntn.Increment(
-        ntn.Access(slots[2], ntn.Update(overwrite), idxs),
+        ntn.Access(slots[2], ntn.Update(overwrite, write), idxs),
         ntn.Call(ntn.Literal(op), reads),
     )
     for d in reversed(range(z.ndim)):
@@ -232,7 +233,7 @@ def stored(loader, format_, data):
 PROTOCOLS = {
     "D": (ntn.DefaultProtocol(), ntn.Follow()),
     "S": (ntn.Walk(), ntn.Gallop(), ntn.Follow()),
-    "H": (ntn.Walk(), ntn.Follow()),
+    "H": (ntn.Walk(), ntn.Gallop(), ntn.Follow()),
     "B": (ntn.Walk(), ntn.Gallop(), ntn.Follow()),
 }
 
@@ -288,7 +289,8 @@ def test_level_protocols_follow_their_indices(loader, op, x_format, y_format):
 
 @pytest.mark.parametrize(
     "format_, protocol",
-    [("D", ntn.Walk()), ("D", ntn.Gallop()), ("H", ntn.Gallop())],
+    # A level isn't read with a protocol which writes it.
+    [("D", ntn.Walk()), ("D", ntn.Gallop()), ("H", ntn.Extrude())],
 )
 def test_unsupported_level_protocols(format_, protocol):
     loader = asm.AssemblyInterpreter()
@@ -298,6 +300,78 @@ def test_unsupported_level_protocols(format_, protocol):
     program = coiterate_program(x, x, z, ffuncs.mul, ((protocol,), walks(format_)))
     with pytest.raises(NotImplementedError, match=f"the {protocol} protocol"):
         NotationCompiler(loader)(program)
+
+
+@pytest.mark.parametrize("format_", ["D", "S", "H", "B"])
+def test_level_write_protocols(format_):
+    loader = asm.AssemblyInterpreter()
+    data = np.array([0, 2, 0, 4])
+    x = stored(loader, "D", data)
+    for protocol in (ntn.Extrude(), ntn.Laminate()):
+        _, z = tensors(format_, data)
+        program = coiterate_program(x, x, z, ffuncs.mul, ((), ()), (protocol,))
+        # A list appends each index after the last, so it's only extruded.
+        if format_ == "S" and protocol == ntn.Laminate():
+            with pytest.raises(NotImplementedError, match=f"the {protocol} protocol"):
+                NotationCompiler(loader)(program)
+            continue
+        result = NotationCompiler(loader)(program).coiterate(x, x, z)
+        np.testing.assert_array_equal(dense_values(result.lvl), data * data)
+
+
+def test_write_protocols_extrude_levels_whose_loops_are_in_storage_order():
+    i, j, k = lgc.Field("i"), lgc.Field("j"), lgc.Field("k")
+    extrude, laminate = lgc.Extrude(), lgc.Laminate()
+    assert write_protocols((i, k), (i, k)) == (extrude, extrude)
+    # A matrix product writes each row of its output once, and each column of
+    # a row once for each j.
+    assert write_protocols((i, k), (i, j, k)) == (extrude, laminate)
+    assert write_protocols((k, i), (i, k)) == (laminate, laminate)
+    # A reduction below the output's loops leaves them in order.
+    assert write_protocols((i,), (i, j)) == (extrude,)
+    # Only the stored levels of a fused table take protocols.
+    assert write_protocols((i, k), (i, j, k), nfused=1) == (laminate,)
+    assert write_protocols((), (i,)) == ()
+
+
+def test_compiler_laminates_updates_in_place():
+    i, j = lgc.Field("i"), lgc.Field("j")
+    a, x, y = lgc.HardAlias("a"), lgc.HardAlias("x"), lgc.HardAlias("y")
+    bindings = {a: ft.asarray(np.ones((2, 3))), x: ft.asarray(np.ones(2))}
+
+    def updates(query):
+        plan = lgc.Plan(
+            (
+                fuse_loop_order(
+                    lgc.Query(lgc.Table(y, (i,)), lgc.Table(x, (i,))), (i,)
+                ),
+                query,
+                lgc.Produces((y,)),
+            )
+        )
+        capture = LogicCapture()
+        ftypes = {var: tns.ftype for var, tns in bindings.items()}
+        DefaultLogicFormatter(CompilerFormLowerer(capture))(plan, ftypes, {}, None)
+        program = NotationGenerator()(
+            capture.last_prgm, capture.last_bindings, {}, None
+        )
+        return [
+            node.mode.protocols
+            for node in PostOrderDFS(program)
+            if isinstance(node, ntn.Access) and isinstance(node.mode, ntn.Update)
+        ]
+
+    # The copy into y extrudes it, and the sum into y laminates what it stores.
+    rows = lgc.Table(a, (i, j))
+    reduce = fuse_loop_order(
+        lgc.QueryInto(lgc.Table(y, (i,)), lgc.Literal(ffuncs.add), rows), (i, j)
+    )
+    assert updates(reduce) == [(ntn.Extrude(),), (ntn.Laminate(),)]
+    overwrite = fuse_loop_order(
+        lgc.QueryInto(lgc.Table(y, (i,)), lgc.Literal(ffuncs.overwrite), rows),
+        (i, j),
+    )
+    assert updates(overwrite)[-1] == (ntn.Extrude(),)
 
 
 def test_protocolize_states_the_default_protocols_of_levels():
@@ -353,12 +427,13 @@ def test_protocolize_states_the_default_protocols_of_levels():
 
 def test_tensors_support_protocols_in_each_dimension():
     csr = fiber_tensor(dense(sparse_list(element(0.0), ftype(np.intp))))
-    walk = (ntn.Walk(), ntn.Gallop(), ntn.Follow())
-    assert csr.protocols() == ((ntn.Follow(),), walk)
-    assert ft.asarray(np.ones((2, 3))).ftype.protocols() == ((ntn.Follow(),),) * 2
+    follow = (ntn.Follow(), ntn.Extrude(), ntn.Laminate())
+    walk = (ntn.Walk(), ntn.Gallop(), ntn.Follow(), ntn.Extrude())
+    assert csr.protocols() == (follow, walk)
+    assert ft.asarray(np.ones((2, 3))).ftype.protocols() == (follow,) * 2
     # A mask is looked up in its outer dimensions, and walked in its inner one.
     assert EyeTensor((3, 3)).ftype.protocols() == ((ntn.Follow(),), (ntn.Walk(),))
     tril = fiber_tensor(
         dense(LoTriMaskFType(sparse_list(element(0.0), ftype(np.intp))))
     )
-    assert tril.protocols() == ((ntn.Follow(),), (ntn.Walk(),))
+    assert tril.protocols() == (follow, (ntn.Walk(),))

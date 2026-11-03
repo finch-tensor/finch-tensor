@@ -789,7 +789,7 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
         return (ntn.Follow(),) * self.ndim
 
     def level_protocols(self):
-        return ((ntn.Follow(),),) * self.ndim
+        return ((ntn.Follow(), ntn.Extrude(), ntn.Laminate()),) * self.ndim
 
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl):
         for r in range(self.ndim):

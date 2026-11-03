@@ -202,8 +202,8 @@ class LevelFType(FType, ABC):
 
     def level_protocols(self) -> tuple[tuple[ntn.Protocol, ...], ...]:
         """
-        The protocols which a loop can read each dimension of the fibers in the
-        structure with.
+        The protocols which a loop can read or write each dimension of the
+        fibers in the structure with.
         """
         return ((ntn.DefaultProtocol(),),) * self.ndim
 

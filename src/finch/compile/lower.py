@@ -796,7 +796,7 @@ def lower_looplets(
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
                     match mode:
-                        case ntn.Read((proto, *_)):
+                        case ntn.Read((proto, *_)) | ntn.Update(_, (proto, *_)):
                             pass
                         case _:
                             proto = ntn.DefaultProtocol()
