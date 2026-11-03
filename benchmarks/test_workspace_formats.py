@@ -2,7 +2,7 @@
 Workspace format benchmarks: time the Julia kernel for C = A @ B, looping over
 (i, j, k), when C is written directly in each format, or when each row of C is
 accumulated in a workspace and copied in order into a sorted list, as the
-workspaces of ``WorkspaceCostFormatter`` do. Inputs are CSR. Every result is
+workspaces of ``WorkspaceLoopOrderer`` are. Inputs are CSR. Every result is
 checked against SciPy before it is timed.
 
 The looping order scatters the writes to each row of C. A dense output takes
@@ -30,7 +30,7 @@ import finch.finch_logic as lgc
 from finch import ffuncs
 from finch.algebra import StaticFillFType, ftypes
 from finch.autoschedule import NotationGenerator
-from finch.autoschedule.formatter.smart_formatter import add_workspace
+from finch.autoschedule.loop_orderer.loop_order_workspace import add_workspace
 from finch.autoschedule.util import fuse_loop_order
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.compile_jl.interop import jl_tensor_to_python, tensor_to_jl

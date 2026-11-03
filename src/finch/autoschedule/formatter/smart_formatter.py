@@ -38,10 +38,8 @@ from finch.autoschedule.cost_models.format_cost_models import (
 )
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
-from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
 from finch.finch_logic.tensor_stats import TensorStats
-from finch.symbolic import Namespace
 from finch.tensor import (
     FiberTensorFType,
     dense,
@@ -321,82 +319,45 @@ WORKSPACE_COST_MODEL = linear_level_model(
 )
 
 
-def workspace_depth(prgm: lgc.LogicStatement, alias: lgc.Alias) -> int | None:
+def stored_shape_types(
+    prgm: lgc.LogicStatement,
+    bindings: dict[lgc.Alias, TensorFType],
+    machine: StatsMachine,
+) -> dict[lgc.Alias, tuple[FType, ...]]:
     """
-    Return the number of leading fields that the query defining alias writes in
-    loop order, when it scatters into a later field. A workspace fused over
-    those fields can then take the scattered writes. Only an alias which one
-    Query defines, and nothing updates, has a workspace.
+    Return the dimensions each new alias of prgm stores, at its first
+    definition, advancing machine past prgm.
     """
-    writes: list[tuple[lgc.LogicStatement, tuple[lgc.Field, ...]]] = []
+    shape_types: dict[lgc.Alias, tuple[FType | None, ...]] = {
+        var: val.shape_type for var, val in bindings.items()
+    }
+    stored: dict[lgc.Alias, tuple[FType, ...]] = {}
 
-    def visit(node: lgc.LogicStatement, loops: tuple[lgc.Field, ...]):
+    def visit(node: lgc.LogicStatement):
         match node:
             case lgc.Plan(bodies):
                 for body in bodies:
-                    visit(body, loops)
-            case lgc.Fuse(idx, body):
-                visit(body, (*loops, idx))
+                    visit(body)
+            case lgc.Fuse(_, body):
+                visit(body)
             case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
                 lgc.Table(lgc.Alias() as lhs, _), _, _
-            ) if lhs.unfused == alias:
-                writes.append((node, loops))
-
-    visit(prgm, ())
-    match writes:
-        case [(lgc.Query(lgc.Table(lgc.HardAlias(), idxs), _), loops)]:
-            depth = 0
-            while loops[depth : depth + 1] == idxs[depth : depth + 1] != ():
-                depth += 1
-            if depth < len(idxs):
-                return depth
-    return None
-
-
-def add_workspace(
-    prgm: lgc.LogicStatement, alias: lgc.HardAlias, depth: int, ws: lgc.HardAlias
-) -> lgc.LogicStatement:
-    """
-    Redirect the query which defines alias into ws, fused over its first depth
-    fields. Right after the statement within depth Fuse nodes which holds the
-    query, ws is copied into alias in order.
-    """
-    fused = lgc.FusedAlias(ws, depth)
-
-    # Each rewrite returns the copy until the depth where it is inserted.
-    def rewrite(
-        node: lgc.LogicStatement, nloops: int
-    ) -> tuple[lgc.LogicStatement, lgc.LogicStatement | None]:
-        match node:
-            case lgc.Plan(bodies):
-                stmts: list[lgc.LogicStatement] = []
-                pending = None
-                for body in bodies:
-                    body, copy = rewrite(body, nloops)
-                    stmts.append(body)
-                    if copy is not None and nloops == depth:
-                        stmts.append(copy)
-                    elif copy is not None:
-                        pending = copy
-                return lgc.Plan(tuple(stmts)), pending
-            case lgc.Fuse(idx, body):
-                body, copy = rewrite(body, nloops + 1)
-                if copy is not None and nloops + 1 == depth:
-                    return lgc.Fuse(idx, lgc.Plan((body, copy))), None
-                return lgc.Fuse(idx, body), copy
-            case lgc.Query(lgc.Table(lhs, idxs), rhs) if lhs == alias:
-                copy = fuse_loop_order(
-                    lgc.Query(lgc.Table(alias, idxs), lgc.Table(fused, idxs)),
-                    idxs[depth:],
-                )
-                return lgc.Query(lgc.Table(fused, idxs), rhs), copy
+            ):
+                node.infer_shape_type(shape_types)
+                machine(node)
+                alias, nfused = lhs.unfused, lhs.nfused
+                if alias not in bindings and alias not in stored:
+                    stored[alias] = tuple(
+                        ftype(dim) if dim is not None else ftypes.intp
+                        for dim in shape_types[alias][nfused:]
+                    )
+            case lgc.Produces():
+                return
             case _:
-                return node, None
+                raise ValueError(f"Unsupported logic statement for formatting: {node}")
 
-    prgm, copy = rewrite(prgm, 0)
-    if copy is not None:
-        prgm = lgc.Plan((prgm, copy))
-    return prgm
+    visit(prgm)
+    return stored
 
 
 class CostFormatter(LogicFormatter):
@@ -404,9 +365,7 @@ class CostFormatter(LogicFormatter):
     CostFormatter chooses the format of each alias from the level options with
     the lowest cost under cost_model, memoizing the best format for each depth and
     input position count. The cost of a level is summed over the blocks of its
-    alias in the program. With workspaces, a query which scatters into a new
-    alias may instead write a workspace fused over the fields it writes in
-    order, which is then copied into the alias in order, when that costs less.
+    alias in the program.
     """
 
     def __init__(
@@ -414,7 +373,6 @@ class CostFormatter(LogicFormatter):
         loader: LogicLoader | None = None,
         cost_model: CostModel[LevelChoice] = STORAGE_COST_MODEL,
         options: Sequence[LevelOption] = LEVEL_OPTIONS,
-        workspaces: bool = False,
     ):
         super().__init__()
         if loader is None:
@@ -422,20 +380,6 @@ class CostFormatter(LogicFormatter):
         self.ctx = loader
         self.cost_model = cost_model
         self.options = options
-        self.workspaces = workspaces
-
-    def format_cost(
-        self,
-        alias: lgc.Alias,
-        term: lgc.LogicStatement,
-        machine: StatsMachine,
-        fill_type: AbstractFillFType,
-        shape_type: tuple[FType, ...],
-    ) -> float:
-        cost, _ = optimize_format(
-            alias, shape_type, machine, fill_type, self.cost_model, term, self.options
-        )
-        return cost
 
     def get_tensor_ftype(
         self,
@@ -450,85 +394,6 @@ class CostFormatter(LogicFormatter):
         )
         return fiber_tensor(lvl)
 
-    def stored_shape_types(
-        self,
-        prgm: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, TensorFType],
-        machine: StatsMachine,
-    ) -> dict[lgc.Alias, tuple[FType, ...]]:
-        """
-        Return the dimensions each new alias of prgm stores, at its first
-        definition, advancing machine past prgm.
-        """
-        shape_types: dict[lgc.Alias, tuple[FType | None, ...]] = {
-            var: val.shape_type for var, val in bindings.items()
-        }
-        stored_shape_types: dict[lgc.Alias, tuple[FType, ...]] = {}
-
-        def formatter(node: lgc.LogicStatement):
-            match node:
-                case lgc.Plan(bodies):
-                    for body in bodies:
-                        formatter(body)
-                case lgc.Fuse(_, body):
-                    formatter(body)
-                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
-                    lgc.Table(lgc.Alias() as lhs, _), _, _
-                ):
-                    node.infer_shape_type(shape_types)
-                    machine(node)
-                    alias, nfused = lhs.unfused, lhs.nfused
-                    if alias not in bindings and alias not in stored_shape_types:
-                        stored_shape_types[alias] = tuple(
-                            ftype(dim) if dim is not None else ftypes.intp
-                            for dim in shape_types[alias][nfused:]
-                        )
-                case lgc.Produces():
-                    return
-                case _:
-                    raise ValueError(
-                        f"Unsupported logic statement for formatting: {node}"
-                    )
-
-        formatter(prgm)
-        return stored_shape_types
-
-    def add_workspaces(
-        self,
-        prgm: lgc.LogicStatement,
-        bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, TS],
-        stats_factory: StatsFactory,
-    ) -> lgc.LogicStatement:
-        """
-        Give each new alias that its query scatters into a workspace, when
-        formatting the workspace and the alias it is copied into costs less
-        than formatting the alias alone.
-        """
-        initial = StatsMachine(stats_factory, OrderedDict(stats))
-        stored_shape_types = self.stored_shape_types(
-            prgm, bindings, StatsMachine(stats_factory, OrderedDict(stats))
-        )
-        fill_types = prgm.infer_fill_type(
-            {var: val.fill_type for var, val in bindings.items()}
-        )
-        spc = Namespace(prgm)
-        for alias, shape_type in stored_shape_types.items():
-            depth = workspace_depth(prgm, alias)
-            if depth is None:
-                continue
-            assert isinstance(alias, lgc.HardAlias)
-            ws = lgc.HardAlias(spc.freshen(alias.name, "ws"))
-            staged = add_workspace(prgm, alias, depth, ws)
-            fill_type = fill_types[alias]
-            direct = self.format_cost(alias, prgm, initial, fill_type, shape_type)
-            staged_cost = self.format_cost(
-                alias, staged, initial, fill_type, shape_type
-            ) + self.format_cost(ws, staged, initial, fill_type, shape_type[depth:])
-            if staged_cost < direct:
-                prgm = staged
-        return prgm
-
     def lower(
         self,
         prgm: lgc.LogicStatement,
@@ -537,17 +402,15 @@ class CostFormatter(LogicFormatter):
         stats_factory: StatsFactory,
     ):
         bindings = bindings.copy()
-        if self.workspaces:
-            prgm = self.add_workspaces(prgm, bindings, stats, stats_factory)
         machine = StatsMachine(stats_factory, OrderedDict(stats))
-        stored_shape_types = self.stored_shape_types(prgm, bindings, machine)
+        stored = stored_shape_types(prgm, bindings, machine)
         fill_types = prgm.infer_fill_type(
             {var: val.fill_type for var, val in bindings.items()}
         )
         # Each alias is formatted for all of its blocks in the program, which
         # are replayed from the stats before it.
         initial = StatsMachine(stats_factory, OrderedDict(stats))
-        for alias, shape_type in stored_shape_types.items():
+        for alias, shape_type in stored.items():
             bindings[alias] = self.get_tensor_ftype(
                 alias, prgm, initial, fill_types[alias], shape_type
             )
@@ -568,5 +431,10 @@ class IterCostFormatter(CostFormatter):
 
 
 class WorkspaceCostFormatter(CostFormatter):
+    """
+    Choose each format, including the format of each workspace, pricing
+    scattered writes and the reset of each slice by level.
+    """
+
     def __init__(self, loader: LogicLoader | None = None):
-        super().__init__(loader, WORKSPACE_COST_MODEL, LEVEL_OPTIONS, workspaces=True)
+        super().__init__(loader, WORKSPACE_COST_MODEL)
