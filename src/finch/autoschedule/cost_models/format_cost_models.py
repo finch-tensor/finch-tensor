@@ -1,33 +1,37 @@
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import ClassVar
 
 import numpy as np
 
 from finch.algebra import ffuncs, ftypes, np_dtype
-from finch.algebra.utils import is_subsequence
-from finch.autoschedule.stages import LoopOrderedForm
+from finch.autoschedule import util
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
-    Aggregate,
     Alias,
+    DefaultProtocol,
+    Extrude,
     Field,
+    Follow,
     Fuse,
+    Gallop,
+    Laminate,
     Literal,
     LogicStatement,
     Plan,
     Produces,
+    Protocol,
     Query,
     QueryInto,
     StatsFactory,
     Table,
+    Walk,
 )
 from finch.symbolic import PostOrderDFS
 
-from .cost_models import NS, CostModel
-from .loop_cost_models import PigeonCostModel, Prefix
+from .cost_models import NS, Basis
 
 
 def nnz_after(stats: NS, stats_factory: StatsFactory[NS], depth: int, over: tuple = ()):
@@ -50,8 +54,9 @@ def alias_blocks(
     Return the stats and fused fields of each block of alias in term, in program
     order. A block is a query which defines alias and the in-place updates which
     follow it, and its stats are the union of the supports of its results, with
-    the fill of alias. Every block stores the same rank. term is evaluated from
-    the bindings of machine.
+    the fill of alias. An alias which term reads but never defines, such as an
+    input, is one block of its binding. Every block stores the same rank. term
+    is evaluated from the bindings of machine.
     """
     stats_factory = machine.stats_factory
     stats_interpreter = StatsMachine(stats_factory, OrderedDict(machine.bindings))
@@ -91,6 +96,8 @@ def alias_blocks(
                 raise ValueError(f"Unsupported statement type: {stmt}")
 
     visit_stmt(term)
+    if not blocks and alias in machine.bindings:
+        blocks.append((machine.bindings[alias], ()))
     if len({len(stats.index_order) - len(over) for stats, over in blocks}) > 1:
         raise ValueError(f"Cannot change the rank of allocated tensor {alias}.")
     return blocks
@@ -98,17 +105,25 @@ def alias_blocks(
 
 class LevelOption(ABC):
     """
-    A kind of level, which describes the storage of a level with n_features
-    storage features, and the number of positions it passes to its child. Both
-    depend on the stats of the tensor, the zero-based depth of the level, and
-    the num_pos positions entering it. Storage features also depend on the
-    bytes of an index of the level, and of a position and a value of the tensor.
-    A tensor which stores one slice that fixes the fields of over is described
-    by its largest slice.
+    A kind of level, which describes the storage of a level with the storage
+    features feature_names names, and the number of positions it passes to its
+    child. Both depend on the stats of the tensor, the zero-based depth of the
+    level, and the num_pos positions entering it. Storage features also depend
+    on the bytes of an index of the level, and of a position and a value of the
+    tensor. A tensor which stores one slice that fixes the fields of over is
+    described by its largest slice. A level of the kind can only be read and
+    written with its protocols.
     """
 
     kind: ClassVar[str]
-    n_features: ClassVar[int]
+    feature_names: ClassVar[tuple[str, ...]]
+    protocols: ClassVar[tuple[Protocol, ...]]
+    kinds: ClassVar[dict[str, type["LevelOption"]]] = {}
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if "kind" in cls.__dict__:
+            LevelOption.kinds[cls.kind] = cls
 
     @abstractmethod
     def next_num_pos(
@@ -133,7 +148,10 @@ class DenseLevelOption(LevelOption):
     """Storage features are positions and slots."""
 
     kind = "dense"
-    n_features = 2
+    feature_names = ("positions", "slots")
+    # A dense level is only looked up, so that it never decides where a loop
+    # goes.
+    protocols = (Follow(), Extrude(), Laminate())
 
     def next_num_pos(self, stats, stats_factory, depth, num_pos, over):
         return num_pos * stats.get_dim_size(stats.index_order[depth])
@@ -150,7 +168,8 @@ class SparseHashLevelOption(LevelOption):
     """Storage features are positions, entries, position bytes, and index bytes."""
 
     kind = "sparse_hash"
-    n_features = 4
+    feature_names = ("positions", "entries", "position_bytes", "index_bytes")
+    protocols = (DefaultProtocol(), Walk(), Follow(), Extrude(), Laminate())
 
     def next_num_pos(self, stats, stats_factory, depth, num_pos, over):
         return nnz_after(stats, stats_factory, depth, over)
@@ -162,6 +181,53 @@ class SparseHashLevelOption(LevelOption):
         return np.array([num_pos, nnz_l, (num_pos + 1) * pos_size, nnz_l * idx_size])
 
 
+class SparseListLevelOption(LevelOption):
+    """Storage features are positions, entries, position bytes, and index bytes."""
+
+    kind = "sparse_list"
+    feature_names = ("positions", "entries", "position_bytes", "index_bytes")
+    # A list appends each entry after the last, so it's only extruded.
+    protocols = (DefaultProtocol(), Walk(), Gallop(), Follow(), Extrude())
+
+    def next_num_pos(self, stats, stats_factory, depth, num_pos, over):
+        return nnz_after(stats, stats_factory, depth, over)
+
+    def get_storage_features(
+        self, stats, stats_factory, depth, num_pos, idx_size, pos_size, val_size, over
+    ):
+        nnz_l = nnz_after(stats, stats_factory, depth, over)
+        return np.array([num_pos, nnz_l, (num_pos + 1) * pos_size, nnz_l * idx_size])
+
+
+class SparseByteMapLevelOption(LevelOption):
+    """
+    A bytemap flags each of its slots with a byte, and lists the slots which
+    are occupied, so its children are allocated densely. Storage features are
+    positions, slots, entries, and the bytes of its pointers and list.
+    """
+
+    kind = "sparse_bytemap"
+    feature_names = ("positions", "slots", "entries", "position_bytes")
+    protocols = (
+        DefaultProtocol(),
+        Walk(),
+        Gallop(),
+        Follow(),
+        Extrude(),
+        Laminate(),
+    )
+
+    def next_num_pos(self, stats, stats_factory, depth, num_pos, over):
+        return num_pos * stats.get_dim_size(stats.index_order[depth])
+
+    def get_storage_features(
+        self, stats, stats_factory, depth, num_pos, idx_size, pos_size, val_size, over
+    ):
+        slots = self.next_num_pos(stats, stats_factory, depth, num_pos, over)
+        nnz_l = nnz_after(stats, stats_factory, depth, over)
+        return np.array([num_pos, slots, nnz_l, (num_pos + 1 + nnz_l) * pos_size])
+
+
 class ElementLevelOption(LevelOption):
     """
     The element level at the rank of a tensor stores one value for each
@@ -169,7 +235,15 @@ class ElementLevelOption(LevelOption):
     """
 
     kind = "element"
-    n_features = 2
+    feature_names = ("values", "value_bytes")
+    protocols = (
+        DefaultProtocol(),
+        Walk(),
+        Gallop(),
+        Follow(),
+        Extrude(),
+        Laminate(),
+    )
 
     def next_num_pos(self, stats, stats_factory, depth, num_pos, over):
         # The element level has no child, so its positions pass through.
@@ -179,6 +253,81 @@ class ElementLevelOption(LevelOption):
         self, stats, stats_factory, depth, num_pos, idx_size, pos_size, val_size, over
     ):
         return np.array([num_pos, num_pos * val_size])
+
+
+def read_protocols(alias: Alias, depth: int, term: LogicStatement) -> set[Protocol]:
+    """The protocols which term reads the level of alias at a depth with."""
+    protocols = set()
+    for node in PostOrderDFS(term):
+        match node:
+            case Query(_, rhs) | QueryInto(_, _, rhs):
+                for table in PostOrderDFS(rhs):
+                    match table:
+                        case Table(Alias() as tns, idxs, protos) if (
+                            tns.unfused == alias.unfused
+                            and tns.nfused + depth < len(idxs)
+                        ):
+                            protocols.add(
+                                protos[tns.nfused + depth]
+                                if protos
+                                else DefaultProtocol()
+                            )
+    return protocols
+
+
+def write_protocol(
+    lhs: Alias, idxs: tuple[Field, ...], depth: int, loop_order: tuple[Field, ...]
+) -> Protocol:
+    """
+    The protocol which a query under loop_order writes the level of a table of
+    lhs and idxs at a zero-based stored depth with, as util.write_protocols
+    infers. The element level is written with its parent, and an alias which
+    stores only its element is written once for each of its fused fields.
+    """
+    protocols = util.write_protocols(idxs, loop_order, lhs.nfused)
+    return protocols[min(depth, len(protocols) - 1)] if protocols else Extrude()
+
+
+def write_protocols(alias: Alias, depth: int, term: LogicStatement) -> set[Protocol]:
+    """
+    The protocols which term writes the level of alias at a depth with. The
+    loops are the fields of the enclosing Fuse nodes. An update which reduces
+    into alias laminates what it already stores, but one which overwrites it or
+    sets it to a literal starts it again.
+    """
+    protocols = set()
+
+    def visit(stmt: LogicStatement, loop_order: tuple[Field, ...]):
+        match stmt:
+            case Plan(bodies):
+                for body in bodies:
+                    visit(body, loop_order)
+            case Fuse(idx, body):
+                visit(body, (*loop_order, idx))
+            case QueryInto(Table(), _, Literal()):
+                return
+            case QueryInto(Table(Alias() as lhs, _), Literal(op), _) if (
+                lhs.unfused == alias.unfused and op != ffuncs.overwrite
+            ):
+                protocols.add(Laminate())
+            case Query(Table(Alias() as lhs, idxs), _) | QueryInto(
+                Table(Alias() as lhs, idxs), _, _
+            ) if lhs.unfused == alias.unfused and idxs:
+                protocols.add(write_protocol(lhs, idxs, depth, loop_order))
+
+    visit(term, ())
+    return protocols
+
+
+def allowed_options(
+    alias: Alias, depth: int, term: LogicStatement, options: Sequence[LevelOption]
+) -> list[LevelOption]:
+    """
+    The options which can take the level of alias at a depth in term: those
+    which support the protocols term reads and writes it with.
+    """
+    protocols = read_protocols(alias, depth, term) | write_protocols(alias, depth, term)
+    return [option for option in options if protocols <= set(option.protocols)]
 
 
 @dataclass(frozen=True)
@@ -204,9 +353,9 @@ class LevelChoice:
         return self.option.kind
 
 
-class FormatCostModel(CostModel[LevelChoice]):
+class FormatBasis(Basis[LevelChoice]):
     """
-    A cost model where each level of each formatted alias is a component.
+    A basis where each level of each formatted alias is a component.
     bindings lists the options of the levels an alias stores, outermost first
     and ending with its element level. Each level is priced over every block of
     the alias in the program.
@@ -236,146 +385,3 @@ class FormatCostModel(CostModel[LevelChoice]):
         # The levels are priced over the whole of term from the stats before
         # it, so the machine is advanced past term only after every level.
         machine(term)
-
-
-class LevelCostModel(FormatCostModel, LoopOrderedForm):
-    """
-    The cost model of the levels of one type of option. Each level contributes
-    an allocation row for each block of its alias, and an access row for each
-    query loop prefix that uses it. The features are the storage features of
-    the option for the allocation, followed by sequential reads, scatter reads,
-    sequential writes, and scatter writes for the accesses.
-    """
-
-    def __init__(
-        self,
-        option_type: type[LevelOption],
-        predictor: Callable[[np.ndarray], float],
-    ):
-        super().__init__(predictor)
-        self.option_type = option_type
-
-    @property
-    def n_features(self) -> int:
-        return self.option_type.n_features + 4
-
-    def get_access_features(
-        self,
-        alias: Alias,
-        level: int,
-        term: LogicStatement,
-        machine: StatsMachine[NS],
-    ) -> np.ndarray:
-        """
-        Return the accesses to alias at a zero-based stored depth in each query
-        of term: sequential reads, scatter reads, sequential writes, and scatter
-        writes, with one row per loop prefix that accesses the level in each
-        query.
-        Each access is counted by the PigeonCostModel iterations of the loops
-        from the root to the current level, which are the fields of the
-        enclosing Fuse nodes. Every view of alias accesses its levels. The
-        element level is accessed with its parent.
-        """
-        # A sequential write is when the prefix of loops from root to current
-        # level matches the ordering of the access exactly.
-        # A sequential read is when the prefix of loops from root to current
-        # level is a supersequence of the ordering of the access.
-        features = []
-        stats_interpreter = StatsMachine(
-            machine.stats_factory, OrderedDict(machine.bindings)
-        )
-        pigeon = PigeonCostModel()
-
-        def visit_access(tns, idxs, loop_order, rhs, lhs_idxs, is_write, prefixes):
-            if not idxs:
-                return
-            # The levels of a fused alias follow its fused fields.
-            depth = min(tns.nfused + level, len(idxs) - 1)
-            order = tuple(idxs[: depth + 1])
-            loops = tuple(loop_order[: loop_order.index(idxs[depth]) + 1])
-            iterations = pigeon.get_component_features(
-                Prefix(loops, rhs, lhs_idxs), stats_interpreter
-            )[0, 0]
-            features = prefixes.setdefault(loops, np.zeros(4))
-            if is_write:
-                features[2 if loops == order else 3] += iterations
-            else:
-                features[0 if is_subsequence(order, loops) else 1] += iterations
-
-        def visit_stmt(stmt: LogicStatement, loop_order: tuple[Field, ...]):
-            match stmt:
-                case Plan(bodies):
-                    for body in bodies:
-                        visit_stmt(body, loop_order)
-                    return
-                case Fuse(idx, body):
-                    visit_stmt(body, (*loop_order, idx))
-                    return
-                case QueryInto(Table(), _, Literal()):
-                    stats_interpreter(stmt)
-                    return
-                case Produces():
-                    return
-                case Query(Table(Alias() as lhs, lhs_idxs), Table() as rhs):
-                    arg = rhs
-                case Query(
-                    Table(Alias() as lhs, lhs_idxs), Aggregate(_, _, arg, _) as rhs
-                ):
-                    pass
-                case QueryInto(Table(Alias() as lhs, lhs_idxs), _, arg):
-                    rhs = stmt.as_query().rhs
-                case _:
-                    raise ValueError(f"Unsupported statement type: {stmt}")
-
-            prefixes = {}
-            for node in PostOrderDFS(arg):
-                match node:
-                    case Table(Alias() as tns, idxs) if tns.unfused == alias.unfused:
-                        visit_access(
-                            tns, idxs, loop_order, rhs, lhs_idxs, False, prefixes
-                        )
-            if lhs.unfused == alias.unfused:
-                visit_access(lhs, lhs_idxs, loop_order, rhs, lhs_idxs, True, prefixes)
-            features.extend(prefixes.values())
-            stats_interpreter(stmt)
-
-        visit_stmt(term, ())
-        return np.asarray(features, dtype=float).reshape(-1, 4)
-
-    def get_component_features(
-        self,
-        component: LevelChoice,
-        machine: StatsMachine[NS],
-    ) -> np.ndarray:
-        """
-        Return the allocation row of the level in each block of its alias,
-        followed by its access rows in the whole program.
-        """
-        blocks = alias_blocks(component.alias, component.term, machine)
-        access_features = self.get_access_features(
-            component.alias, component.depth, component.term, machine
-        )
-        n_storage = self.option_type.n_features
-        features = np.zeros((len(blocks) + len(access_features), self.n_features))
-        for row, ((stats, over), num_pos) in enumerate(
-            zip(blocks, component.num_pos, strict=True)
-        ):
-            depth = len(over) + component.depth
-            shape_type = stats.shape_type
-            # The element level has no dimension, and a broadcast dimension is
-            # intp.
-            idx_size = 0
-            if depth < len(shape_type):
-                idx_size = np_dtype(shape_type[depth] or ftypes.intp).itemsize
-            features[row, :n_storage] = component.option.get_storage_features(
-                stats,
-                machine.stats_factory,
-                depth,
-                num_pos,
-                idx_size,
-                component.pos_size,
-                np_dtype(stats.element_type).itemsize,
-                over,
-            )
-        features[len(blocks) :, n_storage:] = access_features
-        return features

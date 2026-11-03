@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 
 import numpy as np
@@ -23,7 +23,7 @@ from finch.finch_logic import (
     Table,
 )
 
-from .cost_models import NS, CostModel, LinearPredictor
+from .cost_models import NS, Basis, LinearCostModel
 
 
 @dataclass(frozen=True)
@@ -33,9 +33,9 @@ class Statement:
     stmt: LogicStatement
 
 
-class FactorizeCostModel(CostModel[Statement]):
+class FactorizeBasis(Basis[Statement]):
     """
-    A cost model where each query statement is a component, in program order.
+    A basis where each query statement is a component, in program order.
     get_component_features returns one row for each statement.
     """
 
@@ -60,23 +60,19 @@ class FactorizeCostModel(CostModel[Statement]):
                 raise ValueError(f"Unsupported statement type: {term}")
 
 
-class FlopsCostModel(FactorizeCostModel, AliasedForm):
+class FlopsBasis(FactorizeBasis, AliasedForm):
     """
-    FlopsCostModel counts the non-fill values in the iteration space of each
+    FlopsBasis counts the non-fill values in the iteration space of each
     query, and in the output it materializes. Each query is a component.
-    By default, allocations are weighted 10x iterations.
     """
 
     @property
     def n_features(self) -> int:
         return 2
 
-    def __init__(self, predictor: Callable[[np.ndarray], float] | None = None):
-        super().__init__(
-            predictor
-            if predictor is not None
-            else LinearPredictor(np.array([1.0, 10.0]))
-        )
+    @property
+    def feature_names(self) -> tuple[str, ...]:
+        return ("iterations", "outputs")
 
     def get_component_features(
         self,
@@ -136,9 +132,13 @@ class FlopsCostModel(FactorizeCostModel, AliasedForm):
                 raise ValueError(f"Unsupported statement type: {stmt}")
 
 
-class LoopDepthCostModel(FactorizeCostModel, AliasedForm):
+# Allocations are weighted 10x iterations.
+FLOPS_COST_MODEL = LinearCostModel(FlopsBasis(), [1.0, 10.0])
+
+
+class LoopDepthBasis(FactorizeBasis, AliasedForm):
     """
-    LoopDepthCostModel counts the fields each query loops over, so that a greedy
+    LoopDepthBasis counts the fields each query loops over, so that a greedy
     search reduces the indices which keep the deepest loop nest shallow. It
     needs only the shapes of its statistics. Each query is a component.
     """
@@ -147,10 +147,9 @@ class LoopDepthCostModel(FactorizeCostModel, AliasedForm):
     def n_features(self) -> int:
         return 1
 
-    def __init__(self, predictor: Callable[[np.ndarray], float] | None = None):
-        super().__init__(
-            predictor if predictor is not None else LinearPredictor(np.array([1.0]))
-        )
+    @property
+    def feature_names(self) -> tuple[str, ...]:
+        return ("loop_depth",)
 
     def get_component_features(
         self,
@@ -166,3 +165,6 @@ class LoopDepthCostModel(FactorizeCostModel, AliasedForm):
                 return self.get_component_features(Statement(stmt.as_query()), machine)
             case stmt:
                 raise ValueError(f"Unsupported statement type: {stmt}")
+
+
+LOOP_DEPTH_COST_MODEL = LinearCostModel(LoopDepthBasis(), [1.0])

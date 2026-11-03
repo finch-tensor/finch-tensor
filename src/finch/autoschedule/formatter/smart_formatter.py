@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod
 from collections import OrderedDict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TypeVar
 
 import numpy as np
@@ -22,18 +22,33 @@ from finch.autoschedule.cost_models import (
     CostModel,
     DenseLevelOption,
     ElementLevelOption,
+    LevelBasis,
     LevelChoice,
-    LevelCostModel,
     LevelOption,
-    LinearPredictor,
+    LinearCostModel,
+    SparseByteMapLevelOption,
     SparseHashLevelOption,
+    SparseListLevelOption,
+    allowed_options,
 )
-from finch.autoschedule.cost_models.format_cost_models import alias_blocks
+from finch.autoschedule.cost_models.format_cost_models import (
+    alias_blocks,
+    read_protocols,
+    write_protocols,
+)
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
 from finch.finch_logic.tensor_stats import TensorStats
-from finch.tensor import FiberTensorFType, dense, element, fiber_tensor, sparse_hash
+from finch.tensor import (
+    FiberTensorFType,
+    dense,
+    element,
+    fiber_tensor,
+    sparse_bytemap,
+    sparse_hash,
+    sparse_list,
+)
 from finch.util.logging import LOG_LOGIC_POST_OPT
 
 from .formatter import LogicFormatter
@@ -42,8 +57,20 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 
 
 # The level options CostFormatter chooses from by default, and their builders.
-LEVEL_OPTIONS = (DenseLevelOption(), SparseHashLevelOption())
-LEVEL_BUILDERS = {"dense": dense, "sparse_hash": sparse_hash}
+# Of options which cost the same, the earliest is chosen, so a list is chosen
+# over a hash wherever it can be written.
+LEVEL_OPTIONS = (
+    DenseLevelOption(),
+    SparseListLevelOption(),
+    SparseHashLevelOption(),
+    SparseByteMapLevelOption(),
+)
+LEVEL_BUILDERS = {
+    "dense": dense,
+    "sparse_list": sparse_list,
+    "sparse_hash": sparse_hash,
+    "sparse_bytemap": sparse_bytemap,
+}
 
 
 def optimize_format(
@@ -51,6 +78,14 @@ def optimize_format(
 ):
     blocks = alias_blocks(alias, term, machine)
     n = len(shape_type)
+    allowed = [allowed_options(alias, depth, term, options) for depth in range(n)]
+    for depth, level_options in enumerate(allowed):
+        if not level_options:
+            raise ValueError(
+                f"No level option supports reading level {depth} of {alias} with "
+                f"{read_protocols(alias, depth, term)} and writing it with "
+                f"{write_protocols(alias, depth, term)}."
+            )
     position_type = ftypes.intp
     leaf = element(fill_type, fill_type.element_type, position_type)
     pos_size = np_dtype(position_type).itemsize
@@ -70,7 +105,7 @@ def optimize_format(
 
         best_cost = None
         best_format = None
-        for option in options:
+        for option in allowed[level]:
             local = cost(level, num_pos, option)
             child_num_pos = tuple(
                 option.next_num_pos(
@@ -214,29 +249,48 @@ class FDFormatter(SmartFormatter):
         return fiber_tensor(lvl)
 
 
+# The basis of the levels of each kind of option, which cost models of the
+# formatter describe.
+LEVEL_BASIS = ByKind(
+    {
+        option.kind: LevelBasis(type(option))
+        for option in (*LEVEL_OPTIONS, ElementLevelOption())
+    }
+)
+
+
 def linear_level_model(
-    option_type: type[LevelOption],
-    storage: Sequence[float],
-    access: Sequence[float] = (0, 0, 0, 0),
-) -> LevelCostModel:
-    coefficients = np.array([*storage, *access], dtype=float)
-    return LevelCostModel(option_type, LinearPredictor(coefficients))
+    storage: Mapping[type[LevelOption], Sequence[float]],
+) -> LinearCostModel[LevelChoice]:
+    """
+    A linear model of LEVEL_BASIS, from the coefficients of the storage features
+    of each option type. The accesses of the levels are free.
+    """
+    coefficients = [
+        [*storage[LevelOption.kinds[kind]], 0, 0, 0, 0] for kind in LEVEL_BASIS.by_kind
+    ]
+    return LinearCostModel(LEVEL_BASIS, np.concatenate(coefficients))
 
 
 # Each level option lists its storage features. The access features are
 # sequential reads, scatter reads, sequential writes, and scatter writes.
-ITER_COST_MODEL = ByKind(
+ITER_COST_MODEL = linear_level_model(
     {
-        "dense": linear_level_model(DenseLevelOption, (0, 1)),
-        "sparse_hash": linear_level_model(SparseHashLevelOption, (1, 1, 0, 0)),
-        "element": linear_level_model(ElementLevelOption, (0, 0)),
+        DenseLevelOption: (0, 1),
+        SparseListLevelOption: (1, 1, 0, 0),
+        SparseHashLevelOption: (1, 1, 0, 0),
+        SparseByteMapLevelOption: (1, 0, 1, 0),
+        ElementLevelOption: (0, 0),
     }
 )
-STORAGE_COST_MODEL = ByKind(
+STORAGE_COST_MODEL = linear_level_model(
     {
-        "dense": linear_level_model(DenseLevelOption, (0, 0)),
-        "sparse_hash": linear_level_model(SparseHashLevelOption, (0, 0, 1, 1)),
-        "element": linear_level_model(ElementLevelOption, (0, 1)),
+        DenseLevelOption: (0, 0),
+        SparseListLevelOption: (0, 0, 1, 1),
+        SparseHashLevelOption: (0, 0, 1, 1),
+        # Each slot is flagged with a byte.
+        SparseByteMapLevelOption: (0, 1, 0, 1),
+        ElementLevelOption: (0, 1),
     }
 )
 
