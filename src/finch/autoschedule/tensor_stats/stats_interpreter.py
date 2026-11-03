@@ -48,11 +48,25 @@ class StatsInterpreter(Generic[TS]):
     ):
         self.stats_factory = stats_factory
 
+    @overload
+    def __call__(
+        self, node: LogicExpression, bindings: MutableMapping[Alias, TS]
+    ) -> TS: ...
+
+    @overload
+    def __call__(
+        self, node: LogicStatement, bindings: MutableMapping[Alias, TS]
+    ) -> tuple[TS, ...]: ...
+
+    @overload
+    def __call__(
+        self, node: LogicNode, bindings: MutableMapping[Alias, TS]
+    ) -> TS | tuple[TS, ...]: ...
+
     def __call__(
         self, node: LogicNode, bindings: MutableMapping[Alias, TS]
     ) -> TS | tuple[TS, ...]:
-        if not isinstance(bindings, OrderedDict):
-            bindings = OrderedDict(bindings)
+        # A statement binds the statistics of its results in bindings.
         machine = StatsMachine(
             stats_factory=self.stats_factory,
             bindings=bindings,

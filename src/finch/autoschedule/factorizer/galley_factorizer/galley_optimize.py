@@ -11,9 +11,7 @@ from finch.algebra.tensor import TensorFType
 from finch.autoschedule.cost_models import CostModel
 from finch.autoschedule.factorizer.optimize import with_unique_lhs
 from finch.autoschedule.stages import LogicFactorizer
-from finch.autoschedule.tensor_stats.logic_to_stats import (
-    insert_statistics,
-)
+from finch.autoschedule.tensor_stats import StatsInterpreter
 from finch.autoschedule.util import (
     desugar_query_into,
     flatten_plans,
@@ -80,7 +78,6 @@ def optimize_plan(
     """
     plan = preprocess_plan_for_galley(plan)
     optimized_queries = []
-    cache_dict: dict[object, TensorStats] = {}
     for body in plan.bodies:
         if isinstance(body, Query):
             new_queries = optimize_query(
@@ -92,13 +89,7 @@ def optimize_plan(
                 cost_model=cost_model,
             )
             for new_query in new_queries:
-                insert_statistics(
-                    stats_factory,
-                    new_query,
-                    stats_bindings,
-                    replace=True,
-                    cache=cache_dict,
-                )
+                StatsInterpreter(stats_factory)(new_query, stats_bindings)
             optimized_queries.extend(new_queries)
         else:
             optimized_queries.append(body)

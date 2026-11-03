@@ -3,8 +3,10 @@ from typing import Any, TypeVar, cast, overload
 
 from finch.algebra.tensor import Tensor
 from finch.finch_logic import (
+    Aggregate,
     Alias,
     Field,
+    Fuse,
     FusedAlias,
     HardAlias,
     Literal,
@@ -18,7 +20,7 @@ from finch.finch_logic import (
     Reorder,
     Table,
 )
-from finch.finch_logic.nodes import LogicExpression, LogicStatement
+from finch.finch_logic.nodes import LogicExpression, LogicStatement, LogicTree
 from finch.symbolic import Namespace, PostWalk, Rewrite, UnvalidatedForm
 from finch.tensor.scalar import ConstantScalar
 from finch.util.logging import LOG_LOGIC_PRE_OPT
@@ -45,6 +47,9 @@ def normalize_names(
 ) -> tuple[LogicNode, dict[Alias, T]]:
     """
     Normalizes names of aliases and fields in the logic program to avoid conflicts.
+    The fields an aggregate reduces are its own, so they are renamed apart from
+    any field of the same name outside it, unless an enclosing Fuse loops over
+    them.
     """
     if bindings is None:
         bindings = {}
@@ -72,8 +77,36 @@ def normalize_names(
             case _:
                 return None
 
+    def rename(node: LogicNode, scope: dict[str, str], looped=frozenset()):
+        match node:
+            case Fuse(idx, body):
+                return Fuse(
+                    cast(Field, rename(idx, scope, looped)),
+                    cast(LogicStatement, rename(body, scope, looped | {idx.name})),
+                )
+            case Aggregate(op, init, arg, idxs):
+                inner = dict(scope)
+                for idx in idxs:
+                    if idx.name not in looped:
+                        inner[idx.name] = spc.freshen("i")
+                return Aggregate(
+                    op,
+                    cast(LogicExpression, rename(init, scope, looped)),
+                    cast(LogicExpression, rename(arg, inner, looped)),
+                    tuple(cast(Field, rename(idx, inner, looped)) for idx in idxs),
+                )
+            case Field(name) if name in scope:
+                return Field(scope[name])
+            case Alias() | Field():
+                return Rewrite(rule_0)(node)
+            case LogicTree():
+                children = (rename(child, scope, looped) for child in node.children)
+                return node.make_term(node.head(), *children)
+            case _:
+                return node
+
     bindings = {Rewrite(rule_0)(var): tns for var, tns in bindings.items()}
-    root = Rewrite(PostWalk(rule_0))(prgm)
+    root = rename(prgm, {})
 
     return root, bindings
 
