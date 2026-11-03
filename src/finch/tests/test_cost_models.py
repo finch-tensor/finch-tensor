@@ -255,23 +255,23 @@ def test_pigeon_cost_model_dependent_queries(factory):
         (
             DCStatsFactory,
             [
-                [30, 8, 8],
-                [28, 13, 8],
-                [30, 8, 8],
-                [32, 10, 10],
-                [32, 15, 10],
-                [32, 14, 10],
+                [13, 8, 8],
+                [25, 13, 8],
+                [11, 8, 8],
+                [13, 10, 10],
+                [27, 15, 10],
+                [21, 14, 10],
             ],
         ),
         (
             UniformStatsFactory,
             [
-                [25.030714922766236, 8.397118199352539, 6.9057883730956355],
-                [20.948107815782194, 10.936459669391933, 6.9057883730956355],
-                [25.546706922536774, 8.172993988088525, 6.9057883730956355],
-                [25.64527434095588, 9.008949572579267, 8.042275185340479],
-                [22.592642244606303, 12.072946481636775, 8.042275185340479],
-                [22.275728472420994, 11.506047408332968, 8.042275185340479],
+                [13.125646170864904, 8.397118199352539, 6.9057883730956355],
+                [16.33218448022594, 10.936459669391933, 6.9057883730956355],
+                [11.511605654582105, 8.172993988088525, 6.9057883730956355],
+                [11.61017307300121, 9.008949572579267, 8.042275185340479],
+                [17.03615392598815, 12.072946481636775, 8.042275185340479],
+                [15.400056530780656, 11.506047408332968, 8.042275185340479],
             ],
         ),
     ],
@@ -297,7 +297,8 @@ def test_pigeon_prefix_costs_match_full_cost(factory, expected):
     original_fills = [stat.fill_type for stat in spaces]
     original_idxs = [stat.index_order for stat in spaces]
 
-    # These totals were captured before extracting the prefix calculation.
+    # These totals were captured after projecting the inputs of each prefix
+    # onto its fields.
     for order, original_features in zip(
         itertools.permutations((i, j, k)), expected, strict=True
     ):

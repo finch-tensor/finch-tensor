@@ -134,20 +134,22 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
         if not prefix:
             return np.array([[0.0, 0.0, out_space.estimate_non_fill_values()]])
 
-        def project(stat: NS) -> NS:
-            reduce_idxs = tuple(idx for idx in stat.index_order if idx not in parent)
+        def project(stat: NS, fields: set[Field]) -> NS:
+            reduce_idxs = tuple(idx for idx in stat.index_order if idx not in fields)
             return stats_factory.aggregate(
                 ffuncs.or_, False, reduce_idxs, stats_factory.support(stat)
             )
 
         parent = set(prefix[:-1])
         idx = prefix[-1]
-        exec_space = project(machine(arg))
+        exec_space = project(machine(arg), parent)
+        # Each executed parent tuple visits the coordinates of the last index
+        # that any input over it stores, projected onto the prefix.
         inputs = []
         for node in PostOrderDFS(arg):
             match node:
                 case Table(_, idxs) if idx in idxs:
-                    inputs.append(stats_factory.support(machine(node)))
+                    inputs.append(project(machine(node), set(prefix)))
         iter_space = exec_space
         if inputs:
             iter_space = stats_factory.mapjoin(
@@ -155,7 +157,7 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
             )
         out_cost = 0.0
         if idx in out_space.index_order:
-            out_cost = project(out_space).estimate_non_fill_values()
+            out_cost = project(out_space, parent).estimate_non_fill_values()
         return np.array(
             [
                 [
