@@ -1,5 +1,6 @@
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
+from typing import Generic
 
 import numpy as np
 
@@ -10,20 +11,25 @@ from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    DefaultProtocol,
     Field,
+    Follow,
     Fuse,
+    Gallop,
     Literal,
     LogicExpression,
     LogicStatement,
+    MapJoin,
     Plan,
     Produces,
+    Protocol,
     Query,
     QueryInto,
     Table,
 )
-from finch.symbolic import PostOrderDFS
+from finch.symbolic import PostOrderDFS, Term
 
-from .cost_models import NS, CostModel, LinearPredictor
+from .cost_models import NS, Basis, Concat, LinearCostModel
 
 
 @dataclass(frozen=True)
@@ -38,14 +44,14 @@ class Prefix:
     output_vars: tuple[Field, ...] | None = None
 
 
-class LoopCostModel(CostModel[Prefix]):
+class LoopBasis(Basis[Prefix]):
     """
-    A cost model where each loop prefix, including the empty prefix, is a component.
+    A basis where each loop prefix, including the empty prefix, is a component.
     components yields prefixes in query order, from the shortest prefix to the
     longest, and get_component_features returns one row for each prefix. The
-    loop order of a query is the fields of its enclosing Fuse nodes.
-    Predictors used with branch-and-bound loop search must predict nonnegative
-    component costs.
+    loop order of a query is the fields of its enclosing Fuse nodes. Models
+    used with branch-and-bound loop search must predict nonnegative component
+    costs.
     """
 
     def components(
@@ -81,22 +87,102 @@ class LoopCostModel(CostModel[Prefix]):
         machine(term)
 
 
-class PigeonCostModel(LoopCostModel, LoopOrderedForm):
+class LoopSpaces(Generic[NS]):
     """
-    PigeonCostModel counts iteration, operation, and output costs across loop
-    prefixes. By default, allocations are weighted 10x reads and operations.
+    The spaces of the last loop of a nonempty loop prefix. Execution is where a
+    merge of the inputs, which can't look ahead, visits the enclosing loops. A
+    table walks the field of the loop unless it gallops or follows it, as its
+    protocol for that field says.
+    """
+
+    def __init__(self, component: Prefix, machine: StatsMachine[NS]):
+        self.machine = machine
+        self.stats_factory = machine.stats_factory
+        self.parent = set(component.prefix[:-1])
+        self.idx = component.prefix[-1]
+        match component.expr:
+            case Aggregate(arg=arg):
+                self.arg = arg
+            case expr:
+                self.arg = expr
+        self.exec_space = self.stats_factory.support(self.merged(self.arg))
+
+    def project(self, stat: NS, fields=()) -> NS:
+        fields = {*self.parent, *fields}
+        reduce_idxs = tuple(idx for idx in stat.index_order if idx not in fields)
+        return self.stats_factory.aggregate(
+            ffuncs.or_, False, reduce_idxs, self.stats_factory.support(stat)
+        )
+
+    def protocol(self, node: Term) -> Protocol:
+        match node:
+            case Table(_, idxs, (_, *_) as protocols) if self.idx in idxs:
+                return protocols[idxs.index(self.idx)]
+        return DefaultProtocol()
+
+    def merged(self, node: LogicExpression, fields=()) -> NS:
+        # A merge coiterates the projections of the inputs, so it visits more
+        # of parent than the projection of their result.
+        match node:
+            case MapJoin(Literal(op), args):
+                return self.stats_factory.mapjoin(
+                    op, *(self.merged(arg, fields) for arg in args)
+                )
+            case _:
+                stat = self.machine(node)
+                # A followed table is looked up wherever the others go.
+                followed = any(
+                    self.protocol(table) == Follow() for table in PostOrderDFS(node)
+                )
+                projected = self.project(stat, () if followed else fields)
+                # The fill decides whether a mapjoin joins or unions it.
+                projected.fill_type = stat.fill_type
+                return projected
+
+    def count(self, stat: NS) -> float:
+        # A space without idx spans all of it.
+        if self.idx in stat.index_order:
+            return stat.estimate_non_fill_values()
+        for node in PostOrderDFS(self.arg):
+            match node:
+                case Table(_, idxs) if self.idx in idxs:
+                    dim = self.machine(node).dim_sizes[self.idx]
+                    return stat.estimate_non_fill_values() * dim
+        return stat.estimate_non_fill_values()
+
+    def visited(self) -> NS:
+        """Where the loop visits idx, which its walks and gallops restrict."""
+        return self.stats_factory.mapjoin(
+            ffuncs.and_,
+            self.exec_space,
+            self.stats_factory.support(self.merged(self.arg, (self.idx,))),
+        )
+
+    def walk(self, table: Table) -> float:
+        """The steps of a walk of table through idx."""
+        return self.count(
+            self.stats_factory.mapjoin(
+                ffuncs.and_,
+                self.exec_space,
+                self.project(self.machine(table), (self.idx,)),
+            )
+        )
+
+
+class PigeonBasis(LoopBasis, LoopOrderedForm):
+    """
+    PigeonBasis counts iteration, operation, output, and lookup costs across
+    loop prefixes. Each table reads the field of a loop with its protocol for
+    that field, and a table without protocols walks it.
     """
 
     @property
     def n_features(self) -> int:
-        return 3
+        return 4
 
-    def __init__(self, predictor: Callable[[np.ndarray], float] | None = None):
-        super().__init__(
-            predictor
-            if predictor is not None
-            else LinearPredictor(np.array([1.0, 1.0, 10.0]))
-        )
+    @property
+    def feature_names(self) -> tuple[str, ...]:
+        return ("iterations", "operations", "outputs", "lookups")
 
     def get_component_features(
         self,
@@ -106,9 +192,15 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
         """Return the incremental features for an outermost-first loop prefix.
 
         A nonempty prefix charges its last index, projecting execution and
-        output onto prefix[:-1], as in the inside-out calculation. The empty
-        prefix charges the output's non-fill values once. Summing all prefixes,
-        including the empty one, gives the query's features.
+        output onto prefix[:-1], as in the inside-out calculation. Execution is
+        where a merge of the inputs, which can't look ahead, visits prefix[:-1].
+        The empty prefix charges the output's non-fill values once. Summing all
+        prefixes, including the empty one, gives the query's features.
+
+        A walk steps through the stored indices of its table. A gallop or a
+        follow instead visits the indices where the expression runs, which a
+        follow doesn't restrict, and charges a lookup at each of them. A loop
+        whose tables all follow its field visits all of it.
         """
         prefix, expr, output_vars = (
             component.prefix,
@@ -116,11 +208,6 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
             component.output_vars,
         )
         stats_factory = machine.stats_factory
-        match expr:
-            case Aggregate(arg=arg):
-                pass
-            case _:
-                arg = expr
         out_space = machine(expr)
         if output_vars is not None:
             reduce_idxs = tuple(
@@ -132,42 +219,51 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
                 )
             out_space = stats_factory.reorder(out_space, output_vars)
         if not prefix:
-            return np.array([[0.0, 0.0, out_space.estimate_non_fill_values()]])
-
-        def project(stat: NS) -> NS:
-            reduce_idxs = tuple(idx for idx in stat.index_order if idx not in parent)
-            return stats_factory.aggregate(
-                ffuncs.or_, False, reduce_idxs, stats_factory.support(stat)
-            )
-
-        parent = set(prefix[:-1])
-        idx = prefix[-1]
-        exec_space = project(machine(arg))
-        inputs = []
-        for node in PostOrderDFS(arg):
+            return np.array([[0.0, 0.0, out_space.estimate_non_fill_values(), 0.0]])
+        spaces = LoopSpaces(component, machine)
+        idx = spaces.idx
+        exec_space = spaces.exec_space
+        inputs, walks, lookups = [], [], 0
+        for node in PostOrderDFS(spaces.arg):
             match node:
                 case Table(_, idxs) if idx in idxs:
-                    inputs.append(stats_factory.support(machine(node)))
-        iter_space = exec_space
-        if inputs:
-            iter_space = stats_factory.mapjoin(
-                ffuncs.and_, exec_space, stats_factory.mapjoin(ffuncs.or_, *inputs)
+                    stat = machine(node)
+                    inputs.append(stat)
+                    match spaces.protocol(node):
+                        case Follow() | Gallop():
+                            lookups += 1
+                        case _:
+                            walks.append(spaces.project(stat, (idx,)))
+        iterations = exec_space.estimate_non_fill_values()
+        lookup_cost = 0.0
+        if lookups:
+            visited = spaces.visited()
+            # The loop steps through the tables it walks, and visits the rest.
+            steps = stats_factory.mapjoin(ffuncs.or_, visited, *walks)
+            iterations = spaces.count(
+                stats_factory.mapjoin(ffuncs.and_, exec_space, steps)
             )
+            lookup_cost = spaces.count(visited) * lookups
+        elif inputs:
+            iterations = stats_factory.mapjoin(
+                ffuncs.and_, exec_space, stats_factory.mapjoin(ffuncs.or_, *walks)
+            ).estimate_non_fill_values()
         out_cost = 0.0
         if idx in out_space.index_order:
-            out_cost = project(out_space).estimate_non_fill_values()
+            out_cost = spaces.project(out_space).estimate_non_fill_values()
         return np.array(
             [
                 [
-                    iter_space.estimate_non_fill_values(),
+                    iterations,
                     exec_space.estimate_non_fill_values() * len(inputs),
                     out_cost,
+                    lookup_cost,
                 ]
             ]
         )
 
 
-class TransposeCostModel(LoopCostModel, LoopOrderedForm):
+class TransposeBasis(LoopBasis, LoopOrderedForm):
     """
     Count dense and sparse transposed entries, charging each input once per query.
     """
@@ -176,12 +272,9 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
     def n_features(self) -> int:
         return 2
 
-    def __init__(self, predictor: Callable[[np.ndarray], float] | None = None):
-        super().__init__(
-            predictor
-            if predictor is not None
-            else LinearPredictor(np.array([0.5, 60.0]))
-        )
+    @property
+    def feature_names(self) -> tuple[str, ...]:
+        return ("dense_transposes", "sparse_transposes")
 
     def get_component_features(
         self,
@@ -218,3 +311,10 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
                 dense = 0 < space < float("inf") and nnz / space > 0.1
                 features[0, 0 if dense else 1] += nnz
         return features
+
+
+# Allocations are weighted 10x reads and operations, and a lookup costs as
+# much as an iteration.
+LOOP_COST_MODEL = LinearCostModel(
+    Concat(PigeonBasis(), TransposeBasis()), [1.0, 1.0, 10.0, 1.0, 0.5, 60.0]
+)
