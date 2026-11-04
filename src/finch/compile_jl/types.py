@@ -288,7 +288,8 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
         pos_t = _leaf_type_str(level_ftype.position_type)
         dim_t = _leaf_type_str(level_ftype.dimension_type)
         return (
-            f"Finch.SparseListLevel({_level_constructor_str(level_ftype.lvl_t)}, "
+            f"Finch.SparseListLevel{{{dim_t}}}("
+            f"{_level_constructor_str(level_ftype.lvl_t)}, "
             f"1, {_buffer_ctor_str(pos_t, offset=1)}, "
             f"{_buffer_ctor_str(dim_t, offset=1)})"
         )
