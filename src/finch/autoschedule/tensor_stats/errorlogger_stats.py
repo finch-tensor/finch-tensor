@@ -53,6 +53,16 @@ class ErrorLoggerStatsFactory(
             },
         )
 
+    def support(self, stat: ErrorLoggerStats) -> ErrorLoggerStats:
+        return ErrorLoggerStats(
+            log=self.log,
+            exact=self.exact_factory.support(stat.exact),
+            estimates={
+                factory: factory.support(stat.estimates[factory])
+                for factory in self.factories
+            },
+        )
+
     def mapjoin(self, op: FinchOperator, *stats: ErrorLoggerStats) -> ErrorLoggerStats:
         exact = self.exact_factory.mapjoin(op, *(stat.exact for stat in stats))
         estimates = {
@@ -124,17 +134,17 @@ class ErrorLoggerStats(NumericStats):
         for factory, estimate in self.estimates.items():
             count = estimate.estimate_non_fill_values(over=fields)
             self.log.record(factory, actual, count)
-        return self.log.samples[next(iter(self.estimates))][1]
+        return self.log.samples[next(iter(self.estimates))][-1][1]
 
     def get_embedding(self) -> np.ndarray:
         return self.estimate.get_embedding()
 
 
 class ErrorLog:
-    """Record the latest exact and estimated non-fill count pair per estimator."""
+    """Record every exact and estimated non-fill count pair per estimator."""
 
     def __init__(self):
-        self.samples: dict[StatsFactory[Any], tuple[float, float]] = {}
+        self.samples: dict[StatsFactory[Any], list[tuple[float, float]]] = {}
 
     def record(
         self,
@@ -142,26 +152,36 @@ class ErrorLog:
         exact: float,
         estimate: float,
     ) -> None:
-        self.samples[estimator] = (exact, estimate)
+        self.samples.setdefault(estimator, []).append((exact, estimate))
 
 
 class ErrorReport:
-    """Create bar charts of signed relative errors on a symmetric log scale."""
+    """Create box plots of estimate/exact ratios across prediction requests."""
 
     def __init__(self, log: ErrorLog):
         self.log = log
 
-    def plot(self, filename: str) -> None:
+    def plot(self, filename: str, *, max_ratio: float | None = 10.0) -> None:
         import matplotlib.pyplot as plt
+        from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
 
-        relative_errors = []
+        if max_ratio is not None and (not np.isfinite(max_ratio) or max_ratio <= 1):
+            raise ValueError("max_ratio must be finite and greater than 1, or None")
+
+        estimate_ratios = []
         labels = []
-        for factory, (exact, estimate) in self.log.samples.items():
-            if exact == 0:
-                error = 0.0 if estimate == 0 else float("inf")
-            else:
-                error = (estimate - exact) / exact
-            relative_errors.append(error)
+        for factory, samples in self.log.samples.items():
+            ratios = []
+            for exact, estimate in samples:
+                if np.isnan(exact) or np.isnan(estimate) or exact < 0 or estimate < 0:
+                    ratio = float("nan")
+                elif exact == 0:
+                    ratio = 1.0 if estimate == 0 else float("inf")
+                else:
+                    ratio = estimate / exact
+                ratios.append(ratio)
+            ratios = np.array(ratios)
+            estimate_ratios.append(ratios[np.isfinite(ratios) & (ratios > 0)])
 
             names = []
             factories = [factory]
@@ -178,46 +198,133 @@ class ErrorReport:
                         name = f"{name} ({estimator})"
                 names.append(name)
             name = " ".join(names)
-            labels.append(name)
-            print(f"{name}: {error}")
+            counts = [f"n={len(samples)}"]
+            for mask, label in (
+                (ratios == 0, "zero"),
+                (np.isposinf(ratios), "∞"),
+                (np.isnan(ratios), "invalid"),
+            ):
+                count = np.count_nonzero(mask)
+                if count:
+                    counts.append(f"{label}={count}")
+            labels.append(f"{name} ({', '.join(counts)})")
 
-        limit = max(
-            (abs(error) for error in relative_errors if np.isfinite(error)),
+        minimum = min(
+            (ratio for ratios in estimate_ratios for ratio in ratios),
             default=1.0,
         )
-        limit = max(limit, 0.01)
-        figure, axis = plt.subplots(figsize=(10, max(3, 0.4 * len(labels) + 1.5)))
-        bars = axis.barh(
-            range(len(labels)),
-            np.nan_to_num(relative_errors, nan=0.0, posinf=limit, neginf=-limit),
-            tick_label=labels,
-            color=[
-                "tab:blue" if error < 0 else "tab:orange" for error in relative_errors
-            ],
+        maximum = max(
+            (ratio for ratios in estimate_ratios for ratio in ratios),
+            default=1.0,
         )
-        for bar, error in zip(bars, relative_errors, strict=True):
-            center = bar.get_y() + bar.get_height() / 2
-            if np.isinf(error):
-                axis.annotate(
-                    "−∞" if error < 0 else "∞",
-                    (bar.get_width(), center),
-                    xytext=(-4 if error < 0 else 4, 0),
-                    textcoords="offset points",
-                    ha="right" if error < 0 else "left",
-                    va="center",
+        right_limit = max(2.0, maximum * 1.2)
+        if max_ratio is not None:
+            right_limit = min(right_limit, max_ratio)
+        figure, axis = plt.subplots(figsize=(10, max(3, 0.4 * len(labels) + 2.5)))
+        if estimate_ratios:
+            artists = axis.boxplot(
+                estimate_ratios,
+                orientation="horizontal",
+                tick_labels=labels,
+                patch_artist=True,
+                whis=(0, 100),
+                showfliers=False,
+                boxprops={"facecolor": "none"},
+                medianprops={"color": "black"},
+            )
+            for box in artists["boxes"]:
+                bounds = box.get_path().vertices
+                if not np.isfinite(bounds).all():
+                    continue
+                left, bottom = bounds.min(axis=0)
+                right, top = bounds.max(axis=0)
+                if left < 1:
+                    axis.fill_betweenx(
+                        [bottom, top],
+                        left,
+                        min(right, 1),
+                        color="tab:blue",
+                        alpha=0.35,
+                        zorder=1,
+                    )
+                if right > 1:
+                    axis.fill_betweenx(
+                        [bottom, top],
+                        max(left, 1),
+                        right,
+                        color="tab:orange",
+                        alpha=0.35,
+                        zorder=1,
+                    )
+                box.set_edgecolor(
+                    "tab:blue"
+                    if right < 1
+                    else "tab:orange"
+                    if left > 1
+                    else "tab:gray"
                 )
-            elif error == 0:
-                axis.plot(0, center, marker="o", color="tab:gray", markersize=3)
-        axis.set_xscale("symlog", linthresh=0.01)
-        axis.set_xlim(-1.2 * limit, 1.2 * limit)
-        axis.axvline(0, color="black", linewidth=0.8)
+            for line in artists["whiskers"] + artists["caps"] + artists["medians"]:
+                values = line.get_xdata()
+                line.set_color(
+                    "tab:blue"
+                    if max(values) < 1
+                    else "tab:orange"
+                    if min(values) > 1
+                    else "tab:gray"
+                )
+            for position, ratios in enumerate(estimate_ratios, start=1):
+                if not len(ratios):
+                    axis.text(
+                        1,
+                        position,
+                        "No positive finite ratios",
+                        ha="center",
+                        va="center",
+                    )
+        else:
+            axis.set_yticks([])
+            axis.text(
+                0.5,
+                0.5,
+                "No predictions recorded",
+                transform=axis.transAxes,
+                ha="center",
+                va="center",
+            )
+        axis.set_xscale("log")
+        axis.set_xlim(min(0.5, minimum / 1.2), right_limit)
+        for position, ratios in enumerate(estimate_ratios, start=1):
+            if not len(ratios) or ratios.max() <= right_limit:
+                continue
+            axis.plot(
+                right_limit,
+                position,
+                marker=">",
+                color="tab:orange",
+                markersize=6,
+                clip_on=False,
+            )
+            axis.annotate(
+                f"{ratios.max():,.6g}×",
+                (right_limit, position),
+                xytext=(8, 0),
+                textcoords="offset points",
+                ha="left",
+                va="center",
+                color="tab:orange",
+                annotation_clip=False,
+            )
+        axis.xaxis.set_major_locator(LogLocator(base=10, subs=(1, 2, 5)))
+        axis.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:g}"))
+        axis.xaxis.set_minor_formatter(NullFormatter())
+        axis.axvline(1, color="black", linewidth=0.8)
         axis.set_axisbelow(True)
         axis.grid(axis="x", which="both", alpha=0.25)
         axis.set_xlabel(
-            "Relative error: (estimate - exact) / exact\n"
-            "Underestimation < 0 < Overestimation (symmetric log scale)"
+            "Estimate / exact (log scale; 1 = exact)\n"
+            "Blue < 1: underestimation; orange > 1: overestimation"
         )
-        axis.set_ylabel("Estimator")
-        axis.set_title("Relative Error Across Stats")
+        axis.set_ylabel("Estimator\n(n = number of prediction requests)")
+        axis.set_title("Estimate / Exact Distributions")
         figure.savefig(filename, bbox_inches="tight")
         plt.close(figure)
