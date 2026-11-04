@@ -100,6 +100,15 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
     def level_format_properties(self, n):
         return self.lvl_t.level_format_properties(n + 1)
 
+    def level_default_protocols(self):
+        return (ntn.Walk(), *self.lvl_t.level_default_protocols())
+
+    def level_protocols(self):
+        return (
+            (ntn.Walk(), ntn.Gallop(), ntn.Follow(), ntn.Extrude(), ntn.Laminate()),
+            *self.lvl_t.level_protocols(),
+        )
+
     def construct(self, shape: tuple[Any, ...], *, pos: int) -> "SparseByteMapLevel":
         dimension = self.dimension_type(shape[0])
         child_pos = int(pos) * int(dimension)
@@ -372,6 +381,17 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
                 for r in range(1, self.ndim)
             ),
         )
+        match proto:
+            case ntn.DefaultProtocol() | ntn.Walk():
+                step = lplt.Stepper
+            case ntn.Gallop():
+                step = lplt.Jumper
+            case ntn.Follow():
+                return self._level_unfurl_follow(ctx, fiber, pos, full)
+            case _:
+                raise NotImplementedError(
+                    f"SparseByteMapLevelFType does not support the {proto} protocol."
+                )
         bindings = locals() | self._bindings(lvl)
         bindings |= {
             "one": asm.Literal(p_t(1)),
@@ -441,7 +461,7 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
         return lplt.Thunk(
             preamble=thunk_preamble,
             body=lambda ctx, ext: lplt.Sequence(
-                head=lambda ctx, idx: lplt.Stepper(
+                head=lambda ctx, idx: step(
                     preamble=stepper_preamble,
                     stop=lambda ctx: ntn.Variable(i_stop.name, p_t),
                     chunk=lplt.Sequence(
@@ -462,7 +482,61 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
             ),
         )
 
+    def _level_unfurl_follow(self, ctx, fiber, pos, full):
+        lvl = ctx(fiber.lvl)
+        p_t = self.position_type
+
+        def lookup(ctx, idx):
+            q = asm.Variable(ctx.freshen("q"), p_t)
+            found = asm.Variable(ctx.freshen("found"), ftypes.bool_)
+            exec_block(
+                ctx,
+                parse_assembly(
+                    """finch
+                    q = add(mul(to_pos(pos), dimension), to_pos(i))
+                    found = false
+                    if (to_len(q) < n_tbl)
+                        if (tbl[to_len(q)] == present)
+                            found = true
+                        end
+                    end
+                    """,
+                    self._bindings(lvl)
+                    | {
+                        "q": q,
+                        "found": found,
+                        "pos": pos,
+                        "i": ctx.ctx(idx),
+                        "dimension": asm.Call(
+                            asm.Literal(ffuncs.astype(p_t)),
+                            (asm.GetAttr(lvl, asm.Literal("dimension")),),
+                        ),
+                    },
+                    position_type=self.ptr_type.length_type,
+                ),
+            )
+            return lplt.Switch(
+                found,
+                lplt.Run(
+                    ntn.Fiber(
+                        ntn.Child(fiber.lvl),
+                        ntn.Value(q, p_t),
+                        (*fiber.idxs, idx),
+                    )
+                ),
+                lplt.Run(full),
+            )
+
+        return lplt.Lookup(lookup)
+
     def level_unfurl_update(self, ctx, fiber, ext, mode, proto, pos):
+        match proto:
+            case ntn.DefaultProtocol() | ntn.Extrude() | ntn.Laminate():
+                pass
+            case _:
+                raise NotImplementedError(
+                    f"SparseByteMapLevelFType does not support the {proto} protocol."
+                )
         lvl = ctx(fiber.lvl)
         p_t = self.position_type
         bindings = self._bindings(lvl) | {

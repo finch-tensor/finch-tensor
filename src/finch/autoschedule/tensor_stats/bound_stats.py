@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import math
 from collections import Counter
 from collections.abc import Iterable
@@ -28,6 +29,9 @@ __all__ = [
     "LPStats",
     "LPStatsFactory",
 ]
+
+# Distinguishes the names of the fields which aggregates reduce.
+_hidden_ids = itertools.count()
 
 # Default ell_p norm orders kept by LPStats.
 DEFAULT_PS: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0, 4.0, 5.0, math.inf)
@@ -219,7 +223,22 @@ class BoundStatsFactory(BaseTensorStatsFactory[TS], StatsFactory[TS], Generic[TS
             base: BaseTensorStats = stats.copy()
         else:
             base = self.aggregate_def(op, init, reduce_indices, stats)
-        return self._rebuild(base, stats.dcs)
+        # The reduced fields are renamed apart, so that their constraints still
+        # bound the result through them, but not a later join over fields of
+        # the same name.
+        hidden = {
+            idx: Field(f"{idx.name}#{next(_hidden_ids)}") for idx in reduce_indices
+        }
+        dcs = {
+            DC(
+                frozenset(hidden.get(idx, idx) for idx in dc.from_indices),
+                frozenset(hidden.get(idx, idx) for idx in dc.to_indices),
+                dc.value,
+                dc.p,
+            )
+            for dc in stats.dcs
+        }
+        return self._rebuild(base, dcs)
 
     def relabel(self, stats: TS, relabel_indices: tuple[Field, ...]) -> TS:
         base = self.relabel_def(stats, relabel_indices)

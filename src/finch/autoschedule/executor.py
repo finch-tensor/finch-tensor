@@ -32,16 +32,16 @@ def extract_tensors(
     def rule_0(node):
         match node:
             # Case where we have table with actual tensor
-            case lgc.Table(lgc.Literal(tns), idxs):
+            case lgc.Table(lgc.Literal(tns), idxs, protocols):
                 if id(tns) in ids:
                     var = ids[id(tns)]
-                    return lgc.Table(var, idxs)
+                    return lgc.Table(var, idxs, protocols)
                 # If we don't have an Alias for the tensor we just found we create one
                 var = lgc.HardAlias(spc.freshen("A"))
                 # Updating the ids and bindings
                 ids[id(tns)] = var
                 bindings[var] = tns
-                return lgc.Table(var, idxs)
+                return lgc.Table(var, idxs, protocols)
 
     root = Rewrite(PostWalk(rule_0))(root)
     return root, bindings

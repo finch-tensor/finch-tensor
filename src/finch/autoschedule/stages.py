@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from collections import Counter
 from itertools import count
 
 from finch import finch_einsum as ein
@@ -16,6 +17,7 @@ from finch.finch_logic import (
     HardAlias,
     Literal,
     LogicExpression,
+    LogicNode,
     LogicStatement,
     LogicTree,
     MapJoin,
@@ -105,6 +107,10 @@ class AliasedForm(Form):
                     validate(body, (*fuses, (idx, next(fuse_ids))))
                     if not fuses:
                         FusedForm.validate_inputs(node, bindings, stats, stats_factory)
+                case Query(Table(_, _, (_, *_)) as lhs, _) | QueryInto(
+                    Table(_, _, (_, *_)) as lhs, _, _
+                ):
+                    raise ValueError(f"{lhs} has protocols, which only apply to reads.")
                 case Query(Table(Alias() as lhs, _), rhs):
                     # The rhs is read before the lhs is defined.
                     validate(rhs, fuses)
@@ -150,6 +156,51 @@ class AliasedForm(Form):
                         validate(child, fuses)
 
         validate(term, ())
+
+
+def _field_uses(node: LogicNode) -> Counter[Field]:
+    return Counter(child for child in PostOrderDFS(node) if isinstance(child, Field))
+
+
+class ScopedForm(AliasedForm):
+    """
+    ScopedForm requires that the fields an aggregate reduces appear nowhere
+    outside it, unless an enclosing Fuse loops over them, so that a rewrite can
+    move an aggregate without capturing a field of the same name. normalize_names
+    renames the fields of each aggregate apart to put a program in ScopedForm.
+    """
+
+    @classmethod
+    def validate_inputs(
+        cls,
+        term: Plan,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> None:
+        super().validate_inputs(term, bindings, stats, stats_factory)
+        uses = _field_uses(term)
+
+        def validate(node, looped):
+            match node:
+                case Fuse(idx, body):
+                    validate(body, looped | {idx})
+                    return
+                case Aggregate(_, _, _, idxs):
+                    inside = _field_uses(node)
+                    for idx in idxs:
+                        if idx not in looped and inside[idx] != uses[idx]:
+                            raise ValueError(
+                                f"{idx} is reduced by {node}, but used outside it. "
+                                "Rename the fields of each aggregate apart, as "
+                                "normalize_names does."
+                            )
+            match node:
+                case LogicTree():
+                    for child in node.children:
+                        validate(child, looped)
+
+        validate(term, frozenset())
 
 
 def _fused_statements(node: LogicStatement) -> tuple[LogicStatement, ...]:
@@ -543,7 +594,7 @@ class FusedForm(Form):
         validate(term, ())
 
 
-class LogicFactorizer(AliasedForm, LogicLoader):
+class LogicFactorizer(ScopedForm, LogicLoader):
     @abstractmethod
     def lower(
         self,

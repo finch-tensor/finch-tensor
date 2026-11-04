@@ -1,7 +1,9 @@
+import pytest
+
 import numpy as np
 
 import finch
-from finch.algebra import ffuncs
+from finch.algebra import TensorFType, ffuncs
 from finch.algebra.ftypes import ftype
 from finch.autoschedule import (
     DefaultLogicFactorizer,
@@ -9,6 +11,7 @@ from finch.autoschedule import (
     LogicCapture,
     normalize_names,
 )
+from finch.autoschedule.default_schedulers import COMPILE_NUMBA, INTERPRET_NOTATION
 from finch.autoschedule.factorizer.optimize import (
     isolate_aggregates,
     lift_fields,
@@ -23,11 +26,14 @@ from finch.autoschedule.loop_orderer.loop_ordering import (
     concordize,
     heuristic_loop_order,
 )
+from finch.autoschedule.stages import ScopedForm
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.util import flatten_plans, fuse_loop_order, push_fields
 from finch.finch_logic import (
     Aggregate,
+    Alias,
     Field,
+    Fuse,
     HardAlias,
     Literal,
     MapJoin,
@@ -546,6 +552,66 @@ def test_normalize_names():
     assert result == expected
 
 
+def test_normalize_names_renames_reduced_fields_apart():
+    j, i, i_2 = Field("j"), Field("i"), Field("i_2")
+    A, A_2, B = HardAlias("A"), HardAlias("A_2"), HardAlias("B")
+    add, mul, zero = Literal(ffuncs.add), Literal(ffuncs.mul), Literal(0.0)
+    prgm = MapJoin(mul, (Aggregate(add, zero, Table(A, (j,)), (j,)), Table(A, (j,))))
+    result, _ = normalize_names(prgm, {})
+    assert result == MapJoin(
+        mul, (Aggregate(add, zero, Table(A, (i,)), (i,)), Table(A, (i_2,)))
+    )
+    # A field which an enclosing Fuse loops over is the same field inside it.
+    prgm = Fuse(j, Query(Table(B, ()), Aggregate(add, zero, Table(A, (j,)), (j,))))
+    result, _ = normalize_names(prgm, {})
+    assert result == Fuse(
+        i, Query(Table(A, ()), Aggregate(add, zero, Table(A_2, (i,)), (i,)))
+    )
+
+
+@pytest.mark.parametrize("scheduler", [INTERPRET_NOTATION, COMPILE_NUMBA])
+def test_scheduler_scopes_reduced_fields(scheduler):
+    j, k = Field("j"), Field("k")
+    add, mul, zero = Literal(ffuncs.add), Literal(ffuncs.mul), Literal(0.0)
+    t = Table(Literal(finch.asarray(np.ones((4, 4)))), (j, k))
+    # The sum of t is 16 wherever it is used, though it reduces j and k.
+    total = Aggregate(add, zero, t, (j, k))
+    prgm = Aggregate(add, zero, MapJoin(mul, (total, t)), (j, k))
+    assert float(scheduler(prgm).tns.to_numpy()) == 256.0
+
+
+def test_scoped_form_requires_reduced_fields_to_be_unique():
+    A, B, C = HardAlias("A"), HardAlias("B"), HardAlias("C")
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
+    add, mul, zero = Literal(ffuncs.add), Literal(ffuncs.mul), Literal(0.0)
+    ftypes: dict[Alias, TensorFType] = {A: ftype(finch.asarray(np.ones((2, 2))))}
+
+    def validate(*bodies):
+        ScopedForm.validate_inputs(Plan(bodies), ftypes, {}, DenseStatsFactory())
+
+    total = Aggregate(add, zero, Table(A, (i, j)), (i, j))
+    with pytest.raises(ValueError, match="used outside it"):
+        validate(
+            Query(Table(B, (i, j)), MapJoin(mul, (total, Table(A, (i, j))))),
+            Produces((B,)),
+        )
+    # The factorizer may inline one query into another.
+    with pytest.raises(ValueError, match="used outside it"):
+        validate(
+            Query(Table(C, ()), total),
+            Query(Table(B, (i, j)), Table(A, (i, j))),
+            Produces((B, C)),
+        )
+    renamed = Aggregate(add, zero, Table(A, (k, m)), (k, m))
+    validate(
+        Query(Table(B, (i, j)), MapJoin(mul, (renamed, Table(A, (i, j))))),
+        Produces((B,)),
+    )
+    # The Fuse of a reduced field loops over it outside the aggregate.
+    query = Query(Table(C, (i,)), Aggregate(add, zero, Table(A, (i, j)), (j,)))
+    validate(fuse_loop_order(query, (i, j)), Produces((C,)))
+
+
 def test_concordize():
     # A0 is read transposed under the loop order of A1, so it needs a
     # swizzled copy. A2 reads A0 in storage order and needs none.
@@ -753,17 +819,19 @@ def test_scheduler_e2e_sddmm(file_regression):
     s = np.array([[2, 4], [6, 0]])
     a = np.array([[1, 2], [3, 2]])
     b = np.array([[9, 8], [6, 5]])
-    i, j, k = Field("i"), Field("j"), Field("k")
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
 
+    # The factorizer requires that the k which the matmul reduces is used
+    # nowhere else.
     plan = Plan(
         (
             Query(
-                Table(HardAlias("AB"), (i, j, k)),
+                Table(HardAlias("AB"), (i, j, m)),
                 MapJoin(
                     Literal(ffuncs.mul),
                     (
                         Reorder(Table(HardAlias("A"), (i, j)), (i, j)),
-                        Reorder(Table(HardAlias("B"), (k, j)), (j, k)),
+                        Reorder(Table(HardAlias("B"), (m, j)), (j, m)),
                     ),
                 ),
             ),

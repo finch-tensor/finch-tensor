@@ -2,6 +2,7 @@ from finch import ffuncs
 from finch.autoschedule.factorizer.galley_factorizer.query_normalization import (
     merge_queries,
     preprocess_plan_for_galley,
+    push_aggregates_up,
 )
 from finch.finch_logic import (
     Aggregate,
@@ -548,3 +549,43 @@ def test_merge_queries_same_alias_inlined_twice_unique_internal_fields():
     assert len(names) == len(set(names)), (
         f"Duplicate reduction index names after inlining same alias twice: {names}"
     )
+
+
+def test_push_aggregates_up_keeps_inits_that_dont_annihilate():
+    # 1.0 doesn't annihilate mul, so A * (1 + sum_j B) isn't 1 + sum_j A * B.
+    i, j = Field("i"), Field("j")
+    expr = MapJoin(
+        Literal(ffuncs.mul),
+        (
+            Table(HardAlias("A"), (i,)),
+            Aggregate(
+                Literal(ffuncs.add), Literal(1.0), Table(HardAlias("B"), (i, j)), (j,)
+            ),
+        ),
+    )
+    assert push_aggregates_up(expr) == expr
+
+
+def test_push_aggregates_up_does_not_capture_fields():
+    # The j of A is free, so it can't move under the reduction over j.
+    i, j = Field("i"), Field("j")
+    expr = MapJoin(
+        Literal(ffuncs.mul),
+        (
+            Table(HardAlias("A"), (i, j)),
+            Aggregate(
+                Literal(ffuncs.add), Literal(0.0), Table(HardAlias("B"), (i, j)), (j,)
+            ),
+        ),
+    )
+    assert push_aggregates_up(expr) == expr
+
+
+def test_push_aggregates_up_does_not_merge_inits_that_arent_identities():
+    # 1.0 isn't an identity of add, so each aggregate adds its own init.
+    i, j = Field("i"), Field("j")
+    inner = Aggregate(
+        Literal(ffuncs.add), Literal(1.0), Table(HardAlias("A"), (i, j)), (j,)
+    )
+    expr = Aggregate(Literal(ffuncs.add), Literal(1.0), inner, (i,))
+    assert push_aggregates_up(expr) == expr
