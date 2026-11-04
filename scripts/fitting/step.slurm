@@ -25,4 +25,26 @@ args+=("$@")
 if [[ -n ${SLURM_ARRAY_TASK_ID:-} ]]; then
   args+=(--chunk "$SLURM_ARRAY_TASK_ID")
 fi
+# Julia maps the caches of its precompiled packages into memory from its depot
+# in the shared home directory, where any process which precompiles them again
+# can delete a cache that a running step still maps, killing it with a bus
+# error. So the step which runs Julia maps a copy of the caches on the node's
+# own disk, which comes first in the depot path, so anything precompiled again
+# is written there too, and finds the packages in the shared depot behind it.
+# The trailing colon keeps the depots of Julia's own installation.
+if [[ $module == time_physical_data ]]; then
+  shared_depot=${JULIA_DEPOT_PATH:-$HOME/.julia}
+  local_depot=$(mktemp -d "${TMPDIR:-/tmp}/julia-depot-XXXXXX")
+  trap 'rm -rf "$local_depot"' EXIT
+  julia=$(pixi run --frozen -e fitting python -c \
+    'import juliapkg; print(juliapkg.executable())' | tail -1)
+  version=$("$julia" --startup-file=no -e 'print(VERSION.major, ".", VERSION.minor)')
+  compiled=${shared_depot%%:*}/compiled/v$version
+  mkdir -p "$local_depot/compiled" "$local_depot/registries"
+  if [[ -d $compiled ]]; then
+    cp -a "$compiled" "$local_depot/compiled/"
+  fi
+  export JULIA_DEPOT_PATH="$local_depot:$shared_depot:"
+  echo "loading Julia's caches from $local_depot"
+fi
 pixi run --frozen -e fitting python -m "scripts.fitting.$module" "${args[@]}"
