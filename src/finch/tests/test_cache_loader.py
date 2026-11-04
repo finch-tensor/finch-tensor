@@ -4,7 +4,7 @@ import numpy as np
 
 import finch as ft
 from finch.algebra import ffuncs
-from finch.autoschedule.cache import (
+from finch.autoschedule.embedding_cache import (
     LogicCacheLRU_Embeddings_Norms,
 )
 from finch.autoschedule.executor import LogicExecutor

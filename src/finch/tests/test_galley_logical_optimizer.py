@@ -10,7 +10,6 @@ from finch.autoschedule.cost_models import FlopsCostModel
 from finch.autoschedule.factorizer.galley_factorizer import (
     AnnotatedQuery,
     greedy_query,
-    insert_statistics,
 )
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.finch_logic import (
@@ -542,22 +541,6 @@ def test_get_reduce_query(expr, reduce_field, expected):
     aq.connected_idxs = OrderedDict({reduce_field: {reduce_field}})
     aq.output_order = []
     aq.bindings = OrderedDict()
-    aq.cache_point = {}
-
-    insert_statistics(
-        aq.stats_factory,
-        aq.point_expr,
-        aq.bindings,
-        replace=False,
-        cache=aq.cache_point,
-    )
-
-    for stat in aq.cache_point.values():
-        dims = stat.dim_sizes
-        for i in list(dims.keys()):
-            if isinstance(i, str):
-                dims[Field(i)] = dims[i]
-
     query, replace_path, removal_paths, reduced_idxs = aq.get_reduce_query(reduce_field)
 
     assert query.rhs == expected
@@ -705,21 +688,6 @@ def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
     aq.connected_idxs = OrderedDict({reduce_field: {reduce_field}})
     aq.output_order = []
     aq.bindings = OrderedDict()
-    aq.cache_point = {}
-
-    insert_statistics(
-        aq.stats_factory,
-        aq.point_expr,
-        aq.bindings,
-        replace=False,
-        cache=aq.cache_point,
-    )
-
-    for stat in aq.cache_point.values():
-        dims = stat.dim_sizes
-        for k in list(dims.keys()):
-            if isinstance(k, str):
-                dims[Field(k)] = dims[k]
 
     query = aq.reduce_idx(reduce_field)
     assert query.rhs == expected_query
@@ -1048,22 +1016,7 @@ def test_greedy_query_multi_component():
     aq.connected_idxs = OrderedDict({fi: set(), fj: set()})
     aq.output_order = []
     aq.bindings = OrderedDict()
-    aq.cache_point = {}
     aq.cost_model = FlopsCostModel()
-
-    insert_statistics(
-        aq.stats_factory,
-        aq.point_expr,
-        aq.bindings,
-        replace=False,
-        cache=aq.cache_point,
-    )
-
-    for stat in aq.cache_point.values():
-        dims = stat.dim_sizes
-        for k in list(dims.keys()):
-            if isinstance(k, str):
-                dims[Field(k)] = dims[k]
 
     # Two independent components: {i} and {j}
     assert len(aq.connected_components) == 2

@@ -161,6 +161,23 @@ def register_julia_op(op, julia_name: str, definition: str | None = None) -> Non
 _JULIA_DEFINITIONS: dict[str, str] = {}
 
 
+def _protocol_str(proto: ntn.Protocol, idx: str) -> str:
+    match proto:
+        case ntn.DefaultProtocol():
+            return idx
+        case ntn.Walk():
+            return f"walk({idx})"
+        case ntn.Gallop():
+            return f"gallop({idx})"
+        case ntn.Follow():
+            return f"follow({idx})"
+        case ntn.Extrude():
+            return f"extrude({idx})"
+        case ntn.Laminate():
+            return f"laminate({idx})"
+    raise NotImplementedError(f"Unrecognized protocol: {proto}")
+
+
 class FinchJLGenerator:
     def __init__(self):
         self.pack_dict = {}
@@ -343,11 +360,19 @@ class FinchJLGenerator:
                 # loop extents no longer come from the tensors read.
                 return f"{self.generate_julia(tns, nestingLvl)}[]"
 
-            case ntn.Access(tns, _, idxs):
+            case ntn.Access(tns, mode, idxs):
                 tns_str = self.generate_julia(tns, nestingLvl)
-                idx_str = ",".join(
-                    [self.generate_julia(idx, nestingLvl) for idx in reversed(idxs)]
-                )
+                idx_strs = [self.generate_julia(idx, nestingLvl) for idx in idxs]
+                match mode, tns.result_type:
+                    # Finch.jl reads its masks with their default protocols only.
+                    case _, PatternTensorFType():
+                        pass
+                    case ntn.Read(protocols) | ntn.Update(_, protocols), _ if protocols:
+                        idx_strs = [
+                            _protocol_str(proto, idx)
+                            for idx, proto in zip(idx_strs, protocols, strict=True)
+                        ]
+                idx_str = ",".join(reversed(idx_strs))
                 access = f"{tns_str}[{idx_str}]"
                 match tns.result_type:
                     case PatternTensorFType() as tensor_type:

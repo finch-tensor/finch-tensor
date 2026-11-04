@@ -4,13 +4,13 @@ eval(let
         v1 = Finch.window(Finch.randommask((1,), 0.5; seed=UInt64(14276969152011380360)), Finch.Extent(1, 1))
         v2 = Finch.window(Finch.randommask((1,), 0.5; seed=UInt64(8095878257575067585)), Finch.Extent(1, 1))
         v3 = Finch.Tensor(Finch.SparseHashLevel{Int64}(Finch.SparseHashLevel{Int64}(Finch.ElementLevel(0, FinchInterop.Buffer(Int64[])), 1, 1, Finch.SPARSE_HASH_POS_MULTIPLIER, Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), FinchInterop.Buffer(UInt8[]), Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), Finch.PlusOneVector(FinchInterop.Buffer(Tuple{Int64,Int64,UInt8}[]), (1, 2)), Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), FinchInterop.Buffer(Int[0])), 1, 1, Finch.SPARSE_HASH_POS_MULTIPLIER, Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), FinchInterop.Buffer(UInt8[]), Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), Finch.PlusOneVector(FinchInterop.Buffer(Tuple{Int64,Int64,UInt8}[]), (1, 2)), Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), FinchInterop.Buffer(Int[0])))
-        v4 = 1
-        v5 = 1
-    Finch.@finch_kernel function main(v0,v1,v2,v3,v4,v5)
+        v6 = 1
+        v7 = 1
+    Finch.@finch_kernel function main(v0,v1,v2,v3,v6,v7)
         v3 .= 0
-        for v12 = 1:v4
-            for v13 = 1:v5
-                v3[v13,v12] <<Finch.initwrite(0)>>= ((v0[v13,v12] != 0) * Int64(v1[v12]) * Int64(v2[v13]))
+        for v12 = 1:v6
+            for v13 = 1:v7
+                v3[extrude(v13),extrude(v12)] <<Finch.initwrite(0)>>= ((v0[v13,v12] != 0) * (Int64(v1[v12]) * Int64(v2[v13])))
             end
         end
         return v3
@@ -18,7 +18,7 @@ eval(let
 end)
 
 # Generated Julia
-function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}}, v1::Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}}, Finch.RandomMask{1}}, v2::Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}}, Finch.RandomMask{1}}, v3::Tensor{SparseHashLevel{Int64, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, Main.FinchInterop.Buffer{UInt8}, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, PlusOneVector{Tuple{Int64, Int64, UInt8}, Main.FinchInterop.Buffer{Tuple{Int64, Int64, UInt8}}, (1, 2)}, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, Main.FinchInterop.Buffer{Int64}, SparseHashLevel{Int64, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, Main.FinchInterop.Buffer{UInt8}, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, PlusOneVector{Tuple{Int64, Int64, UInt8}, Main.FinchInterop.Buffer{Tuple{Int64, Int64, UInt8}}, (1, 2)}, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, Main.FinchInterop.Buffer{Int64}, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}}, v4::Int64, v5::Int64)
+function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}}, v1::Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}}, Finch.RandomMask{1}}, v2::Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}}, Finch.RandomMask{1}}, v3::Tensor{SparseHashLevel{Int64, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, Main.FinchInterop.Buffer{UInt8}, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, PlusOneVector{Tuple{Int64, Int64, UInt8}, Main.FinchInterop.Buffer{Tuple{Int64, Int64, UInt8}}, (1, 2)}, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, Main.FinchInterop.Buffer{Int64}, SparseHashLevel{Int64, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, Main.FinchInterop.Buffer{UInt8}, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, PlusOneVector{Tuple{Int64, Int64, UInt8}, Main.FinchInterop.Buffer{Tuple{Int64, Int64, UInt8}}, (1, 2)}, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, Main.FinchInterop.Buffer{Int64}, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}}, v6::Int64, v7::Int64)
     @inbounds @fastmath(begin
                 v0_lvl = v0.lvl
                 v0_lvl_stop = v0_lvl.shape
@@ -48,8 +48,8 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                 v3_lvl_2_tbl_count = v3_lvl_2.tbl_count
                 v3_lvl_3 = v3_lvl_2.lvl
                 v3_lvl_3_val = v3_lvl_3.val
-                v0_lvl_2_stop == v5 || throw(DimensionMismatch("mismatched dimension limits ($(v0_lvl_2_stop) != $(v5))"))
-                v0_lvl_stop == v4 || throw(DimensionMismatch("mismatched dimension limits ($(v0_lvl_stop) != $(v4))"))
+                v0_lvl_2_stop == v7 || throw(DimensionMismatch("mismatched dimension limits ($(v0_lvl_2_stop) != $(v7))"))
+                v0_lvl_stop == v6 || throw(DimensionMismatch("mismatched dimension limits ($(v0_lvl_stop) != $(v6))"))
                 1 == (v1.dims[1]).start || throw(DimensionMismatch("mismatched dimension limits ($(1) != $((v1.dims[1]).start))"))
                 v0_lvl_stop == (v1.dims[1]).stop || throw(DimensionMismatch("mismatched dimension limits ($(v0_lvl_stop) != $((v1.dims[1]).stop))"))
                 1 == (v2.dims[1]).start || throw(DimensionMismatch("mismatched dimension limits ($(1) != $((v2.dims[1]).start))"))

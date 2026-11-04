@@ -33,8 +33,26 @@ from finch.tensor.patterns import EyeTensor
 from finch.util.logging import LOG_NOTATION
 
 from .stages import CompilerForm, FormattedForm, LogicNotationLowerer
+from .util import write_protocols
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_NOTATION)
+
+
+def lower_protocol(proto: lgc.Protocol) -> ntn.Protocol:
+    match proto:
+        case lgc.DefaultProtocol():
+            return ntn.DefaultProtocol()
+        case lgc.Walk():
+            return ntn.Walk()
+        case lgc.Gallop():
+            return ntn.Gallop()
+        case lgc.Follow():
+            return ntn.Follow()
+        case lgc.Extrude():
+            return ntn.Extrude()
+        case lgc.Laminate():
+            return ntn.Laminate()
+    raise ValueError(f"Unrecognized protocol: {proto}")
 
 
 class PointwiseContext:
@@ -55,15 +73,19 @@ class PointwiseContext:
                         for arg in args
                     ),
                 )
-            case lgc.Table(lgc.Alias() as var, idxs):
+            case lgc.Table(lgc.Alias() as var, idxs, protocols):
+                stored = self.ctx.stored_idxs(var.unfused, idxs)
+                mode = ntn.Read(
+                    tuple(
+                        lower_protocol(proto)
+                        for proto in protocols[len(idxs) - len(stored) :]
+                    )
+                )
                 return ntn.Unwrap(
                     ntn.Access(
                         self.ctx.slots[var.unfused],
-                        ntn.Read(),
-                        tuple(
-                            loops[idx]
-                            for idx in self.ctx.stored_idxs(var.unfused, idxs)
-                        ),
+                        mode,
+                        tuple(loops[idx] for idx in stored),
                     )
                 )
             case lgc.Literal(val):
@@ -214,6 +236,13 @@ class NotationContext:
         """Reduce `arg` into a table of `var` with `op`, after resetting `var` to
         `init` unless it is None."""
         loops = {loop.idx: loop.var for loop in self.fused}
+        stored = self.stored_idxs(var, idxs)
+        # An update which reduces into var writes over what it already stores.
+        if init is None and op != ffuncs.overwrite:
+            protocols = (lgc.Laminate(),) * len(stored)
+        else:
+            loop_order = tuple(loop.idx for loop in self.fused)
+            protocols = write_protocols(idxs, loop_order, len(idxs) - len(stored))
         reset: tuple[ntn.NotationStatement, ...] = ()
         if init is not None:
             match init:
@@ -224,8 +253,8 @@ class NotationContext:
             reset = self.reset(var, idxs, self.declare(var, init, ntn.Literal(op)))
         lhs = ntn.Access(
             self.slots[var],
-            ntn.Update(ntn.Literal(op)),
-            tuple(loops[idx] for idx in self.stored_idxs(var, idxs)),
+            ntn.Update(ntn.Literal(op), tuple(map(lower_protocol, protocols))),
+            tuple(loops[idx] for idx in stored),
         )
         body = ntn.Increment(lhs, PointwiseContext(self)(arg, loops))
         return ntn.Block((*reset, body)) if reset else body
@@ -307,10 +336,13 @@ class NotationContext:
                     or ntn.Variable(gensym(idx.name), shape_types[idx])
                     for idx in idxs
                 }
+                stored = self.stored_idxs(lhs, idxs)
+                loop_order = (*fused, *(idx for idx in idxs if idx not in fused))
+                protocols = write_protocols(idxs, loop_order, len(idxs) - len(stored))
                 lhs_access = ntn.Access(
                     self.slots[lhs],
-                    ntn.Update(op),
-                    tuple(loops[idx] for idx in self.stored_idxs(lhs, idxs)),
+                    ntn.Update(op, tuple(map(lower_protocol, protocols))),
+                    tuple(loops[idx] for idx in stored),
                 )
                 body: ntn.NotationStatement = ntn.Increment(
                     lhs_access, ntn.Literal(init)
@@ -647,7 +679,7 @@ def enforce_lifecycles(root: ntn.NotationStatement) -> ntn.NotationStatement:
         reads: list[tuple[Any, ntn.AccessMode | None, ntn.AccessMode]] = [
             (x.tns, read, read)
             for x in PostOrderDFS(stmt)
-            if isinstance(x, ntn.Access) and x.mode == read
+            if isinstance(x, ntn.Access) and isinstance(x.mode, ntn.Read)
         ]
         match stmt:
             case ntn.Increment(ntn.Access(tns, mode, _), _):
@@ -677,11 +709,19 @@ def enforce_lifecycles(root: ntn.NotationStatement) -> ntn.NotationStatement:
 
     def transition(tns: Any, mode: ntn.AccessMode) -> list[ntn.NotationStatement]:
         stmts: list[ntn.NotationStatement] = []
+
+        # A tensor is thawed with the op of an update, whatever its protocols.
+        def thawed(mode):
+            match mode:
+                case ntn.Update(op):
+                    return op
+            return None
+
         match modes.get(tns, ntn.Read()):
-            case ntn.Update(op) if mode != ntn.Update(op):
+            case ntn.Update(op) if thawed(mode) != op:
                 stmts.append(ntn.Freeze(tns, op))
         match mode:
-            case ntn.Update(op) if modes.get(tns, ntn.Read()) != mode:
+            case ntn.Update(op) if thawed(modes.get(tns, ntn.Read())) != op:
                 stmts.append(ntn.Thaw(tns, op))
         modes[tns] = mode
         return stmts

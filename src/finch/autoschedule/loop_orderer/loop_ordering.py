@@ -55,7 +55,7 @@ def concordize(
     def swizzle(rhs: LogicExpression, loop_order: tuple[Field, ...]):
         def rule(ex):
             match ex:
-                case Table(Alias(_) as var, idxs_1) if not is_subsequence(
+                case Table(Alias(_) as var, idxs_1, protocols) if not is_subsequence(
                     intersect(idxs_1, loop_order), loop_order
                 ):
                     idxs_subseq = with_subsequence(
@@ -67,6 +67,7 @@ def concordize(
                             perm, HardAlias(namespace.freshen(var.name))
                         ),
                         idxs_subseq,
+                        tuple(protocols[p] for p in perm) if protocols else (),
                     )
 
         return Rewrite(PostWalk(rule))(rhs)

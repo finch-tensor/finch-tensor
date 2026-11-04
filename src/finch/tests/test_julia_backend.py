@@ -479,6 +479,7 @@ def test_compile_julia_pattern_lowering(file_regression):
 def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
     _requires_julia_backend()
     from finch.autoschedule import default_schedulers
+    from finch.autoschedule.factor_cache import FactorCacheEvaluator
     from finch.autoschedule.tensor_stats import SamplingStatsFactory
     from finch.compile_jl.compiler import (
         FinchJLCompiler,
@@ -517,7 +518,11 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
             stats_factory=FDStatsFactory(),
         )
     )
-    monkeypatch.setattr(default_schedulers, "NON_RECURSIVE_SCHEDULER", scheduler)
+    monkeypatch.setattr(
+        default_schedulers,
+        "CACHING_SCHEDULER",
+        LogicNormalizer(FactorCacheEvaluator(scheduler)),
+    )
     i, j = Field("i"), Field("j")
     data = np.arange(35, dtype=DTYPE).reshape(5, 7) % 3
     factory = SamplingStatsFactory()
@@ -783,6 +788,63 @@ def test_compile_julia_sums_sparse_list_level():
     result = _compute_sparse_axis_sum(level)
 
     np.testing.assert_array_equal(result.to_numpy(), EXPECTED_ROW_SUMS)
+
+
+@pytest.mark.parametrize("protocol", ["walk", "gallop", "follow"])
+def test_compile_julia_protocols(protocol):
+    _requires_julia_backend()
+    from finch import dense, fiber_tensor
+    from finch import finch_logic as lgc
+    from finch.compile_jl.compiler import FinchJLGenerator, handle_fills
+
+    class RecordingJLCompiler(FinchJLCompiler):
+        def __init__(self):
+            super().__init__()
+            self.sources = []
+
+        def __call__(self, prgm):
+            for func in prgm.children:
+                func, _ = handle_fills(func)
+                self.sources.append(FinchJLGenerator()(func))
+            return super().__call__(prgm)
+
+    protocols = {"walk": lgc.Walk(), "gallop": lgc.Gallop(), "follow": lgc.Follow()}
+    data_a = np.array([[1, 0, 2], [0, 3, 0], [4, 0, 5]], dtype=DTYPE)
+    data_b = np.array([1, 0, 7], dtype=DTYPE)
+    i, j = lgc.Field("i"), lgc.Field("j")
+    A, B, Y = lgc.HardAlias("A"), lgc.HardAlias("B"), lgc.HardAlias("Y")
+    # The columns of the sparse rows of A are read with the protocol, and B is
+    # looked up at each of them.
+    product = lgc.MapJoin(
+        lgc.Literal(ffuncs.mul),
+        (
+            lgc.Table(A, (i, j), (lgc.DefaultProtocol(), protocols[protocol])),
+            lgc.Table(B, (j,), (lgc.Follow(),)),
+        ),
+    )
+    rhs = lgc.Aggregate(lgc.Literal(ffuncs.add), lgc.Literal(DTYPE(0)), product, (j,))
+    query = fuse_loop_order(lgc.Query(lgc.Table(Y, (i,)), rhs), (i, j))
+    prgm = lgc.Plan((query, lgc.Produces((Y,))))
+    out_t = fiber_tensor(
+        dense(element(DTYPE(0), ftype(DTYPE), ftype(np.intp)), ftype(np.intp))
+    )
+    bindings = {
+        A: _csr_tensor(data_a),
+        B: ft.asarray(data_b),
+        Y: out_t.construct((3,)),
+    }
+    compiler = RecordingJLCompiler()
+    lib, *_ = CompilerFormLowerer(LogicCompiler(compiler))(
+        prgm, {k: v.ftype for k, v in bindings.items()}, {}, None
+    )
+    (result,) = lib.main(*bindings.values())
+
+    (source,) = compiler.sources
+    assert f"{protocol}(" in source
+    assert "follow(" in source
+    np.testing.assert_array_equal(
+        jl.Array(result.raw_julia_obj).to_numpy(), data_a @ data_b
+    )
 
 
 @pytest.mark.parametrize("dtype", [np.float32, np.int32, np.float64, np.int64])
