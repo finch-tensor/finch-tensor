@@ -10,16 +10,24 @@ from finch.autoschedule.cost_models import (
     ByKind,
     DenseLevelOption,
     ElementLevelOption,
+    LevelBasis,
     LevelChoice,
-    LevelCostModel,
     LevelOption,
-    LinearPredictor,
-    QuadraticPredictor,
+    LinearCostModel,
+    Quadratic,
+    SparseByteMapLevelOption,
     SparseHashLevelOption,
+    allowed_options,
+    write_protocols,
 )
-from finch.autoschedule.cost_models.format_cost_models import alias_blocks, nnz_after
+from finch.autoschedule.cost_models.format_cost_models import (
+    alias_blocks,
+    nnz_after,
+    read_protocols,
+)
 from finch.autoschedule.formatter.galley_formatter import estimate_nnz
 from finch.autoschedule.formatter.smart_formatter import (
+    LEVEL_OPTIONS,
     CostFormatter,
     IterCostFormatter,
     StorageCostFormatter,
@@ -35,9 +43,13 @@ from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    DefaultProtocol,
+    Extrude,
     Field,
+    Follow,
     FusedAlias,
     HardAlias,
+    Laminate,
     Literal,
     MapJoin,
     Plan,
@@ -46,6 +58,7 @@ from finch.finch_logic import (
     QueryInto,
     Table,
     TensorStats,
+    Walk,
 )
 
 
@@ -136,7 +149,7 @@ def test_storage_cost_formatter_uses_dense_levels_for_dense_matrx():
     np.testing.assert_array_equal(constructed.to_numpy(), np.zeros((2, 3)))
 
 
-def test_storage_cost_formatter_uses_sparse_hash_for_sparse_matrix():
+def test_storage_cost_formatter_uses_sparse_list_for_sparse_matrix():
     matrix = np.zeros((100, 100))
     matrix[0, 0] = 1.0
     matrix[99, 99] = 1.0
@@ -145,12 +158,12 @@ def test_storage_cost_formatter_uses_sparse_hash_for_sparse_matrix():
     )
 
     assert isinstance(ftype, fl.FiberTensorFType)
-    assert isinstance(ftype.lvl_t, fl.SparseHashLevelFType)
-    assert isinstance(ftype.lvl_t.lvl_t, fl.SparseHashLevelFType)
+    assert isinstance(ftype.lvl_t, fl.SparseListLevelFType)
+    assert isinstance(ftype.lvl_t.lvl_t, fl.SparseListLevelFType)
     assert isinstance(ftype.lvl_t.lvl_t.lvl_t, fl.ElementLevelFType)
 
 
-def test_iter_cost_formatter_uses_sparse_hash_for_sparse_matrix():
+def test_iter_cost_formatter_uses_sparse_list_for_sparse_matrix():
     matrix = np.zeros((100, 100))
     matrix[0, 0] = 1.0
     matrix[99, 99] = 1.0
@@ -159,7 +172,85 @@ def test_iter_cost_formatter_uses_sparse_hash_for_sparse_matrix():
     )
 
     assert isinstance(ftype, fl.FiberTensorFType)
+    assert isinstance(ftype.lvl_t, fl.SparseListLevelFType)
+
+
+def test_cost_formatter_uses_sparse_hash_for_transposed_matrix():
+    # A transposed copy writes each column for every row, so it laminates the
+    # levels of its output, which a list can't store.
+    i, j = Field("i"), Field("j")
+    A, M = HardAlias("A"), HardAlias("M")
+    matrix = np.zeros((100, 100))
+    matrix[0, 0] = 1.0
+    matrix[99, 98] = 1.0
+    stats_factory = DCStatsFactory()
+    query = fuse_loop_order(Query(Table(A, (j, i)), Table(M, (i, j))), (i, j))
+    machine = StatsMachine(
+        stats_factory, {M: stats_factory(fl.asarray(matrix), (i, j))}
+    )
+    machine(query)
+    shape_type = (fl.ftype(np.intp), fl.ftype(np.intp))
+    ftype = StorageCostFormatter().get_tensor_ftype(
+        A, query, machine, StaticFillFType(np.float64(0.0)), shape_type
+    )
+
+    assert write_protocols(A, 0, query) == {Laminate()}
+    assert write_protocols(A, 1, query) == {Laminate()}
     assert isinstance(ftype.lvl_t, fl.SparseHashLevelFType)
+    assert isinstance(ftype.lvl_t.lvl_t, fl.SparseHashLevelFType)
+
+
+def test_write_protocols_extrude_fibers_whose_prefix_is_fixed():
+    i, j = Field("i"), Field("j")
+    a, x, y = HardAlias("a"), HardAlias("x"), HardAlias("y")
+
+    def matvec(loop_order):
+        product = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(x, (j,))))
+        rhs = Aggregate(Literal(ffuncs.add), Literal(0.0), product, (j,))
+        return fuse_loop_order(Query(Table(y, (i,)), rhs), loop_order)
+
+    def update(op):
+        return fuse_loop_order(
+            QueryInto(Table(y, (i,)), Literal(op), Table(x, (i,))), (i,)
+        )
+
+    assert write_protocols(y, 0, matvec((i, j))) == {Extrude()}
+    # Each row of y is written again for each column of a.
+    assert write_protocols(y, 0, matvec((j, i))) == {Laminate()}
+    # An update which reduces into y laminates what it stores, but one which
+    # overwrites y starts it again.
+    assert write_protocols(y, 0, update(ffuncs.add)) == {Laminate()}
+    assert write_protocols(y, 0, update(ffuncs.overwrite)) == {Extrude()}
+    assert [
+        opt.kind for opt in allowed_options(y, 0, matvec((i, j)), LEVEL_OPTIONS)
+    ] == [
+        "dense",
+        "sparse_list",
+        "sparse_hash",
+        "sparse_bytemap",
+    ]
+    assert [
+        opt.kind for opt in allowed_options(y, 0, matvec((j, i)), LEVEL_OPTIONS)
+    ] == [
+        "dense",
+        "sparse_hash",
+        "sparse_bytemap",
+    ]
+
+
+def test_bytemap_allocates_its_children_densely():
+    i, j = Field("i"), Field("j")
+    fill_type = StaticFillFType(np.float64(0))
+    stats = UniformStats(BaseTensorStats((i, j), {i: 4, j: 3}, fill_type), nnz=6)
+    factory = UniformStatsFactory()
+    option = SparseByteMapLevelOption()
+    pos_size = np.dtype(np.intp).itemsize
+
+    assert option.next_num_pos(stats, factory, 0, 1, ()) == 4
+    np.testing.assert_allclose(
+        option.get_storage_features(stats, factory, 0, 1, 8, pos_size, 8, ()),
+        [1, 4, 3.5, (2 + 3.5) * pos_size],
+    )
 
 
 def _cost_output_pattern(formatter_cls, matrix):
@@ -171,6 +262,8 @@ def _cost_output_pattern(formatter_cls, matrix):
         match lvl:
             case fl.DenseLevelFType():
                 pattern.append("dense")
+            case fl.SparseListLevelFType():
+                pattern.append("sparse_list")
             case fl.SparseHashLevelFType():
                 pattern.append("sparse_hash")
             case _:
@@ -190,8 +283,8 @@ def test_check_expected_pattern_using_storage_cost_formatter():
         "dense",
     )
     assert _cost_output_pattern(StorageCostFormatter, sparse_matrix) == (
-        "sparse_hash",
-        "sparse_hash",
+        "sparse_list",
+        "sparse_list",
     )
 
 
@@ -267,20 +360,82 @@ def test_format_access_features_separate_sequential_and_scatter():
     machine(prgm)
 
     def accessed(depth, option):
-        model = LevelCostModel(
-            type(option), LinearPredictor(np.zeros(option.n_features + 4))
-        )
-        features = model.get_component_features(
+        features = LevelBasis(type(option)).get_component_features(
             LevelChoice(prgm, A, depth, (1.0,), option, np.dtype(np.intp).itemsize),
             machine,
         )
-        return tuple(features.sum(axis=0)[-4:] > 0)
+        return tuple(features.sum(axis=0)[-6:] > 0)
 
-    # Reading A in loop order is sequential at every level. Writing A is
-    # sequential at i, but the k loop makes it scatter at j.
-    assert accessed(0, DenseLevelOption()) == (True, False, True, False)
-    assert accessed(1, DenseLevelOption()) == (True, False, False, True)
-    assert accessed(2, ElementLevelOption()) == (True, False, False, True)
+    # Reading A in loop order visits its levels at their own loops, densely
+    # or not, and steps through their entries, and looks up its values.
+    # Writing A is sequential at i, but the k loop makes it scatter at j.
+    read = (True, True, True, False)
+    assert accessed(0, DenseLevelOption()) == (*read, True, False)
+    assert accessed(1, DenseLevelOption()) == (*read, False, True)
+    assert accessed(2, ElementLevelOption()) == (False, False, False, True, False, True)
+    assert accessed(0, SparseHashLevelOption()) == (*read, True, False)
+
+
+@pytest.mark.parametrize(
+    ("op", "scatters"), [(ffuncs.overwrite, False), (ffuncs.add, True)]
+)
+def test_format_access_features_scatter_reductions_into_a_level(op, scatters):
+    i, j = Field("i"), Field("j")
+    X, A = HardAlias("X"), HardAlias("A")
+    stats_factory = DCStatsFactory()
+    ones = fl.asarray(np.ones((3, 3)))
+    machine = StatsMachine(stats_factory, {X: stats_factory(ones, (i, j))})
+    copy = Query(
+        Table(A, (i, j)),
+        Aggregate(Literal(ffuncs.add), Literal(0.0), Table(X, (i, j)), ()),
+    )
+    update = QueryInto(Table(A, (i, j)), Literal(op), Table(X, (i, j)))
+    prgm = Plan(
+        (
+            fuse_loop_order(copy, (i, j)),
+            fuse_loop_order(update, (i, j)),
+            Produces((A,)),
+        )
+    )
+    features = LevelBasis(DenseLevelOption).get_component_features(
+        LevelChoice(prgm, A, 0, (1.0,), DenseLevelOption(), 8), machine
+    )
+    # Both queries write A in order, but an update which reduces into A
+    # laminates what it stores, as write_protocols says.
+    assert write_protocols(A, 0, prgm) == (
+        {Extrude(), Laminate()} if scatters else {Extrude()}
+    )
+    assert tuple(features.sum(axis=0)[-2:] > 0) == (True, scatters)
+
+
+def test_format_access_features_reach_a_level_through_its_parents():
+    i, k = Field("i"), Field("k")
+    X, C = HardAlias("X"), HardAlias("C")
+    stats_factory = DCStatsFactory()
+    machine = StatsMachine(
+        stats_factory, {X: stats_factory(fl.asarray(np.ones((3, 3))), (i, k))}
+    )
+    # C[k, i] = X[i, k], looping over (k, i), against the order X stores.
+    query = Query(
+        Table(C, (k, i)),
+        Aggregate(Literal(ffuncs.add), Literal(0.0), Table(X, (i, k)), ()),
+    )
+    prgm = Plan((fuse_loop_order(query, (k, i)), Produces((C,))))
+
+    def reads(depth, option):
+        features = LevelBasis(type(option)).get_component_features(
+            LevelChoice(prgm, X, depth, (1.0,), option, np.dtype(np.intp).itemsize),
+            machine,
+        )
+        return tuple(features.sum(axis=0)[-6:-2])
+
+    # The i level is visited at its own loop, which steps through its 9
+    # entries over the iterations of k, while the k level and the values of X
+    # are reached through i, so each of the 9 iterations looks them up.
+    assert reads(0, SparseHashLevelOption()) == (9, 9, 9, 0)
+    assert reads(0, DenseLevelOption()) == (9, 9, 9, 0)
+    assert reads(1, DenseLevelOption()) == (0, 0, 0, 9)
+    assert reads(2, ElementLevelOption()) == (0, 0, 0, 9)
 
 
 def test_fused_alias_levels_describe_the_largest_slice():
@@ -291,20 +446,48 @@ def test_fused_alias_levels_describe_the_largest_slice():
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.eye(4)), (t, i))}
     copy = fuse_loop_order(Query(Table(fused, (t, i)), Table(a, (t, i))), (t, i))
     plan = Plan((copy, Produces((fused,))))
-    model = LevelCostModel(SparseHashLevelOption, LinearPredictor(np.zeros(8)))
+    basis = LevelBasis(SparseHashLevelOption)
     formats: dict[Alias, list[LevelOption]] = {
         scratch: [SparseHashLevelOption(), ElementLevelOption()]
     }
     machine = StatsMachine(sf, dict(stats))
-    sparse, element = model.components(plan, formats, machine)
+    sparse, element = basis.components(plan, formats, machine)
 
     # Each slice of the diagonal stores the one entry of its row.
     assert (sparse.alias, sparse.depth, sparse.num_pos) == (scratch, 0, (1.0,))
     assert element.depth == 1
     assert element.num_pos == pytest.approx((1.0,))
     size = np.dtype(np.intp).itemsize
-    features = model.get_component_features(sparse, machine)
+    features = basis.get_component_features(sparse, machine)
     np.testing.assert_allclose(features[0, :4], [1, 1, 2 * size, size])
+
+
+def test_inputs_are_formatted_from_their_bindings():
+    i, j = Field("i"), Field("j")
+    a, b = HardAlias("a"), HardAlias("b")
+    sf = DCStatsFactory()
+    stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.eye(4)), (i, j))}
+    copy = fuse_loop_order(Query(Table(b, (i, j)), Table(a, (i, j))), (i, j))
+    plan = Plan((copy, Produces((b,))))
+    basis = LevelBasis(DenseLevelOption)
+    formats: dict[Alias, list[LevelOption]] = {
+        a: [DenseLevelOption(), SparseHashLevelOption(), ElementLevelOption()]
+    }
+    dense, sparse, element = basis.components(
+        plan, formats, StatsMachine(sf, dict(stats))
+    )
+
+    # The input stores its 4 rows, and then the one entry of each.
+    assert [(c.depth, c.num_pos) for c in (dense, sparse, element)] == [
+        (0, (1.0,)),
+        (1, (4.0,)),
+        (2, (4.0,)),
+    ]
+    features = basis.get_component_features(dense, StatsMachine(sf, dict(stats)))
+    # The binding allocates the level once, and the copy visits it at its own
+    # loop.
+    assert features.shape[0] == 2
+    assert tuple(features[1, -6:] > 0) == (True, True, True, False, False, False)
 
 
 def test_format_costs_sum_the_union_of_each_block():
@@ -338,18 +521,96 @@ def test_format_costs_sum_the_union_of_each_block():
     assert [block.estimate_non_fill_values() for block, _ in blocks] == nnz
     assert all(block.fill_type == states[0].fill_type for block, _ in blocks)
 
-    model = LevelCostModel(SparseHashLevelOption, LinearPredictor(np.zeros(8)))
+    basis = LevelBasis(SparseHashLevelOption)
     size = np.dtype(np.intp).itemsize
     choice = LevelChoice(plan, out, 0, (1.0, 1.0), SparseHashLevelOption(), size)
-    features = model.get_component_features(choice, machine)
+    features = basis.get_component_features(choice, machine)
     # An allocation row for each block, then a write row for each query.
-    assert features.shape == (5, 8)
+    assert features.shape == (5, 10)
     np.testing.assert_array_equal(
         features[:2, :4], [[1, n, 2 * size, n * size] for n in nnz]
     )
     assert not features[:2, 4:].any()
     assert not features[2:, :4].any()
-    assert (features[2:, 6] > 0).all()
+    # The definitions write out in order, and the update reduces into what it
+    # stores, which laminates it.
+    np.testing.assert_array_equal(
+        features[2:, 8:] > 0, [[True, False], [False, True], [True, False]]
+    )
+
+
+def test_format_access_features_ignore_protocols():
+    i = Field("i")
+    X, Y, C = HardAlias("X"), HardAlias("Y"), HardAlias("C")
+    sf = DCStatsFactory()
+    machine = StatsMachine(
+        sf,
+        {
+            X: sf(fl.asarray(np.array([0.0, 1.0, 0.0, 0.0])), (i,)),
+            Y: sf(fl.asarray(np.ones(4)), (i,)),
+        },
+    )
+
+    def reads(protocol):
+        product = MapJoin(
+            Literal(ffuncs.mul), (Table(X, (i,)), Table(Y, (i,), (protocol,)))
+        )
+        query = Query(
+            Table(C, (i,)), Aggregate(Literal(ffuncs.add), Literal(0.0), product, ())
+        )
+        prgm = Plan((fuse_loop_order(query, (i,)), Produces((C,))))
+        features = LevelBasis(DenseLevelOption).get_component_features(
+            LevelChoice(prgm, Y, 0, (1.0,), DenseLevelOption(), 8), machine
+        )
+        return tuple(features.sum(axis=0)[-6:-2])
+
+    # Y is visited where X stores its 1, even if Y were dense, and stores the
+    # 4 entries a walk would step through, whatever protocol it is read with.
+    assert reads(Walk()) == (1, 1, 4, 0)
+    assert reads(Follow()) == (1, 1, 4, 0)
+    assert reads(DefaultProtocol()) == (1, 1, 4, 0)
+
+
+def test_dense_levels_are_only_followed():
+    i = Field("i")
+    a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
+    tensor = fl.asarray(np.ones(3))
+    sf = DCStatsFactory()
+    stats: dict[Alias, TensorStats] = {a: sf(tensor, (i,))}
+
+    def plan(protocols):
+        return Plan(
+            (
+                fuse_loop_order(Query(Table(b, (i,)), Table(a, (i,))), (i,)),
+                fuse_loop_order(Query(Table(c, (i,)), Table(b, (i,), protocols)), (i,)),
+                Produces((c,)),
+            )
+        )
+
+    # A default read takes whichever protocol the level supports, so it
+    # constrains nothing, but a walk rules a dense level out.
+    assert read_protocols(b, 0, plan(())) == set()
+    assert read_protocols(b, 0, plan((Follow(),))) == {Follow()}
+    assert read_protocols(b, 0, plan((Walk(),))) == {Walk()}
+    formatter = CostFormatter(options=(DenseLevelOption(),))
+    shape_type = (fl.ftype(np.intp),)
+    with pytest.raises(ValueError, match="No level option supports"):
+        formatter.get_tensor_ftype(
+            b,
+            plan((Walk(),)),
+            StatsMachine(sf, dict(stats)),
+            tensor.ftype.fill_type,
+            shape_type,
+        )
+    for protocols in ((), (Follow(),)):
+        fmt = formatter.get_tensor_ftype(
+            b,
+            plan(protocols),
+            StatsMachine(sf, dict(stats)),
+            tensor.ftype.fill_type,
+            shape_type,
+        )
+        assert isinstance(fmt.lvl_t, fl.DenseLevelFType)
 
 
 def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
@@ -365,22 +626,27 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
             Produces((c,)),
         )
     )
-    cost = ByKind(
-        {
-            "dense": LevelCostModel(DenseLevelOption, QuadraticPredictor(np.ones(36))),
-            "element": LevelCostModel(
-                ElementLevelOption, QuadraticPredictor(np.ones(36))
-            ),
-        }
+    bases = {
+        "dense": LevelBasis(DenseLevelOption),
+        "element": LevelBasis(ElementLevelOption),
+    }
+    basis = ByKind(bases)
+    cost = LinearCostModel(
+        ByKind({kind: Quadratic(sub) for kind, sub in bases.items()}), np.ones(128)
     )
     formats: dict[Alias, list[LevelOption]] = {
         b: [DenseLevelOption(), ElementLevelOption()]
     }
-    features = cost.get_features(plan, formats, stats, sf)
-    # Allocation, write, and read rows for both the dense and element levels.
-    assert features.shape == (6, 12)
-    np.testing.assert_array_equal(features[1:3, 2:6], [[0, 0, 3, 0], [3, 0, 0, 0]])
-    np.testing.assert_array_equal(features[4:6, 8:12], [[0, 0, 3, 0], [3, 0, 0, 0]])
+    features = basis.get_features(plan, formats, stats, sf)
+    # Allocation, write, and read rows for both the dense and element levels:
+    # the dense level is visited, and the values are looked up.
+    assert features.shape == (6, 16)
+    np.testing.assert_array_equal(
+        features[1:3, 2:8], [[0, 0, 0, 0, 3, 0], [3, 3, 3, 0, 0, 0]]
+    )
+    np.testing.assert_array_equal(
+        features[4:6, 10:16], [[0, 0, 0, 0, 3, 0], [0, 0, 0, 3, 0, 0]]
+    )
     expected = sum(row.sum() ** 2 for row in features)
     assert cost.predict_cost(plan, formats, stats, sf) == expected
     machine = StatsMachine(sf, dict(stats))
@@ -395,7 +661,7 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
             (1, (3,), ElementLevelOption()),
         )
     )
-    assert cost.get_features(Plan(()), {}, {}, sf).shape == (0, 12)
+    assert cost.get_features(Plan(()), {}, {}, sf).shape == (0, 128)
     assert cost.predict_cost(Plan(()), {}, {}, sf) == 0.0
     formatter = CostFormatter(cost_model=cost, options=(DenseLevelOption(),))
     fmt = formatter.get_tensor_ftype(
@@ -404,27 +670,27 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
     assert isinstance(fmt.lvl_t, fl.DenseLevelFType)
 
 
-def test_format_selection_uses_custom_predictor():
+def test_format_selection_uses_custom_model():
     i = Field("i")
     a = HardAlias("a")
     tensor = fl.asarray(np.ones(3))
     query = fuse_loop_order(Query(Table(a, (i,)), Table(Literal(tensor), (i,))), (i,))
     machine = StatsMachine(DCStatsFactory())
     machine(query)
-    zeros = {
-        option_type.kind: LevelCostModel(
-            option_type, LinearPredictor(np.zeros(option_type.n_features + 4))
-        )
+    bases = {
+        option_type.kind: LevelBasis(option_type)
         for option_type in (DenseLevelOption, SparseHashLevelOption, ElementLevelOption)
     }
-    slots = LevelCostModel(
-        DenseLevelOption, lambda rows: float(np.square(rows[:, 1]).sum())
-    )
-    linear = ByKind(zeros)
-    nonlinear = ByKind({**zeros, "dense": slots})
+    linear = LinearCostModel(ByKind(bases), np.zeros(ByKind(bases).n_features))
+    # Charge the square of the dense slots, the second storage feature.
+    slots = ByKind({**bases, "dense": Quadratic(bases["dense"])})
+    coefficients = np.zeros(slots.n_features)
+    coefficients[bases["dense"].n_features + 1] = 1.0
+    nonlinear = LinearCostModel(slots, coefficients)
 
     def choose(cost):
-        return CostFormatter(cost_model=cost).get_tensor_ftype(
+        options = (DenseLevelOption(), SparseHashLevelOption())
+        return CostFormatter(cost_model=cost, options=options).get_tensor_ftype(
             a, query, machine, tensor.ftype.fill_type, (fl.ftype(np.intp),)
         )
 

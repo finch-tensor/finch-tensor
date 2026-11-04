@@ -166,7 +166,7 @@ def test_cost_formatters_format_the_largest_fused_slice(monkeypatch, formatter_c
     formatter_cls(capture).lower(plan, {a: tensor.ftype}, {a: stats}, factory)
     fmt = capture.last_bindings[scratch]
     assert isinstance(fmt, ft.FiberTensorFType)
-    assert isinstance(fmt.lvl_t, ft.SparseHashLevelFType)
+    assert isinstance(fmt.lvl_t, ft.SparseListLevelFType)
 
     # The support projected over the fused dimension would be dense.
     support, projected = lgc.HardAlias("support"), lgc.HardAlias("projected")
