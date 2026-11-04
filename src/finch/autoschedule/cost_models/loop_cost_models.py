@@ -38,12 +38,16 @@ class Prefix:
     output_vars orders the output of the query, when there is one, and
     formats, which bases that price formatted tensors need, lists the level
     options each alias stores, outermost first, as FormatBasis takes them.
+    executions, when given, estimates how many times the enclosing loops run,
+    as the protocol optimizer computes it from its choices at them, and the
+    counts of the last loop are scaled to it.
     """
 
     prefix: tuple[Field, ...]
     expr: LogicExpression
     output_vars: tuple[Field, ...] | None = None
     formats: Mapping[Alias, Any] | None = field(default=None, compare=False, hash=False)
+    executions: float | None = None
 
 
 def prefixes(
@@ -104,8 +108,15 @@ class LoopSpaces(Generic[NS]):
     """
     The spaces of the last loop of a nonempty loop prefix. Execution is where a
     merge of the inputs, which can't look ahead, visits the enclosing loops. A
-    table walks the field of the loop unless it gallops or follows it, as its
-    protocol for that field says.
+    table walks the field of a loop unless it gallops or follows it, as its
+    protocol for that field says. A walk steps through the entries of a fiber,
+    so a table restricts the loops to its support down to the last field it
+    walks, and doesn't restrict the fields it follows after that, at the last
+    loop or at enclosing ones, so a loop whose tables all follow its field
+    spans all of it. The counts are taken over the executions of the enclosing
+    loops which the stats estimate, and are scaled to the executions the
+    prefix gives, when it does, since the loops run as often as the choices at
+    the enclosing loops make them, whatever the stats of the tables say.
     """
 
     def __init__(self, component: Prefix, machine: StatsMachine[NS]):
@@ -118,20 +129,59 @@ class LoopSpaces(Generic[NS]):
                 self.arg = arg
             case expr:
                 self.arg = expr
+        # The extent of each field, from the tables which read it.
+        self.dims: dict[Field, float] = {}
+        for node in PostOrderDFS(self.arg):
+            match node:
+                case Table(_, idxs) if idxs:
+                    self.dims.update(self.machine(node).dim_sizes)
         self.exec_space = self.stats_factory.support(self.merged(self.arg))
+        self.scale = 1.0
+        if component.executions is not None:
+            estimated = self.extent(self.exec_space, self.parent)
+            if estimated:
+                self.scale = component.executions / estimated
+        self._executions = component.executions
 
-    def project(self, stat: NS, fields=()) -> NS:
-        fields = {*self.parent, *fields}
+    def project(self, stat: NS, fields=(), followed=()) -> NS:
+        """
+        The support of stat over parent and fields, less the fields of
+        followed, which it spans wholly.
+        """
+        fields = {*self.parent, *fields} - {*followed}
         reduce_idxs = tuple(idx for idx in stat.index_order if idx not in fields)
         return self.stats_factory.aggregate(
             ffuncs.or_, False, reduce_idxs, self.stats_factory.support(stat)
         )
 
-    def protocol(self, node: Term) -> Protocol:
+    def protocol(self, node: Term, idx: Field | None = None) -> Protocol:
+        """The protocol node reads idx with, by default the field of the loop."""
+        if idx is None:
+            idx = self.idx
         match node:
-            case Table(_, idxs, (_, *_) as protocols) if self.idx in idxs:
-                return protocols[idxs.index(self.idx)]
+            case Table(_, idxs, (_, *_) as protocols) if idx in idxs:
+                return protocols[idxs.index(idx)]
         return DefaultProtocol()
+
+    def followed(self, node: LogicExpression, fields) -> set[Field]:
+        """
+        The fields of fields which node doesn't restrict: those a table of
+        node follows after the last of them it walks, in its order.
+        """
+        followed = set()
+        for table in PostOrderDFS(node):
+            match table:
+                case Table(_, idxs):
+                    trailing = set()
+                    for idx in idxs:
+                        if idx not in fields:
+                            continue
+                        if self.protocol(table, idx) == Follow():
+                            trailing.add(idx)
+                        else:
+                            trailing.clear()
+                    followed |= trailing
+        return followed
 
     def merged(self, node: LogicExpression, fields=()) -> NS:
         # A merge coiterates the projections of the inputs, so it visits more
@@ -143,25 +193,35 @@ class LoopSpaces(Generic[NS]):
                 )
             case _:
                 stat = self.machine(node)
-                # A followed table is looked up wherever the others go.
-                followed = any(
-                    self.protocol(table) == Follow() for table in PostOrderDFS(node)
+                # A followed field is looked up wherever the others go.
+                projected = self.project(
+                    stat, fields, self.followed(node, {*self.parent, *fields})
                 )
-                projected = self.project(stat, () if followed else fields)
                 # The fill decides whether a mapjoin joins or unions it.
                 projected.fill_type = stat.fill_type
                 return projected
 
+    def extent(self, stat: NS, fields) -> float:
+        """The points of stat over fields, spanning all of those it lacks."""
+        count = stat.estimate_non_fill_values()
+        for idx in fields:
+            if idx not in stat.index_order:
+                count *= self.dims.get(idx, 1.0)
+        return count
+
     def count(self, stat: NS) -> float:
-        # A space without idx spans all of it.
-        if self.idx in stat.index_order:
-            return stat.estimate_non_fill_values()
-        for node in PostOrderDFS(self.arg):
-            match node:
-                case Table(_, idxs) if self.idx in idxs:
-                    dim = self.machine(node).dim_sizes[self.idx]
-                    return stat.estimate_non_fill_values() * dim
-        return stat.estimate_non_fill_values()
+        """The points of stat over the loops of the prefix."""
+        return self.extent(stat, (*self.parent, self.idx)) * self.scale
+
+    def executions(self) -> float:
+        """The points the enclosing loops visit."""
+        if self._executions is not None:
+            return self._executions
+        return self.extent(self.exec_space, self.parent)
+
+    def iterations(self) -> float:
+        """The points the loop visits, at each of which its body runs."""
+        return self.count(self.visited())
 
     def visited(self) -> NS:
         """Where the loop visits idx, which its walks and gallops restrict."""
@@ -254,7 +314,7 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
                             lookups += 1
                         case _:
                             walks.append(spaces.project(stat, (idx,)))
-        iterations = exec_space.estimate_non_fill_values()
+        iterations = spaces.executions()
         lookup_cost = 0.0
         if lookups:
             visited = spaces.visited()
@@ -265,9 +325,11 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
             )
             lookup_cost = spaces.count(visited) * lookups
         elif inputs:
-            iterations = stats_factory.mapjoin(
-                ffuncs.and_, exec_space, stats_factory.mapjoin(ffuncs.or_, *walks)
-            ).estimate_non_fill_values()
+            iterations = spaces.count(
+                stats_factory.mapjoin(
+                    ffuncs.and_, exec_space, stats_factory.mapjoin(ffuncs.or_, *walks)
+                )
+            )
         out_cost = 0.0
         if idx in out_space.index_order:
             out_cost = spaces.project(out_space).estimate_non_fill_values()
@@ -275,7 +337,7 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
             [
                 [
                     iterations,
-                    exec_space.estimate_non_fill_values() * len(inputs),
+                    spaces.executions() * len(inputs),
                     out_cost,
                     lookup_cost,
                     spaces.count(exec_space),

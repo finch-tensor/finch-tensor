@@ -23,6 +23,7 @@ from finch.autoschedule.cost_models import (
     KNearest,
     LevelBasis,
     LinearCostModel,
+    LoopSpaces,
     PigeonBasis,
     Prefix,
     Quadratic,
@@ -798,6 +799,39 @@ def test_pigeon_counts_the_dense_iterations_of_a_loop():
         rows = basis.get_component_features(Prefix(prefix, expr, ()), machine)
         assert rows[0, 4] == space
     assert basis.feature_names[4] == "dense_iterations"
+
+
+def test_prefix_executions_scale_the_counts_of_its_loop():
+    sf = ExactStatsFactory()
+    i, j = Field("i"), Field("j")
+    x, y = HardAlias("x"), HardAlias("y")
+    xd, yd = np.zeros((8, 8)), np.zeros((8, 8))
+    xd[:4] = 1.0
+    yd[2:6, ::2] = 1.0
+    stats: dict[Alias, TensorStats] = {
+        x: sf(fl.asarray(xd), (i, j)),
+        y: sf(fl.asarray(yd), (i, j)),
+    }
+    expr = MapJoin(Literal(ffuncs.mul), (Table(x, (i, j)), Table(y, (i, j))))
+    machine = StatsMachine(sf, dict(stats))
+    basis = PigeonBasis()
+    estimated = basis.get_component_features(Prefix((i, j), expr, ()), machine)
+    # The stats say the loop over i visits the 2 rows of both, and the loop
+    # over j steps through the 8 entries of x and y together in each. If the
+    # choices at the loop over i make it run 6 times instead, the loop over j
+    # runs three times as often: as often in each row as the stats say, in
+    # thrice the rows, with an operation on each input in each row, and a
+    # dense extent of 6 rows of 8.
+    assert estimated[0, 0] == 2 * 8
+    given = basis.get_component_features(
+        Prefix((i, j), expr, (), executions=6.0), machine
+    )
+    assert given[0, 0] == 6 * 8
+    assert given[0, 1] == 6 * 2
+    assert given[0, 4] == 6 * 8
+    # Without a given count, the loop iterates as the stats say.
+    assert LoopSpaces(Prefix((i, j), expr, ()), machine).executions() == 2
+    assert LoopSpaces(Prefix((i,), expr, ()), machine).iterations() == 2
 
 
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])

@@ -30,6 +30,7 @@ from finch.autoschedule.cost_models import (
     SparseHashLevelOption,
     SparseListLevelOption,
     allowed_options,
+    level_executions,
 )
 from finch.autoschedule.cost_models.format_cost_models import (
     alias_blocks,
@@ -91,29 +92,40 @@ def optimize_format(
     pos_size = np_dtype(position_type).itemsize
     memo = {}
 
-    def cost(level, num_pos, option):
-        choice = LevelChoice(term, alias, level, num_pos, option, pos_size)
-        return cost_model.predict_component_cost(choice, machine)
+    def choice(level, num_pos, option, executions):
+        return LevelChoice(term, alias, level, num_pos, option, pos_size, executions)
 
-    def rec(level, num_pos):
+    def cost(level, num_pos, option, executions):
+        return cost_model.predict_component_cost(
+            choice(level, num_pos, option, executions), machine
+        )
+
+    # The levels from a level down cost the same under levels above it which
+    # pass it the same positions and enter its fibers as often, so the search
+    # is a dynamic program over those.
+    def rec(level, num_pos, executions):
         if level == n:
-            return cost(level, num_pos, ElementLevelOption()), leaf
+            return cost(level, num_pos, ElementLevelOption(), executions), leaf
 
-        key = (level, num_pos)
+        key = (level, num_pos, executions)
         if key in memo:
             return memo[key]
 
         best_cost = None
         best_format = None
         for option in allowed[level]:
-            local = cost(level, num_pos, option)
+            local = cost(level, num_pos, option, executions)
             child_num_pos = tuple(
                 option.next_num_pos(
                     stats, machine.stats_factory, len(over) + level, n, over
                 )
                 for (stats, over), n in zip(blocks, num_pos, strict=True)
             )
-            child_cost, child_fmt = rec(level + 1, child_num_pos)
+            child_cost, child_fmt = rec(
+                level + 1,
+                child_num_pos,
+                level_executions(choice(level, num_pos, option, executions), machine),
+            )
             total = local + child_cost
             if best_cost is None or total < best_cost:
                 best_cost, best_format = (
@@ -124,7 +136,7 @@ def optimize_format(
         memo[key] = (best_cost, best_format)
         return best_cost, best_format
 
-    _, fmt = rec(0, (1.0,) * len(blocks))
+    _, fmt = rec(0, (1.0,) * len(blocks), None)
     return fmt
 
 

@@ -14,11 +14,14 @@ from finch import finch_assembly as asm
 from finch.algebra import TensorFType
 from finch.autoschedule import CompilerFormLowerer, LogicCapture, NotationGenerator
 from finch.autoschedule.cost_models import (
+    DenseLevelOption,
+    ElementLevelOption,
     LevelBasis,
     LevelChoice,
     ProtocolBasis,
     SparseListLevelOption,
     TransposeBasis,
+    level_executions,
 )
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
 from finch.autoschedule.loop_orderer.loop_ordering import AbstractLoopOrderer
@@ -293,3 +296,58 @@ def test_gallops_jump_within_the_smallest_support():
     gallops, _ = run(program(Gallop(), Gallop()), inputs, {c: ()})
     assert gallops["while"] < walks["while"]
     assert loads(gallops, "y", "idx") < loads(walks, "y", "idx")
+
+
+def test_levels_are_entered_as_often_as_the_level_above_is_visited():
+    # c[i] = sum_j x[i, j] * y[i, j], with 2 entries in each of the first 4
+    # of 16 rows of x, and y full.
+    n = 16
+    i, j = Field("i"), Field("j")
+    x, y, c = HardAlias("x"), HardAlias("y"), HardAlias("c")
+    xd = np.zeros((n, n), np.int64)
+    xd[:4, :2] = 1
+    yd = np.ones((n, n), np.int64)
+    sf = ExactStatsFactory()
+    stats = {x: sf(fl.asarray(xd), (i, j)), y: sf(fl.asarray(yd), (i, j))}
+    product = MapJoin(Literal(ffuncs.mul), (Table(x, (i, j)), Table(y, (i, j))))
+    query = Query(
+        Table(c, (i,)), Aggregate(Literal(ffuncs.add), Literal(0), product, (j,))
+    )
+    plan = Plan((fuse_loop_order(query, (i, j)), Produces((c,))))
+    machine = StatsMachine(sf, dict(stats))
+    dense, lists = DenseLevelOption(), SparseListLevelOption()
+
+    def choice(depth, option, executions=None):
+        return LevelChoice(plan, x, depth, (1.0,), option, 8, executions)
+
+    def accesses(depth, option, executions=None):
+        basis = LevelBasis(type(option))
+        rows = basis.get_component_features(choice(depth, option, executions), machine)
+        # The allocation row comes first.
+        return dict(zip(basis.feature_names, rows[1:].sum(axis=0), strict=True))
+
+    # A list at the first level is visited at its 4 rows, where a dense level
+    # is visited at the 16 rows of y, and each passes those fibers on.
+    assert accesses(0, lists)["visits"] == 4
+    assert accesses(0, lists)["dense_visits"] == n
+    assert level_executions(choice(0, lists), machine) == (4.0,)
+    assert level_executions(choice(0, dense), machine) == (16.0,)
+    # The second level walks its 8 entries under either, but under the dense
+    # level the loop over j runs in 12 more rows, where x has no entries and
+    # y drives it over all 16 columns, which a dense second level is looked up
+    # at, and its element level with it.
+    under_list = accesses(1, lists, (4.0,))
+    under_dense = accesses(1, lists, (16.0,))
+    assert under_list["visits"] == under_dense["visits"] == 8
+    assert under_list["entries"] == under_dense["entries"] == 8
+    assert under_list["dense_visits"] == 4 * n
+    assert under_dense["dense_visits"] == n * n
+    assert level_executions(choice(1, lists, (16.0,)), machine) == (8.0,)
+    assert level_executions(choice(1, dense, (16.0,)), machine) == (256.0,)
+    assert accesses(2, ElementLevelOption(), (8.0,))["lookups"] == 8
+    assert accesses(2, ElementLevelOption(), (256.0,))["lookups"] == 256
+    # The interpreter looks x up as often as the model says.
+    counts, _ = run(plan, {x: stored("SS", xd), y: stored("DD", yd)}, {c: (n,)})
+    assert loads(counts, "x", "val") == 8
+    counts, _ = run(plan, {x: stored("DD", xd), y: stored("DD", yd)}, {c: (n,)})
+    assert loads(counts, "x", "val") == n * n

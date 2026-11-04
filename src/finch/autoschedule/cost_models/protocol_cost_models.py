@@ -202,7 +202,7 @@ class ProtocolBasis(LoopBasis, LoopOrderedForm):
                 replace(component, expr=followed(component.expr, read.table)), machine
             )
             dense_visits = dense.count(dense.visited())
-            row[0, block] += spaces.exec_space.estimate_non_fill_values()
+            row[0, block] += spaces.executions()
             match read.protocol:
                 case Follow():
                     row[0, block + 1] += spaces.count(spaces.visited())

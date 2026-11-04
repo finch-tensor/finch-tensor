@@ -17,6 +17,7 @@ from finch.autoschedule.cost_models import (
     Affine,
     DenseLevelOption,
     LevelOption,
+    LinearCostModel,
     Prefix,
     ProtocolBasis,
     SparseHashLevelOption,
@@ -246,6 +247,53 @@ def test_optimize_protocols_only_follows_levels_read_out_of_order():
     plan = Plan((fuse_loop_order(query, (i, j)), Produces((C,))))
     out = optimize_protocols(plan, {A: fmt}, stats, sf)
     assert read_protocols(out, A) == [(Walk(), Walk())]
+
+
+def test_optimize_protocols_prices_the_loops_within_a_choice():
+    sf = ExactStatsFactory()
+    i, j = Field("i"), Field("j")
+    x, y, c = HardAlias("x"), HardAlias("y"), HardAlias("c")
+    # x has a diagonal entry in rows 0-59, and y in rows 40-99.
+    n = 100
+    xd, yd = np.zeros((n, n)), np.zeros((n, n))
+    xd[np.arange(60), np.arange(60)] = 1.0
+    yd[np.arange(40, n), np.arange(40, n)] = 1.0
+    stats: dict[Alias, TensorStats] = {
+        x: sf(fl.asarray(xd), (i, j)),
+        y: sf(fl.asarray(yd), (i, j)),
+    }
+    lists = fiber_tensor(
+        sparse_list(sparse_list(element(0.0), ftype(np.intp)), ftype(np.intp))
+    )
+    query = Query(
+        Table(c, (i,)),
+        Aggregate(
+            Literal(ffuncs.add),
+            Literal(0.0),
+            MapJoin(Literal(ffuncs.mul), (Table(x, (i, j)), Table(y, (i, j)))),
+            (j,),
+        ),
+    )
+    plan = Plan((fuse_loop_order(query, (i, j)), Produces((c,))))
+
+    def model(seek):
+        weights = {"seeks": seek, "walk_visits": 1.0, "gallop_visits": 1.0}
+        return LinearCostModel(
+            PROTOCOL_BASIS,
+            [
+                weights.get(name.split(".")[1], 0.0)
+                for name in PROTOCOL_BASIS.feature_names
+            ],
+        )
+
+    # Following both at i is free, where walking them steps through 120 rows,
+    # but then the loop over j runs for all 100 rows rather than the 20 both
+    # have, and seeks a fiber of each at every one. Pricing the loop over i
+    # alone would follow; with the seeks within it counted, walking wins.
+    out = optimize_protocols(plan, {x: lists, y: lists}, stats, sf, model(100.0))
+    assert [protos[0] for protos in read_protocols(out, x, y)] == [Walk(), Walk()]
+    out = optimize_protocols(plan, {x: lists, y: lists}, stats, sf, model(0.0))
+    assert [protos[0] for protos in read_protocols(out, x, y)] == [Follow(), Follow()]
 
 
 def test_cost_protocolizer_states_the_protocols_it_chooses():

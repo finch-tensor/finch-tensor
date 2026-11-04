@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, ClassVar, Self
 
 import numpy as np
@@ -409,7 +409,12 @@ class LevelChoice:
     The choice of a level option at a zero-based depth of the levels alias
     stores, in a format whose positions take pos_size bytes. term is the
     program which reads and writes alias, and num_pos lists the positions
-    entering the level in each block of alias in term. A fused view of alias
+    entering the level in each block of alias in term. executions, when
+    given, lists how many fibers of the level each access of alias in term
+    enters, in the order LevelBasis.get_access_features lists the accesses,
+    as the choice of the level above makes it: every position of a level
+    which can't walk, or only those a walk steps to. Without it, the accesses
+    enter the fibers the stats say the loops reach. A fused view of alias
     stores one slice for each value of its fused fields, so its blocks are
     described by their largest slice.
     """
@@ -420,6 +425,7 @@ class LevelChoice:
     num_pos: tuple[float, ...]
     option: LevelOption
     pos_size: int
+    executions: tuple[float, ...] | None = None
 
     @property
     def kind(self) -> str:
@@ -447,8 +453,13 @@ class FormatBasis(Basis[LevelChoice]):
             if not blocks:
                 continue
             num_pos = (1.0,) * len(blocks)
+            executions = None
             for depth, option in enumerate(options):
-                yield LevelChoice(term, alias, depth, num_pos, option, pos_size)
+                choice = LevelChoice(
+                    term, alias, depth, num_pos, option, pos_size, executions
+                )
+                yield choice
+                executions = level_executions(choice, machine)
                 num_pos = tuple(
                     option.next_num_pos(
                         stats, machine.stats_factory, len(over) + depth, n, over
@@ -504,9 +515,12 @@ class LevelBasis(FormatBasis, LoopOrderedForm):
 
     class_key = "level"
 
+    # The accesses are cached across the bases of every option type, so that
+    # the fibers a level passes to the next are read from the rows priced.
+    _accesses: OrderedDict[Any, Any] = OrderedDict()
+
     def __init__(self, option_type: type[LevelOption]):
         self.option_type = option_type
-        self._accesses: OrderedDict[Any, Any] = OrderedDict()
 
     @property
     def n_features(self) -> int:
@@ -541,52 +555,107 @@ class LevelBasis(FormatBasis, LoopOrderedForm):
         level: int,
         term: LogicStatement,
         machine: StatsMachine[NS],
-    ) -> np.ndarray:
+        executions: tuple[float, ...] | None = None,
+    ) -> tuple[np.ndarray, tuple[float, ...]]:
         """
         Return the accesses to alias at a zero-based stored depth in each query
         of term: visits, dense visits, entries, lookups, sequential writes, and
         scatter writes, with one row per loop prefix that accesses the level in
-        each query. A level is reached at the last loop over a field of the
-        levels from the root to it, since it is reached only once the positions
-        of its parents are known. The loops are the fields of the enclosing
-        Fuse nodes. A read of a level at the loop over its own field visits the
-        level wherever that loop goes, with every table walked, or wherever it
-        would go if the level were dense, so that the level couldn't restrict
-        it, and the level stores its entries in the fibers the loop enters: the
-        steps of a walk, which a gallop or a follow may skip. Any other read
-        looks the level up wherever the loop visits, as does a write. A write
-        is sequential where it extrudes the level, and scatters where it
-        laminates it, as write_protocols infers. Every view of alias accesses
-        its levels. The element level is accessed with its parent, and looks
-        up its value. The protocols which term gives its reads are ignored.
+        each query, and the fibers of the level below which each access enters.
+        The accesses of a query are the reads of alias in its right-hand side,
+        in post order, then its write of alias, if any. A level is reached at
+        the last loop over a field of the levels from the root to it, since it
+        is reached only once the positions of its parents are known. The loops
+        are the fields of the enclosing Fuse nodes. A read of a level at the
+        loop over its own field visits the level wherever that loop goes, with
+        every table walked, or wherever it would go if the level were dense, so
+        that the level couldn't restrict it, and the level stores its entries
+        in the fibers the loop enters: the steps of a walk, which a gallop or a
+        follow may skip. Any other read looks the level up wherever the loop
+        visits, as does a write. A write is sequential where it extrudes the
+        level, and scatters where it laminates it, as write_protocols infers.
+        Every view of alias accesses its levels. The element level is accessed
+        with its parent, and looks up its value. The protocols which term gives
+        its reads are ignored: alias walks the levels above the level, and
+        looks the level up as its option reads it: following it if the option
+        can't walk, and walking it otherwise. The loops reaching the level run
+        as often as they enter its fibers, which executions gives for each
+        access, rather than as often as the stats say they reach them with the
+        levels above walked. The fibers entered beyond those hold no entries
+        of alias, so they add to the visits the level would make if it were
+        dense and to its lookups, which the other tables drive, but not to the
+        visits or entries of its walks. The level passes on the fibers below
+        it which each access enters: those the loop visits if the level walks,
+        or every one the loop would visit if the level were dense otherwise,
+        since a level which can't walk has a fiber at every position.
         """
         features = []
+        next_executions: list[float] = []
         stats_interpreter = StatsMachine(
             machine.stats_factory, OrderedDict(machine.bindings)
         )
 
         def visit_access(table, loop_order, rhs, lhs_idxs, write, rows):
             tns, idxs = table.tns, table.idxs
+            given = None if executions is None else executions[len(next_executions)]
             if not idxs:
+                next_executions.append(1.0 if given is None else given)
                 return
             # The levels of a fused alias follow its fused fields.
-            depth = min(tns.nfused + level, len(idxs) - 1)
+            own = tns.nfused + level
+            depth = min(own, len(idxs) - 1)
             order = tuple(idxs[: depth + 1])
             loops = loop_order[: max(map(loop_order.index, order)) + 1]
-            spaces = LoopSpaces(Prefix(loops, rhs, lhs_idxs), stats_interpreter)
+            # The level above is reached at the loops over its fields, or at
+            # the same loops as a level without a field, which is reached with
+            # it.
+            reached = order[:-1] if own < len(idxs) else order
+            above = loop_order[: max(map(loop_order.index, reached), default=-1) + 1]
+
+            def read_as(protocol):
+                protocols = [DefaultProtocol()] * len(idxs)
+                if own < len(idxs):
+                    protocols[own] = protocol
+                return with_protocols(rhs, table, tuple(protocols))
+
+            def spaces(protocol, scaled=True):
+                """The spaces of the loop reaching the level, reading it with
+                protocol, whose enclosing loops run as often as the stats say
+                they enter the fibers of the level, or, if scaled, as often as
+                the fibers given, as the loops between the level above and
+                this one run as often under both."""
+                prefix = Prefix(loops, read_as(protocol), lhs_idxs)
+                if scaled and given is not None:
+                    entered = 1.0
+                    if above:
+                        entered = LoopSpaces(
+                            replace(prefix, prefix=above), stats_interpreter
+                        ).iterations()
+                    if entered:
+                        estimated = LoopSpaces(prefix, stats_interpreter).executions()
+                        prefix = replace(prefix, executions=estimated * given / entered)
+                return LoopSpaces(prefix, stats_interpreter)
+
+            walks = Walk() in self.option_type.protocols
+            walked = spaces(DefaultProtocol(), scaled=False)
             row = rows.setdefault(loops, np.zeros(6))
-            visits = spaces.count(spaces.visited())
             if write is not None:
+                visits = walked.count(walked.visited())
                 row[4 if write == Extrude() else 5] += visits
+                next_executions.append(visits)
             elif self.option_type is ElementLevelOption or loops[-1] != idxs[depth]:
+                read = spaces(DefaultProtocol() if walks else Follow())
+                visits = read.count(read.visited())
                 row[3] += visits
+                next_executions.append(visits)
             else:
-                dense = LoopSpaces(
-                    Prefix(loops, followed(rhs, table), lhs_idxs), stats_interpreter
-                )
+                dense = spaces(Follow())
+                visits = walked.count(walked.visited())
+                dense_visits = dense.count(dense.visited())
                 row[0] += visits
-                row[1] += dense.count(dense.visited())
-                row[2] += spaces.walk(table)
+                row[1] += dense_visits
+                row[2] += walked.walk(table)
+                next_executions.append(visits if walks else dense_visits)
 
         def visit_stmt(stmt: LogicStatement, loop_order: tuple[Field, ...]):
             match stmt:
@@ -633,30 +702,47 @@ class LevelBasis(FormatBasis, LoopOrderedForm):
             stats_interpreter(stmt)
 
         visit_stmt(term, ())
-        return np.asarray(features, dtype=float).reshape(-1, 6)
+        return (
+            np.asarray(features, dtype=float).reshape(-1, 6),
+            tuple(next_executions),
+        )
 
     def accesses(
-        self, alias: Alias, level: int, term: LogicStatement, machine: StatsMachine[NS]
-    ) -> tuple[list[tuple[NS, tuple[Field, ...]]], np.ndarray]:
+        self,
+        alias: Alias,
+        level: int,
+        term: LogicStatement,
+        machine: StatsMachine[NS],
+        executions: tuple[float, ...] | None = None,
+    ) -> tuple[list[tuple[NS, tuple[Field, ...]]], np.ndarray, tuple[float, ...]]:
         """
-        The blocks of alias in term, and the access rows of its level at a
-        zero-based stored depth, which don't depend on the option or the
-        positions of the level, so they are found once for every option the
-        formatter prices the level with, while machine holds the same stats.
+        The blocks of alias in term, the access rows of its level at a
+        zero-based stored depth, whose accesses enter the fibers executions
+        gives, and the fibers each access enters below it. The rows don't
+        depend on the positions of the level, so they are found once for every
+        choice of the level entered the same, while machine holds the same
+        stats.
         """
         bindings = machine.bindings
-        key = (alias, level, term, tuple((var, id(s)) for var, s in bindings.items()))
+        key = (
+            self.option_type,
+            alias,
+            level,
+            term,
+            executions,
+            tuple((var, id(s)) for var, s in bindings.items()),
+        )
         if key not in self._accesses:
             # The stats are kept with their rows, so that their ids aren't reused.
             self._accesses[key] = (
                 list(bindings.values()),
                 alias_blocks(alias, term, machine),
-                self.get_access_features(alias, level, term, machine),
+                *self.get_access_features(alias, level, term, machine, executions),
             )
             if len(self._accesses) > 64:
                 self._accesses.popitem(last=False)
-        _, blocks, access_features = self._accesses[key]
-        return blocks, access_features
+        _, blocks, access_features, next_executions = self._accesses[key]
+        return blocks, access_features, next_executions
 
     def get_component_features(
         self,
@@ -667,8 +753,12 @@ class LevelBasis(FormatBasis, LoopOrderedForm):
         Return the allocation row of the level in each block of its alias,
         followed by its access rows in the whole program.
         """
-        blocks, access_features = self.accesses(
-            component.alias, component.depth, component.term, machine
+        blocks, access_features, _ = self.accesses(
+            component.alias,
+            component.depth,
+            component.term,
+            machine,
+            component.executions,
         )
         n_storage = len(self.option_type.feature_names)
         features = np.zeros((len(blocks) + len(access_features), self.n_features))
@@ -694,3 +784,13 @@ class LevelBasis(FormatBasis, LoopOrderedForm):
             )
         features[len(blocks) :, n_storage:] = access_features
         return features
+
+
+def level_executions(
+    choice: LevelChoice, machine: StatsMachine[NS]
+) -> tuple[float, ...]:
+    """The fibers of the level below the level of choice which each access
+    of its alias enters, as LevelChoice takes them, under choice."""
+    return LevelBasis(type(choice.option)).accesses(
+        choice.alias, choice.depth, choice.term, machine, choice.executions
+    )[2]
