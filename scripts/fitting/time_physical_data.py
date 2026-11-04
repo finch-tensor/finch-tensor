@@ -8,14 +8,18 @@ after they are materialized as COO from their blocks and copied into their
 formats. The variants of the examples of a program compile to the same
 kernels, which are compiled once and kept for as long as this runs. The
 runtime of each variant is written to DIR/data as JSON after it is measured,
-by its index.
+by its index. With --hours H, no variant is timed after H hours, so a job
+measures for about as long as it is given, whatever its programs cost.
 
     pixi run -e fitting python -m scripts.fitting.time_physical_data \\
-        DIR [--model NAME=PATH]... [--chunk K] [--repeat N] [--resume]
+        DIR [--model NAME=PATH]... [--chunk K] [--repeat N] [--resume] \\
+        [--hours H]
 """
 
 import argparse
 import json
+import math
+import time
 import timeit
 from collections.abc import Mapping
 from pathlib import Path
@@ -117,10 +121,13 @@ class Timer:
         )
         return min(runs)
 
-    def time_example(self, directory: Path, example, resume) -> dict[str, float]:
+    def time_example(
+        self, directory: Path, example, resume, deadline=math.inf
+    ) -> dict[str, float]:
         """
         Time each variant of example which hasn't been timed, if resuming, and
-        write their runtimes to its timing.json after each.
+        write their runtimes to its timing.json after each, until the time of
+        time.monotonic passes deadline.
         """
         record, inputs = load(directory, example)
         timing_path = path(directory, example, "timing.json")
@@ -134,6 +141,8 @@ class Timer:
         for index, variant in enumerate(record["variants"]):
             if str(index) in runtimes:
                 continue
+            if time.monotonic() > deadline:
+                break
             plan, formats = resolve(record, variant, inputs, self.models)
             # The inputs the program reads are stored in the order it reads them.
             perms = input_perms(record, plan)
@@ -147,17 +156,21 @@ class Timer:
         return runtimes
 
 
-def time_programs(directory: Path, models, chunk, repeat, resume) -> None:
+def time_programs(directory: Path, models, chunk, repeat, resume, hours) -> None:
     timer = Timer(models, repeat)
     names = examples(directory, chunk)
+    deadline = time.monotonic() + 3600 * hours
     for i, example in enumerate(names, 1):
-        runtimes = timer.time_example(directory, example, resume)
-        best = min(runtimes.values())
-        print(
-            f"[{i}/{len(names)}] {example}: {len(runtimes)} variants, "
-            f"best {best:.2e}s, {len(timer.executors)} kernels",
-            flush=True,
-        )
+        runtimes = timer.time_example(directory, example, resume, deadline)
+        if runtimes:
+            print(
+                f"[{i}/{len(names)}] {example}: {len(runtimes)} variants, "
+                f"best {min(runtimes.values()):.2e}s, {len(timer.executors)} kernels",
+                flush=True,
+            )
+        if time.monotonic() > deadline:
+            print(f"stopped after {hours} hours, at {i} of {len(names)}", flush=True)
+            return
 
 
 def main() -> None:
@@ -176,9 +189,20 @@ def main() -> None:
     parser.add_argument(
         "--resume", action="store_true", help="skip the variants already timed"
     )
+    parser.add_argument(
+        "--hours",
+        type=float,
+        default=math.inf,
+        help="the hours after which no more variants are timed",
+    )
     args = parser.parse_args()
     time_programs(
-        args.directory, parse_models(args.model), args.chunk, args.repeat, args.resume
+        args.directory,
+        parse_models(args.model),
+        args.chunk,
+        args.repeat,
+        args.resume,
+        args.hours,
     )
 
 

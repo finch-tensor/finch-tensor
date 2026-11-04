@@ -14,16 +14,18 @@
 # default account otherwise. With --resume, DIR's programs are kept rather
 # than generated, only the variants not yet timed are timed, each example is
 # featurized only with the bases it lacks, and the jobs are added to
-# DIR/jobs.txt. Options of this script come before DIR, and those after it are
-# generate_physical_data's.
+# DIR/jobs.txt. Each chunk is timed and featurized for --hours H, by default 6,
+# and stops then, since its programs cost too differently to choose how many
+# fill the time, so more are generated than any chunk could time. Options of
+# this script come before DIR, and those after it are generate_physical_data's.
 #
 #     scripts/fitting/launch_physical_data.sh [--account A] [--stage STAGE] \
 #         [--model NAME=PATH]... [--basis NAME]... [--chunks N] [--repeat N] \
-#         [--resume] DIR [generate_physical_data options]
+#         [--hours H] [--resume] DIR [generate_physical_data options]
 set -euo pipefail
 
 usage="usage: $0 [--account A] [--stage STAGE] [--model NAME=PATH]... \
-[--basis NAME]... [--chunks N] [--repeat N] [--resume] DIR \
+[--basis NAME]... [--chunks N] [--repeat N] [--hours H] [--resume] DIR \
 [generate_physical_data options]"
 account=
 stage=protocol
@@ -31,6 +33,7 @@ models=()
 bases=()
 chunks=8
 repeat=5
+hours=6
 resume=
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -45,6 +48,7 @@ while [[ $# -gt 0 ]]; do
     --resume) resume=--resume; shift ;;
     --chunks) chunks=$2; shift 2 ;;
     --repeat) repeat=$2; shift 2 ;;
+    --hours) hours=$2; shift 2 ;;
     -h | --help) echo "$usage"; exit 0 ;;
     *) break ;;
   esac
@@ -120,16 +124,20 @@ if [[ ! $resume ]]; then
     "$step" generate_physical_data "$directory" --stage "$stage" "$@")
   echo "generate $generate" >>"$jobs"
 fi
-# Each timing task takes a whole node, so other jobs don't disturb it.
+# Each timing task takes a whole node, so other jobs don't disturb it. A task
+# stops starting variants after its hours, and the limit leaves two more for
+# starting Julia and finishing the last variant, which can run for minutes.
+limit=$((hours + 2)):00:00
 time=$(submit "$array" ${generate:+"--dependency=aftercorr:$generate"} \
-  --job-name=time --exclusive --time=08:00:00 --output="$logs/time-%A_%a.log" \
-  "$step" time_physical_data "$directory" "${models[@]}" --repeat "$repeat" $resume)
+  --job-name=time --exclusive --time="$limit" --output="$logs/time-%A_%a.log" \
+  "$step" time_physical_data "$directory" "${models[@]}" --repeat "$repeat" \
+  --hours "$hours" $resume)
 echo "time $time" >>"$jobs"
 featurize=$(submit "$array" ${generate:+"--dependency=aftercorr:$generate"} \
-  --job-name=featurize --cpus-per-task=2 --mem=16G --time=04:00:00 \
+  --job-name=featurize --cpus-per-task=2 --mem=16G --time="$limit" \
   --output="$logs/featurize-%A_%a.log" \
   "$step" featurize_physical_data "$directory" "${models[@]}" \
-  "${basis_options[@]}" $resume)
+  "${basis_options[@]}" --hours "$hours" $resume)
 echo "featurize $featurize" >>"$jobs"
 for basis in "${bases[@]}"; do
   condense=$(submit --dependency="afterok:$time:$featurize" \

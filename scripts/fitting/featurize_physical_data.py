@@ -10,13 +10,19 @@ stats are counted exactly from the Kronecker blocks of the inputs, so no input
 is materialized. The formats of a variant enter only through the bases, as in
 the optimizers, which see the supports of their inputs. The loop stage orders
 loops before its inputs are formatted, so it reads them without protocols.
+With --hours H, no program is featurized after H hours. Programs are
+featurized in the order they are timed, so those timed within the same hours
+are featurized first.
 
     pixi run -e fitting python -m scripts.fitting.featurize_physical_data \\
-        DIR [--model NAME=PATH]... [--basis NAME]... [--chunk K] [--resume]
+        DIR [--model NAME=PATH]... [--basis NAME]... [--chunk K] [--resume] \\
+        [--hours H]
 """
 
 import argparse
 import json
+import math
+import time
 from pathlib import Path
 
 import numpy as np
@@ -96,7 +102,8 @@ def featurize_example(directory: Path, example, names, models) -> dict[str, list
     return rows
 
 
-def featurize(directory: Path, names, models, chunk, resume) -> None:
+def featurize(directory: Path, names, models, chunk, resume, hours) -> None:
+    deadline = time.monotonic() + 3600 * hours
     # Each example is featurized with the bases it lacks, or all if not resuming.
     todo = []
     for example in examples(directory, chunk):
@@ -110,6 +117,9 @@ def featurize(directory: Path, names, models, chunk, resume) -> None:
         if missing:
             todo.append((example, missing))
     for i, (example, missing) in enumerate(todo, 1):
+        if time.monotonic() > deadline:
+            print(f"stopped after {hours} hours, at {i - 1} of {len(todo)}", flush=True)
+            return
         rows = featurize_example(directory, example, missing, models)
         counts = ", ".join(
             f"{name} {sum(map(len, rows[name]))} rows" for name in missing
@@ -140,9 +150,22 @@ def main() -> None:
         action="store_true",
         help="extract only the bases which each program lacks features of",
     )
+    parser.add_argument(
+        "--hours",
+        type=float,
+        default=math.inf,
+        help="the hours after which no more programs are featurized",
+    )
     args = parser.parse_args()
     names = list(dict.fromkeys(args.basis or []))
-    featurize(args.directory, names, parse_models(args.model), args.chunk, args.resume)
+    featurize(
+        args.directory,
+        names,
+        parse_models(args.model),
+        args.chunk,
+        args.resume,
+        args.hours,
+    )
 
 
 if __name__ == "__main__":
