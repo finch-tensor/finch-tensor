@@ -10,8 +10,11 @@
 # written to DIR/NAME.model.json, which the next stage takes as its --model.
 # The programs and their timings and features go to DIR/data, logs to
 # DIR/logs, and the IDs of the jobs to DIR/jobs.txt, which
-# scripts/fitting/status_physical_data.sh reads to show their progress. A
-# failed step cancels the steps which depend on it. Every job is charged to the Slurm account A if given, or to the
+# scripts/fitting/status_physical_data.sh reads to show their progress. The
+# condensing waits for the timing and featurizing to end however they end,
+# since the chunks which ran out of time still count, and otherwise a failed
+# step cancels the steps which depend on it, and a failed submission cancels
+# the jobs submitted before it. Every job is charged to the Slurm account A if given, or to the
 # default account otherwise. With --resume, DIR's programs are kept rather
 # than generated, only the variants not yet timed are timed, each example is
 # featurized only with the bases it lacks, and the jobs are added to
@@ -90,11 +93,31 @@ cd -- "$(dirname -- "$0")"
 repo_directory=$(git rev-parse --show-toplevel)
 cd -- "$repo_directory"
 
+# If a submission fails, cancel the jobs submitted before it, rather than
+# leaving part of a run queued, and record only the jobs of a whole run.
+submitted=()
+cancel_submitted() {
+  if [[ $? -ne 0 && ${#submitted[@]} -gt 0 ]]; then
+    echo "$0: submission failed; cancelling ${submitted[*]}" >&2
+    scancel "${submitted[@]}" || true
+  fi
+}
+trap cancel_submitted EXIT
+# A command substitution doesn't inherit set -e, so fail explicitly, and on an
+# empty ID, which sbatch can print while failing.
 submit() {
   local id
   id=$(sbatch --parsable --chdir="$repo_directory" --kill-on-invalid-dep=yes \
-    ${account:+"--account=$account"} "$@")
-  echo "${id%%;*}"
+    ${account:+"--account=$account"} "$@") || return 1
+  id=${id%%;*}
+  [[ -n $id ]] || return 1
+  echo "$id"
+}
+# submit runs in a subshell, so the jobs are recorded here, as NAME ID.
+records=()
+record() {
+  submitted+=("$2")
+  records+=("$1 $2")
 }
 
 jobs=$directory/jobs.txt
@@ -103,11 +126,10 @@ logs=$directory/logs
 generate=
 step=scripts/fitting/step.slurm
 if [[ ! $resume ]]; then
-  : >"$jobs"
   generate=$(submit "$array" --job-name=generate --cpus-per-task=8 --mem=64G \
     --time=02:00:00 --output="$logs/generate-%A_%a.log" \
     "$step" generate_physical_data "$directory" --stage "$stage" "$@")
-  echo "generate $generate" >>"$jobs"
+  record generate "$generate"
 fi
 # Each timing task takes a whole node, so other jobs don't disturb it. A task
 # stops starting variants after its hours, and the limit leaves two more for
@@ -118,26 +140,28 @@ time=$(submit "$array" ${generate:+"--dependency=aftercorr:$generate"} \
   --job-name=time --exclusive --time="$limit" --output="$logs/time-%A_%a.log" \
   "$step" time_physical_data "$directory" "${models[@]}" --repeat "$repeat" \
   --hours "$hours" $resume)
-echo "time $time" >>"$jobs"
+record time "$time"
 featurize=$(submit "$array" ${generate:+"--dependency=aftercorr:$generate"} \
   --job-name=featurize --cpus-per-task=2 --mem=16G --time="$limit" \
   --output="$logs/featurize-%A_%a.log" \
   "$step" featurize_physical_data "$directory" "${models[@]}" \
   "${basis_options[@]}" --hours "$hours" $resume)
-echo "featurize $featurize" >>"$jobs"
+record featurize "$featurize"
 for basis in "${bases[@]}"; do
-  condense=$(submit --dependency="afterok:$time:$featurize" \
+  condense=$(submit --dependency="afterany:$time:$featurize" \
     --job-name="condense-$basis" --cpus-per-task=1 --mem=16G --time=01:00:00 \
     --output="$logs/condense-$basis-%j.log" \
     "$step" condense_physical_data "$directory" --basis "$basis")
-  echo "condense-$basis $condense" >>"$jobs"
+  record "condense-$basis" "$condense"
   fit=$(submit --dependency="afterok:$condense" --job-name="fit-$basis" \
     --cpus-per-task=1 --mem=16G --time=01:00:00 --mail-type=END,FAIL \
     --output="$logs/fit-$basis-%j.log" \
     "$step" fit_physical_data "$directory/$basis.json" "$directory/$basis.model.json")
-  echo "fit-$basis $fit" >>"$jobs"
+  record "fit-$basis" "$fit"
 done
 
+[[ $resume ]] || : >"$jobs"
+printf '%s\n' "${records[@]}" >>"$jobs"
 echo "submitted $chunks chunks of the $stage stage:"
-sed 's/^/  /' "$jobs"
+printf '  %s\n' "${records[@]}"
 echo "check progress with: scripts/fitting/status_physical_data.sh $directory"

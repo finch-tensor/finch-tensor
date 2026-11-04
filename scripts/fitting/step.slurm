@@ -12,6 +12,8 @@
 #     sbatch [resources] scripts/fitting/step.slurm MODULE [ARGS...]
 #SBATCH --job-name=physical-data
 #SBATCH --nodes=1
+# The environment, Julia's depot and the copy of the repository need the disk.
+#SBATCH --tmp=20G
 #SBATCH --output=physical-data-%j.log
 #SBATCH --mail-type=FAIL
 
