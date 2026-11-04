@@ -84,25 +84,23 @@ cd -- "$(dirname -- "$0")"
 repo_directory=$(git rev-parse --show-toplevel)
 cd -- "$repo_directory"
 
-# Install the environment and precompile Julia's packages here, once, rather
-# than in every task at once, which race to precompile them into the shared
-# depot. Julia caches precompiled packages for the CPU which compiles them, so
-# compile them for the targets of Julia's own x86 builds, which every node can
-# load. This doesn't change the code Julia compiles while running, such as the
-# kernels being timed, which is always for the CPU it runs on. juliapkg only
-# records that it installed Julia's packages, so install any which the depot
-# lacks, such as a depot of another machine, at the versions it recorded.
-export JULIA_CPU_TARGET=${JULIA_CPU_TARGET:-"generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1);x86-64-v4,-rdrnd,base(1)"}
+# Install the environment and Julia's packages here, once, rather than in
+# every task at once, which would race to install them into the shared depot.
+# Nothing is precompiled here: each task which runs Julia precompiles its
+# packages for its own CPU into a depot on its node's own disk, see
+# scripts/fitting/step.slurm, so the pipeline neither needs nor rewrites the
+# caches of the shared depot. juliapkg only records that it installed Julia's
+# packages, so install any which the depot lacks, such as a depot of another
+# machine, at the versions it recorded, without precompiling them.
 pixi install --frozen -e fitting
-pixi run --frozen -e fitting python -c '
+echo "installing Julia's packages"
+JULIA_PKG_PRECOMPILE_AUTO=0 pixi run --frozen -e fitting python -c '
 import subprocess, juliapkg
 subprocess.run(
     [juliapkg.executable(), f"--project={juliapkg.project()}", "-e",
      "using Pkg; Pkg.instantiate()"],
     check=True,
 )
-from finch.compile_jl.julia import init_julia
-init_julia()
 '
 
 submit() {
