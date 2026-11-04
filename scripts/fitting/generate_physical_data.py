@@ -463,12 +463,15 @@ def path(directory: Path, example, kind) -> Path:
     return directory / "data" / f"{example}.{kind}"
 
 
-def examples(directory: Path, chunk=None) -> list[str]:
-    """The names of the examples in directory, or of those of one chunk."""
+def examples(directory: Path, chunk=None, kind="program.json") -> list[str]:
+    """
+    The names of the examples in directory, or of those of one chunk, which
+    have a file of kind.
+    """
     prefix = "*" if chunk is None else f"{chunk:04d}-*"
     return sorted(
-        file.name.removesuffix(".program.json")
-        for file in (directory / "data").glob(f"{prefix}.program.json")
+        file.name.removesuffix(f".{kind}")
+        for file in (directory / "data").glob(f"{prefix}.{kind}")
     )
 
 

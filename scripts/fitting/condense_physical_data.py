@@ -22,11 +22,14 @@ from scripts.fitting.physical_bases import BASES, features_kind
 def condense(directory: Path, name, chunk, output: Path | None) -> None:
     basis, kind = BASES[name], features_kind(name)
     programs = examples(directory, chunk)
+    # Few examples are timed, so only theirs are looked up, which is much
+    # faster on a parallel filesystem than looking up each example's files.
+    timed_examples = examples(directory, chunk, "timing.json")
     names, features, runtimes = [], [], []
-    for example in programs:
+    for example in timed_examples:
         features_path = path(directory, example, kind)
         timing_path = path(directory, example, "timing.json")
-        if not (features_path.exists() and timing_path.exists()):
+        if not features_path.exists():
             continue
         try:
             rows = basis.features_from_json(json.loads(features_path.read_text()))
