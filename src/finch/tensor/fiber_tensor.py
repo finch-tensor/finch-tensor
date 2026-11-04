@@ -4,7 +4,6 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import scipy.sparse as sps
 
 from finch import finch_assembly as asm
 from finch.algebra import (
@@ -104,53 +103,14 @@ class FiberTensor(OverrideTensor):
         return self.lvl.buffer_factory
 
     def to_numpy(self) -> np.ndarray:
-        # TODO: temporary for dense only. TBD in sparse_level PR
-        return np.reshape(self.lvl.val.to_numpy(), self.shape, copy=False)
+        from finch.interface.constructor import to_numpy
+
+        return to_numpy(self)
 
     def to_scipy(self):
-        from .level import (
-            DenseLevel,
-            ElementLevel,
-            SparseCOOLevel,
-            SparseListLevel,
-        )
+        from finch.interface.constructor import to_scipy
 
-        if self.ndim != 2:
-            raise ValueError("SciPy sparse arrays must be two-dimensional.")
-
-        if self.fill_value != 0:
-            raise ValueError("SciPy CSR conversion requires a zero fill value.")
-
-        assert self.pos == 0
-
-        match self.lvl:
-            case SparseCOOLevel(
-                lvl=ElementLevel() as element,
-                tbl=(row, col),
-            ):
-                return sps.coo_array(
-                    (element.val.to_numpy(), (row.to_numpy(), col.to_numpy())),
-                    shape=self.shape,
-                    copy=False,
-                )
-
-            case DenseLevel(
-                lvl=SparseListLevel(
-                    lvl=ElementLevel() as element,
-                    ptr=ptr,
-                    idx=idx,
-                )
-            ):
-                return sps.csr_array(
-                    (element.val.to_numpy(), idx.to_numpy(), ptr.to_numpy()),
-                    shape=self.shape,
-                    copy=False,
-                )
-
-            case _:
-                raise NotImplementedError(
-                    f"Finch format {self.ftype} is not supported by SciPy conversion."
-                )
+        return to_scipy(self)
 
     def item(self):
         if self.ndim != 0:

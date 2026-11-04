@@ -26,6 +26,50 @@ from finch.tensor.level import (
 )
 
 
+def to_numpy(self) -> np.ndarray:
+    # TODO: temporary for dense only. TBD in sparse_level PR
+    return np.reshape(self.lvl.val.to_numpy(), self.shape, copy=False)
+
+
+def to_scipy(self):
+    if self.ndim != 2:
+        raise ValueError("SciPy sparse arrays must be two-dimensional.")
+
+    if self.fill_value != 0:
+        raise ValueError("SciPy CSR conversion requires a zero fill value.")
+
+    assert self.pos == 0
+
+    match self.lvl:
+        case SparseCOOLevel(
+            lvl=ElementLevel() as element,
+            tbl=(row, col),
+        ):
+            return sps.coo_array(
+                (element.val.to_numpy(), (row.to_numpy(), col.to_numpy())),
+                shape=self.shape,
+                copy=False,
+            )
+
+        case DenseLevel(
+            lvl=SparseListLevel(
+                lvl=ElementLevel() as element,
+                ptr=ptr,
+                idx=idx,
+            )
+        ):
+            return sps.csr_array(
+                (element.val.to_numpy(), idx.to_numpy(), ptr.to_numpy()),
+                shape=self.shape,
+                copy=False,
+            )
+
+        case _:
+            raise NotImplementedError(
+                f"Finch format {self.ftype} is not supported by SciPy conversion."
+            )
+
+
 def from_numpy(arr: np.ndarray, *, device=None, copy=None) -> BufferizedNDArray:
     """Zero-copy constructor from a NumPy array."""
     if copy is True:

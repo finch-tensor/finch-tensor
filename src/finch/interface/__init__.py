@@ -7,6 +7,8 @@ from .constructor import (
     from_numpy,
     from_pydata,
     from_scipy,
+    to_numpy,
+    to_scipy,
 )
 from .eager import (
     abs,
@@ -298,6 +300,8 @@ __all__ = [
     "tanh",
     "tensordot",
     "tile",
+    "to_numpy",
+    "to_scipy",
     "trace",
     "tril",
     "triu",
