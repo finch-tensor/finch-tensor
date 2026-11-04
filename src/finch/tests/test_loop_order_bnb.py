@@ -16,6 +16,7 @@ from finch.autoschedule.cost_models import (
     Prefix,
     Quadratic,
     TransposeBasis,
+    WriteBasis,
 )
 from finch.autoschedule.loop_orderer import loop_order_bnb, loop_order_greedy
 from finch.autoschedule.loop_orderer.loop_order_bnb import (
@@ -235,20 +236,32 @@ def test_loop_orderers_use_selected_model(search, orderer, inplace):
     "search",
     [greedy_loop_order, loop_order_bfs, loop_order_dfs, loop_order_brute_force],
 )
-def test_loop_orderers_respect_output_order(search):
+def test_loop_orderers_may_visit_outputs_out_of_order(search):
     sf = UniformStatsFactory()
     i, j, unit = Field("i"), Field("j"), Field("unit")
     a = HardAlias("a")
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), Table(a, (i, j)), (j,))
-    order = search(
-        expr,
-        sf,
-        stats,
-        (unit, i),
-        cost_model=LinearCostModel(PreferFieldBasis(j), [1.0]),
-    )
-    assert order == (j, unit, i)
+    # Without a cost for writes, the output's fields may come in any order.
+    prefer_i = LinearCostModel(PreferFieldBasis(i), [1.0])
+    assert search(expr, sf, stats, (unit, i), cost_model=prefer_i) == (i, j, unit)
+
+
+# A greedy search only sees the writes to a level once it reaches the level,
+# after it has chosen the loops before it.
+@pytest.mark.parametrize(
+    "search", [loop_order_bfs, loop_order_dfs, loop_order_brute_force]
+)
+def test_loop_orderers_write_outputs_in_order_when_it_pays(search):
+    sf = UniformStatsFactory()
+    i, j, unit = Field("i"), Field("j"), Field("unit")
+    a = HardAlias("a")
+    stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
+    expr = Aggregate(Literal(ffuncs.add), Literal(0.0), Table(a, (i, j)), (j,))
+    # Scattering into the output costs more than looping over i first saves.
+    basis = Concat(PreferFieldBasis(i), WriteBasis())
+    writes = LinearCostModel(basis, [1.0, 0.0, 100.0, 100.0])
+    assert search(expr, sf, stats, (unit, i), cost_model=writes) == (unit, i, j)
 
 
 @pytest.mark.parametrize(

@@ -251,7 +251,7 @@ def test_bytemap_allocates_its_children_densely():
     assert option.next_num_pos(stats, factory, 0, 1, ()) == 4
     np.testing.assert_allclose(
         option.get_storage_features(stats, factory, 0, 1, 8, pos_size, 8, ()),
-        [1, 4, 3.5, (2 + 3.5) * pos_size, 3.5],
+        [1, 4, 3.5, (2 + 3.5) * pos_size, 3.5, 3.5 * np.log2(3.5)],
     )
 
 
@@ -742,7 +742,11 @@ def test_sparse_list_levels_reject_scatter_writes():
     "option, expected",
     [
         (DenseLevelOption(), [1, 4, 16]),
-        (SparseByteMapLevelOption(), [1, 4, 1, 3 * np.dtype(np.intp).itemsize, 4]),
+        # A slice of one entry still takes a comparison to sort.
+        (
+            SparseByteMapLevelOption(),
+            [1, 4, 1, 3 * np.dtype(np.intp).itemsize, 4, 4],
+        ),
     ],
 )
 def test_workspace_levels_reset_each_slice(option, expected):
@@ -760,3 +764,25 @@ def test_workspace_levels_reset_each_slice(option, expected):
     # Each of the 4 slices of the diagonal is reset before it is written.
     features = basis.get_component_features(choice, machine)
     np.testing.assert_allclose(features[0, : len(option.feature_names)], expected)
+
+
+def test_dense_workspaces_are_visited_through_every_slot():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, c, w = (HardAlias(name) for name in "abcw")
+    sf = DCStatsFactory()
+    data_a, data_b = _block_matmul(8, 2)
+    stats: dict[Alias, TensorStats] = {
+        a: sf(fl.asarray(data_a), (i, j)),
+        b: sf(fl.asarray(data_b), (j, k)),
+    }
+    plan, _ = _matmul(c, a, b, (i, j, k))
+    staged = add_workspace(plan, c, 1, w)
+    basis = LevelBasis(DenseLevelOption)
+    choice = LevelChoice(staged, w, 0, (1.0,), DenseLevelOption(), 8)
+    features = basis.get_component_features(choice, StatsMachine(sf, dict(stats)))
+
+    # The copy visits the 16 entries of the workspace at its own loop, which
+    # would visit all 8 slots of each of the 8 rows were the level dense.
+    names = ("visits", "dense_visits", "entries", "lookups")
+    totals = features[:, [basis.feature_names.index(name) for name in names]]
+    np.testing.assert_array_equal(totals.sum(axis=0), [16, 64, 16, 0])

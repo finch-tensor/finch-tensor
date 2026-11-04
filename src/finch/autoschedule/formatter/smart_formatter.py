@@ -284,7 +284,7 @@ ITER_COST_MODEL = linear_level_model(
         DenseLevelOption: (0, 1, 0),
         SparseListLevelOption: (1, 1, 0, 0),
         SparseHashLevelOption: (1, 1, 0, 0),
-        SparseByteMapLevelOption: (1, 0, 1, 0, 0),
+        SparseByteMapLevelOption: (1, 0, 1, 0, 0, 0),
         ElementLevelOption: (0, 0),
     }
 )
@@ -294,29 +294,31 @@ STORAGE_COST_MODEL = linear_level_model(
         SparseListLevelOption: (0, 0, 1, 1),
         SparseHashLevelOption: (0, 0, 1, 1),
         # Each slot is flagged with a byte.
-        SparseByteMapLevelOption: (0, 1, 0, 1, 0),
+        SparseByteMapLevelOption: (0, 1, 0, 1, 0, 0),
         ElementLevelOption: (0, 1),
     }
 )
 
 
-# Dense and byte map levels pay to reset each slice, but take scatter writes
-# as cheaply as sequential ones. Hash levels pay for every probe, and sorted
-# lists take sequential writes cheaply but binary search to look up out of
-# order.
+# Costs are in resets of a dense slot, as fit to Gustavson SpGEMM on Finch.jl.
+# Dense levels pay to reset every slot of each slice, but take writes in any
+# order almost for free. A byte map allocates a flag and a child for each of its
+# slots, like a dense level, but clears and sorts only the entries of each
+# slice. A hash pays for a probe at every write and lookup, and a sorted list
+# appends cheaply but binary searches to look up out of order.
 WORKSPACE_COST_MODEL = linear_level_model(
     {
         DenseLevelOption: (0, 0, 1),
-        SparseListLevelOption: (0, 1, 0, 0),
-        SparseHashLevelOption: (0, 1, 0, 0),
-        SparseByteMapLevelOption: (0, 0.125, 0, 0, 1),
+        SparseListLevelOption: (0, 0, 0, 0),
+        SparseHashLevelOption: (0, 0, 0, 0),
+        SparseByteMapLevelOption: (0, 1, 0, 0, 1, 1.6),
         ElementLevelOption: (0, 0),
     },
     {
-        DenseLevelOption: (0, 0, 1, 1, 1, 1),
-        SparseListLevelOption: (0, 0, 1, 8, 1, 0),
-        SparseHashLevelOption: (0, 0, 1, 4, 4, 4),
-        SparseByteMapLevelOption: (0, 0, 1, 1, 2, 2),
+        DenseLevelOption: (0, 0, 1, 1, 0.1, 0.1),
+        SparseListLevelOption: (0, 0, 1, 8, 1.3, 1.3),
+        SparseHashLevelOption: (0, 0, 1, 15, 15, 15),
+        SparseByteMapLevelOption: (0, 0, 1, 1, 1, 1),
     },
 )
 

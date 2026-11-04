@@ -29,7 +29,7 @@ from .factorizer.optimize import DefaultLogicFactorizer
 from .formatter import DefaultLogicFormatter, FDFormatter, GalleyFormatter
 from .loop_orderer import BFSLoopOrderer, DefaultLoopOrderer
 from .normalize import LogicNormalizer
-from .protocolize import CostProtocolizer
+from .protocolizer import CostProtocolizer
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(

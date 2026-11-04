@@ -37,10 +37,12 @@ from .format_cost_models import (
 )
 from .loop_cost_models import (
     LOOP_COST_MODEL,
+    WORKSPACE_LOOP_COST_MODEL,
     LoopBasis,
     PigeonBasis,
     Prefix,
     TransposeBasis,
+    WriteBasis,
     prefixes,
 )
 from .protocol_cost_models import (
@@ -60,6 +62,7 @@ __all__ = [
     "PROTOCOL_BASIS",
     "PROTOCOL_COST_MODEL",
     "READ_PROTOCOLS",
+    "WORKSPACE_LOOP_COST_MODEL",
     "Affine",
     "Basis",
     "ByKind",
@@ -90,6 +93,7 @@ __all__ = [
     "Statement",
     "Stratify",
     "TransposeBasis",
+    "WriteBasis",
     "allowed_options",
     "level_formats",
     "level_options",

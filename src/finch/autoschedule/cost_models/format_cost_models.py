@@ -227,8 +227,9 @@ class SparseByteMapLevelOption(LevelOption):
     """
     A bytemap flags each of its slots with a byte, and lists the slots which
     are occupied, so its children are allocated densely. Storage features are
-    positions, slots, entries, the bytes of its pointers and list, and the
-    entries cleared by resetting every slice.
+    positions, slots, entries, the bytes of its pointers and list, the entries
+    cleared by resetting every slice, and the comparisons which sort the
+    entries of every slice when it is frozen.
     """
 
     kind = "sparse_bytemap"
@@ -238,6 +239,7 @@ class SparseByteMapLevelOption(LevelOption):
         "entries",
         "position_bytes",
         "reset_entries",
+        "sort_compares",
     )
     protocols = (
         DefaultProtocol(),
@@ -264,6 +266,7 @@ class SparseByteMapLevelOption(LevelOption):
                 nnz_l,
                 (num_pos + 1 + nnz_l) * pos_size,
                 nnz_l * num_slices(stats, over),
+                nnz_l * np.log2(max(nnz_l, 2)) * num_slices(stats, over),
             ]
         )
 

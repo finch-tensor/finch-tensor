@@ -183,11 +183,6 @@ def loop_order_brute_force(
     best_order = ()
     best_cost = float("inf")
     for order in itertools.permutations(all_vars):
-        if (
-            output_vars is not None
-            and tuple(idx for idx in order if idx in output_vars) != output_vars
-        ):
-            continue
         cost = sum(
             cost_model.predict_component_cost(
                 Prefix(order[:n], expr, output_vars), machine

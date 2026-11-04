@@ -1,6 +1,6 @@
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Generic
+from typing import Any, Generic, Self
 
 import numpy as np
 
@@ -250,7 +250,7 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
                     stat = machine(node)
                     inputs.append(stat)
                     match spaces.protocol(node):
-                        case Follow() | Gallop():
+                        case Follow() | Gallop() | DefaultProtocol():
                             lookups += 1
                         case _:
                             walks.append(spaces.project(stat, (idx,)))
@@ -336,8 +336,107 @@ class TransposeBasis(LoopBasis, LoopOrderedForm):
         return features
 
 
+class WriteBasis(LoopBasis, LoopOrderedForm):
+    """
+    Count the writes to each level of the output of a query, at the loop which
+    reaches that level: the last loop over the fields of the levels from the
+    root to it. Where the loops up to it are those fields in storage order, the
+    level is written once for each of its indices, in order, and otherwise its
+    writes scatter, as util.write_protocols infers. The element level is written
+    with its parent.
+
+    A workspace fused over the leading fields of the output which the loops
+    visit in storage order can take the writes which scatter, and stores one
+    slice of the rest of the output. The writes which scatter are counted
+    apart when that slice has at most workspace_limit entries, since only a
+    workspace so small can be reset and copied out cheaply.
+    """
+
+    class_key = "write"
+
+    def __init__(self, workspace_limit: float = 100_000):
+        self.workspace_limit = workspace_limit
+
+    @property
+    def n_features(self) -> int:
+        return 3
+
+    @property
+    def feature_names(self) -> tuple[str, ...]:
+        return ("sequential_writes", "scatter_writes", "workspace_writes")
+
+    def to_json(self) -> dict[str, Any]:
+        return {**super().to_json(), "workspace_limit": self.workspace_limit}
+
+    def _from_json(self, data: Mapping[str, Any]) -> Self:
+        return type(self)(data["workspace_limit"])
+
+    def get_component_features(
+        self,
+        component: Prefix,
+        machine: StatsMachine[NS],
+    ) -> np.ndarray:
+        prefix, expr = component.prefix, component.expr
+        # Without output_vars, the output stores the fields of expr in order.
+        output_vars = component.output_vars
+        if output_vars is None:
+            output_vars = expr.fields()
+        features = np.zeros((1, self.n_features))
+        if not prefix or not output_vars:
+            return features
+        visits = None
+        for depth in range(len(output_vars)):
+            order = output_vars[: depth + 1]
+            # The level is reached by this prefix only if its last loop ends it.
+            if not set(order) <= set(prefix) or prefix[-1] not in order:
+                continue
+            if visits is None:
+                spaces = LoopSpaces(component, machine)
+                visits = spaces.count(spaces.visited())
+            if prefix == order:
+                features[0, 0] += visits
+            elif self.workspace_size(prefix, output_vars, expr, machine) <= (
+                self.workspace_limit
+            ):
+                features[0, 2] += visits
+            else:
+                features[0, 1] += visits
+        return features
+
+    @staticmethod
+    def workspace_size(prefix, output_vars, expr, machine) -> float:
+        """
+        The entries of a slice of a workspace fused over the leading fields of
+        output_vars which prefix visits in order: the product of the dimensions
+        of the rest. A field which no table has, such as a unit dimension of the
+        output alone, has one index.
+        """
+        fused = 0
+        while (
+            fused < len(prefix)
+            and prefix[fused : fused + 1] == output_vars[fused : fused + 1]
+        ):
+            fused += 1
+        dims = {}
+        for node in PostOrderDFS(expr):
+            match node:
+                case Table():
+                    dims.update(machine(node).dim_sizes)
+        return float(np.prod([dims.get(idx, 1) for idx in output_vars[fused:]]))
+
+
 # Allocations are weighted 10x reads and operations, a lookup costs as much as
-# an iteration, and dense iterations are free until the model is fitted.
+# an iteration, dense iterations are free until the model is fitted, and a
+# write which scatters costs 10 iterations more than one in order, as it does
+# into a hash level, which most sparse outputs need for it.
 LOOP_COST_MODEL = LinearCostModel(
-    Concat(PigeonBasis(), TransposeBasis()), [1.0, 1.0, 10.0, 1.0, 0.0, 0.5, 60.0]
+    Concat(PigeonBasis(), TransposeBasis(), WriteBasis()),
+    [1.0, 1.0, 10.0, 1.0, 0.0, 0.5, 60.0, 0.0, 10.0, 10.0],
+)
+# A small workspace takes the writes of a query which scatter, as a dense level
+# or a byte map does, almost as cheaply as those in order. Without one, they
+# cost as much as they do without workspaces.
+WORKSPACE_LOOP_COST_MODEL = LinearCostModel(
+    Concat(PigeonBasis(), TransposeBasis(), WriteBasis()),
+    [1.0, 1.0, 10.0, 1.0, 0.0, 0.5, 60.0, 0.0, 10.0, 1.0],
 )

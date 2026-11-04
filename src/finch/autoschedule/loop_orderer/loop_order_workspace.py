@@ -1,18 +1,7 @@
 from __future__ import annotations
 
-from collections import OrderedDict
-from collections.abc import Sequence
-
-from finch.algebra import AbstractFillFType, FType
 from finch.algebra.tensor import TensorFType
-from finch.autoschedule.cost_models import CostModel, LevelChoice, LevelOption, Prefix
-from finch.autoschedule.formatter.smart_formatter import (
-    LEVEL_OPTIONS,
-    WORKSPACE_COST_MODEL,
-    optimize_format,
-    stored_shape_types,
-)
-from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
+from finch.autoschedule.cost_models import WORKSPACE_LOOP_COST_MODEL, CostModel, Prefix
 from finch.autoschedule.util import flatten_plans, fuse_loop_order
 from finch.finch_logic import (
     Alias,
@@ -29,7 +18,7 @@ from finch.finch_logic import (
     Table,
     TensorStats,
 )
-from finch.symbolic import Namespace
+from finch.symbolic import Namespace, PostOrderDFS
 
 from .loop_order_bnb import BFSLoopOrderer
 from .loop_ordering import with_copy_loop_orders
@@ -114,13 +103,12 @@ def add_workspace(
 
 class WorkspaceLoopOrderer(BFSLoopOrderer):
     """
-    Search for the loop order of each query like BFSLoopOrderer, then redirect
-    each query whose loop order scatters into its output into a workspace fused
-    over the fields it writes in order, when that costs less. The workspace is
-    copied into the output in order after each slice. A workspace costs less
-    when the cheapest formats of the workspace and of the output it is copied
-    into cost less under format_cost_model than the cheapest format of the
-    output alone. The formatter then chooses the formats.
+    Search for the loop order of each query like BFSLoopOrderer, pricing the
+    writes which scatter into an output by WORKSPACE_LOOP_COST_MODEL, as cheaply
+    as a workspace takes them. Then redirect each query whose loop order
+    scatters into its output into a workspace fused over the fields it writes
+    in order, which is copied into the output in order after each slice. The
+    formatter chooses the format of each workspace.
     """
 
     def __init__(
@@ -129,31 +117,10 @@ class WorkspaceLoopOrderer(BFSLoopOrderer):
         *,
         k: int | None = None,
         cost_model: CostModel[Prefix] | None = None,
-        format_cost_model: CostModel[LevelChoice] = WORKSPACE_COST_MODEL,
-        format_options: Sequence[LevelOption] = LEVEL_OPTIONS,
     ):
+        if cost_model is None:
+            cost_model = WORKSPACE_LOOP_COST_MODEL
         super().__init__(ctx, k=k, cost_model=cost_model)
-        self.format_cost_model = format_cost_model
-        self.format_options = format_options
-
-    def format_cost(
-        self,
-        alias: Alias,
-        term: LogicStatement,
-        machine: StatsMachine,
-        fill_type: AbstractFillFType,
-        shape_type: tuple[FType, ...],
-    ) -> float:
-        cost, _ = optimize_format(
-            alias,
-            shape_type,
-            machine,
-            fill_type,
-            self.format_cost_model,
-            term,
-            self.format_options,
-        )
-        return cost
 
     def add_workspaces(
         self,
@@ -162,30 +129,20 @@ class WorkspaceLoopOrderer(BFSLoopOrderer):
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ) -> Plan:
-        # The format costs need the loop order of every query, copies included.
+        # Copies are given their loop orders first, so that a copy in order
+        # isn't mistaken for one which scatters.
         prgm = with_copy_loop_orders(flatten_plans(prgm))
-        initial = StatsMachine(stats_factory, OrderedDict(stats))
-        stored = stored_shape_types(
-            prgm, bindings, StatsMachine(stats_factory, OrderedDict(stats))
-        )
-        fill_types = prgm.infer_fill_type(
-            {var: val.fill_type for var, val in bindings.items()}
-        )
         spc = Namespace(prgm)
-        for alias, shape_type in stored.items():
+        outputs: dict[HardAlias, None] = {}
+        for node in PostOrderDFS(prgm):
+            match node:
+                case Query(Table(HardAlias() as lhs, _), _) if lhs not in bindings:
+                    outputs[lhs] = None
+        for alias in outputs:
             depth = workspace_depth(prgm, alias)
-            if depth is None:
-                continue
-            assert isinstance(alias, HardAlias)
-            ws = HardAlias(spc.freshen(alias.name, "ws"))
-            staged = add_workspace(prgm, alias, depth, ws)
-            assert isinstance(staged, Plan)
-            fill_type = fill_types[alias]
-            direct = self.format_cost(alias, prgm, initial, fill_type, shape_type)
-            copied = self.format_cost(alias, staged, initial, fill_type, shape_type)
-            written = self.format_cost(
-                ws, staged, initial, fill_type, shape_type[depth:]
-            )
-            if copied + written < direct:
+            if depth is not None:
+                ws = HardAlias(spc.freshen(alias.name, "ws"))
+                staged = add_workspace(prgm, alias, depth, ws)
+                assert isinstance(staged, Plan)
                 prgm = staged
         return prgm

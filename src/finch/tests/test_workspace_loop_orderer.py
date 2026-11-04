@@ -2,9 +2,10 @@ import numpy as np
 
 import finch as fl
 from finch import ffuncs
-from finch.algebra import TensorFType
+from finch.algebra import StaticFillFType, TensorFType
 from finch.autoschedule import CompilerFormLowerer, NotationGenerator
 from finch.autoschedule.capture import LogicCapture
+from finch.autoschedule.cost_models import Prefix, WriteBasis
 from finch.autoschedule.formatter.smart_formatter import WorkspaceCostFormatter
 from finch.autoschedule.loop_orderer import BFSLoopOrderer, WorkspaceLoopOrderer
 from finch.autoschedule.loop_orderer.loop_order_workspace import (
@@ -12,7 +13,13 @@ from finch.autoschedule.loop_orderer.loop_order_workspace import (
     workspace_depth,
 )
 from finch.autoschedule.stages import LoopOrderedForm
-from finch.autoschedule.tensor_stats import DCStatsFactory
+from finch.autoschedule.tensor_stats import (
+    BaseTensorStats,
+    DCStatsFactory,
+    UniformStatsFactory,
+)
+from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
+from finch.autoschedule.tensor_stats.uniform_stats import UniformStats
 from finch.autoschedule.util import fuse_loop_order
 from finch.codegen import NumbaCompiler
 from finch.compile import NotationCompiler
@@ -48,14 +55,16 @@ def _matmul(c, a, b, loop_order=()):
     return Plan((query, Produces((c,)))), rhs
 
 
-def _block_matmul(n, m):
-    # Every row of a reads the same m rows of b, so the n * m * m products land
-    # on only n * m entries of the output.
-    data_a = np.zeros((n, n))
-    data_a[:, :m] = 1
-    data_b = np.zeros((n, n))
-    data_b[:m, :m] = np.arange(1, m * m + 1).reshape(m, m)
-    return data_a, data_b
+def _sparse_matmul(n, per_row, seed=0):
+    # Two n by n matrices with per_row entries in each row, in random columns.
+    rng = np.random.default_rng(seed)
+    data = []
+    for _ in range(2):
+        mat = np.zeros((n, n))
+        for row in range(n):
+            mat[row, rng.choice(n, per_row, replace=False)] = rng.random(per_row)
+        data.append(mat)
+    return data
 
 
 def test_workspace_depth_counts_the_fields_written_in_order():
@@ -135,7 +144,7 @@ def _order(orderer_cls, data_a, data_b):
 def test_workspace_loop_orderer_accumulates_rows_in_a_workspace():
     i, j, k = Field("i"), Field("j"), Field("k")
     c = HardAlias("c")
-    data_a, data_b = _block_matmul(64, 2)
+    data_a, data_b = _sparse_matmul(64, 3)
 
     # The search scatters into the columns of c, for each of its rows.
     capture = _order(BFSLoopOrderer, data_a, data_b)
@@ -145,7 +154,8 @@ def test_workspace_loop_orderer_accumulates_rows_in_a_workspace():
         case prgm:
             raise AssertionError(f"Expected the loop order (i, j, k): {prgm}")
 
-    # Copies are propagated before the workspace is added, so its copy stays.
+    # Copies are propagated before the workspace is added, so its copy stays,
+    # and the writes scatter into a workspace for each row instead.
     capture = _order(WorkspaceLoopOrderer, data_a, data_b)
     match capture.last_prgm:
         case Plan(
@@ -180,14 +190,51 @@ def test_workspace_loop_orderer_accumulates_rows_in_a_workspace():
         NumbaCompiler(), ctx_transforms=(LowerPackedStructSlots(), AssemblySimplify())
     )
     (result,) = compiler(program).main(*bindings)
-    np.testing.assert_array_equal(result.to_scipy().toarray(), data_a @ data_b)
+    np.testing.assert_allclose(result.to_scipy().toarray(), data_a @ data_b)
 
 
-def test_workspace_loop_orderer_writes_dense_outputs_directly():
-    # The search scatters into the columns of c, but c is dense, so writing it
-    # directly costs less than copying a workspace into it.
+def test_workspace_loop_orderer_writes_in_order_without_a_workspace():
+    # The product of dense matrices is cheapest as an inner product, which
+    # writes c in order, so it needs no workspace.
     rng = np.random.default_rng(0)
     data_a, data_b = rng.random((8, 8)), rng.random((8, 8))
     ordered = _order(BFSLoopOrderer, data_a, data_b).last_prgm
-    assert workspace_depth(ordered, HardAlias("c")) == 1
+    assert workspace_depth(ordered, HardAlias("c")) is None
     assert _order(WorkspaceLoopOrderer, data_a, data_b).last_prgm == ordered
+
+
+def test_only_small_workspaces_make_scattered_writes_cheap():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b = HardAlias("a"), HardAlias("b")
+    fill = StaticFillFType(np.float64(0.0))
+    n = 1000
+    stats: dict[Alias, TensorStats] = {
+        a: UniformStats(BaseTensorStats((i, j), {i: n, j: n}, fill), nnz=4 * n),
+        b: UniformStats(BaseTensorStats((j, k), {j: n, k: n}, fill), nnz=4 * n),
+    }
+    _, rhs = _matmul(HardAlias("c"), a, b)
+    basis = WriteBasis(workspace_limit=100_000)
+    machine = StatsMachine(UniformStatsFactory(), dict(stats))
+
+    def writes(order):
+        rows = [
+            basis.get_component_features(Prefix(order[:n], rhs, (i, k)), machine)
+            for n in range(len(order) + 1)
+        ]
+        totals = np.concatenate(rows).sum(axis=0)
+        return dict(zip(basis.feature_names, totals > 0, strict=True))
+
+    # Gustavson writes the rows of c in order, so a workspace for one row of n
+    # entries takes the writes which scatter.
+    assert writes((i, j, k)) == {
+        "sequential_writes": True,
+        "scatter_writes": False,
+        "workspace_writes": True,
+    }
+    # An outer product scatters from the outermost loop, so its workspace would
+    # hold all n * n entries of c.
+    assert writes((j, i, k)) == {
+        "sequential_writes": False,
+        "scatter_writes": True,
+        "workspace_writes": False,
+    }
