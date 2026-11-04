@@ -29,7 +29,13 @@ from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.autoschedule.util import fuse_loop_order
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.finch_logic import Alias, Field, HardAlias, Plan, Produces, Query, Table
-from scripts.fitting.generate_physical_data import examples, load, materialize, path
+from scripts.fitting.generate_physical_data import (
+    examples,
+    load,
+    materialize,
+    path,
+    write_json,
+)
 from scripts.fitting.physical_bases import (
     format_ftype,
     input_perms,
@@ -137,7 +143,7 @@ class Timer:
                 if tns in perms
             }
             runtimes[str(index)] = self.measure(plan, formats, bindings)
-            timing_path.write_text(json.dumps({"runtimes": runtimes}))
+            write_json(timing_path, {"runtimes": runtimes})
         return runtimes
 
 

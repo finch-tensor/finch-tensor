@@ -463,6 +463,13 @@ def path(directory: Path, example, kind) -> Path:
     return directory / "data" / f"{example}.{kind}"
 
 
+def write_json(file: Path, data) -> None:
+    # A job killed while writing leaves the file as it was, rather than cut off.
+    partial = file.with_name(f"{file.name}.partial")
+    partial.write_text(json.dumps(data))
+    partial.replace(file)
+
+
 def examples(directory: Path, chunk=None, kind="program.json") -> list[str]:
     """
     The names of the examples in directory, or of those of one chunk, which

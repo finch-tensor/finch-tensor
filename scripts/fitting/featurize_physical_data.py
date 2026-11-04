@@ -23,7 +23,7 @@ import numpy as np
 
 from finch.autoschedule import protocolize
 from finch.autoschedule.cost_models import Basis, ElementLevelOption
-from scripts.fitting.generate_physical_data import examples, load, path
+from scripts.fitting.generate_physical_data import examples, load, path, write_json
 from scripts.fitting.kronecker_stats import KroneckerStatsFactory
 from scripts.fitting.physical_bases import (
     BASES,
@@ -89,8 +89,9 @@ def featurize_example(directory: Path, example, names, models) -> dict[str, list
         for name in names:
             rows[name].append(found[name])
     for name, basis in bases.items():
-        path(directory, example, features_kind(name)).write_text(
-            json.dumps(basis.features_to_json(rows[name]))
+        write_json(
+            path(directory, example, features_kind(name)),
+            basis.features_to_json(rows[name]),
         )
     return rows
 
