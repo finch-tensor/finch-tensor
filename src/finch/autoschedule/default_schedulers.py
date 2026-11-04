@@ -29,6 +29,7 @@ from .factorizer.optimize import DefaultLogicFactorizer
 from .formatter import DefaultLogicFormatter, FDFormatter, GalleyFormatter
 from .loop_orderer import BFSLoopOrderer, DefaultLoopOrderer
 from .normalize import LogicNormalizer
+from .protocolize import CostProtocolizer
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
@@ -172,7 +173,9 @@ COMPILE_JULIA_GALLEY = LogicNormalizer(
             LogicSimplify(
                 BFSLoopOrderer(
                     GalleyFormatter(
-                        CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
+                        CostProtocolizer(
+                            CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
+                        )
                     )
                 )
             )

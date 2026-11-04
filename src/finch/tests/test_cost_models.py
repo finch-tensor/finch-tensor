@@ -13,6 +13,7 @@ from finch.algebra import TensorFType
 from finch.autoschedule.cost_models import (
     FLOPS_COST_MODEL,
     LOOP_COST_MODEL,
+    PROTOCOL_COST_MODEL,
     Affine,
     Basis,
     ByKind,
@@ -147,6 +148,7 @@ def test_stratify_fits_separate_coefficients_per_regime(rng):
         FLOPS_COST_MODEL,
         LOOP_COST_MODEL,
         LinearCostModel(Affine(PigeonBasis()), np.arange(6)),
+        PROTOCOL_COST_MODEL,
         LinearCostModel(
             Affine(ByKind({"dense": Affine(LevelBasis(DenseLevelOption))})),
             np.arange(10),

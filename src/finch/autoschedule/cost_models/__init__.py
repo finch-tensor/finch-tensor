@@ -43,11 +43,23 @@ from .loop_cost_models import (
     TransposeBasis,
     prefixes,
 )
+from .protocol_cost_models import (
+    PROTOCOL_BASIS,
+    PROTOCOL_COST_MODEL,
+    READ_PROTOCOLS,
+    ProtocolBasis,
+    ProtocolChoice,
+    level_reads,
+    read_options,
+)
 
 __all__ = [
     "FLOPS_COST_MODEL",
     "LOOP_COST_MODEL",
     "LOOP_DEPTH_COST_MODEL",
+    "PROTOCOL_BASIS",
+    "PROTOCOL_COST_MODEL",
+    "READ_PROTOCOLS",
     "Affine",
     "Basis",
     "ByKind",
@@ -67,6 +79,8 @@ __all__ = [
     "LoopDepthBasis",
     "PigeonBasis",
     "Prefix",
+    "ProtocolBasis",
+    "ProtocolChoice",
     "Quadratic",
     "RowMap",
     "Serializable",
@@ -79,7 +93,9 @@ __all__ = [
     "allowed_options",
     "level_formats",
     "level_options",
+    "level_reads",
     "prefixes",
+    "read_options",
     "write_protocol",
     "write_protocols",
 ]
