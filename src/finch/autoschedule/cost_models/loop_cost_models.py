@@ -1,11 +1,10 @@
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
-from typing import Generic
+from dataclasses import dataclass, field
+from typing import Any, Generic
 
 import numpy as np
 
 from finch.algebra import ffuncs
-from finch.algebra.tensor import TensorFType
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
@@ -36,55 +35,69 @@ from .cost_models import NS, Basis, Concat, LinearCostModel
 class Prefix:
     """
     An outermost-first loop prefix of expr, the right-hand side of a query.
-    output_vars orders the output of the query, when there is one.
+    output_vars orders the output of the query, when there is one, and
+    formats, which bases that price formatted tensors need, lists the level
+    options each alias stores, outermost first, as FormatBasis takes them.
     """
 
     prefix: tuple[Field, ...]
     expr: LogicExpression
     output_vars: tuple[Field, ...] | None = None
+    formats: Mapping[Alias, Any] | None = field(default=None, compare=False, hash=False)
+
+
+def prefixes(
+    term: LogicStatement,
+    machine: StatsMachine[NS],
+    loop_order: tuple[Field, ...] = (),
+    formats: Mapping[Alias, Any] | None = None,
+) -> Iterator[Prefix]:
+    """
+    The loop prefixes of each query of term, including the empty prefix, in
+    query order and from the shortest to the longest, advancing machine past
+    each query after its prefixes. The loop order of a query is the fields of
+    its enclosing Fuse nodes. Each prefix carries formats.
+    """
+    match term:
+        case Plan(bodies):
+            for body in bodies:
+                yield from prefixes(body, machine, loop_order, formats)
+            return
+        case Fuse(idx, body):
+            yield from prefixes(body, machine, (*loop_order, idx), formats)
+            return
+        case QueryInto(Table(), _, Literal()):
+            machine(term)
+            return
+        case Produces():
+            return
+        case Query(Table(_, lhs_idxs), expr):
+            pass
+        case QueryInto(Table(_, lhs_idxs), _, _):
+            expr = term.as_query().rhs
+        case _:
+            raise ValueError(f"Unsupported statement type: {term}")
+
+    for n in range(len(loop_order) + 1):
+        yield Prefix(loop_order[:n], expr, lhs_idxs, formats)
+    machine(term)
 
 
 class LoopBasis(Basis[Prefix]):
     """
-    A basis where each loop prefix, including the empty prefix, is a component.
-    components yields prefixes in query order, from the shortest prefix to the
-    longest, and get_component_features returns one row for each prefix. The
-    loop order of a query is the fields of its enclosing Fuse nodes. Models
-    used with branch-and-bound loop search must predict nonnegative component
-    costs.
+    A basis where each loop prefix, including the empty prefix, is a component,
+    as prefixes yields them, and get_component_features returns one row for
+    each prefix. Models used with branch-and-bound loop search must predict
+    nonnegative component costs.
     """
 
     def components(
         self,
         term: LogicStatement,
-        bindings: Mapping[Alias, TensorFType],
+        bindings: Mapping[Alias, Any],
         machine: StatsMachine[NS],
-        loop_order: tuple[Field, ...] = (),
     ) -> Iterator[Prefix]:
-        match term:
-            case Plan(bodies):
-                for body in bodies:
-                    yield from self.components(body, bindings, machine, loop_order)
-                return
-            case Fuse(idx, body):
-                loop_order = (*loop_order, idx)
-                yield from self.components(body, bindings, machine, loop_order)
-                return
-            case QueryInto(Table(), _, Literal()):
-                machine(term)
-                return
-            case Produces():
-                return
-            case Query(Table(_, lhs_idxs), expr):
-                pass
-            case QueryInto(Table(_, lhs_idxs), _, _):
-                expr = term.as_query().rhs
-            case _:
-                raise ValueError(f"Unsupported statement type: {term}")
-
-        for n in range(len(loop_order) + 1):
-            yield Prefix(loop_order[:n], expr, lhs_idxs)
-        machine(term)
+        return prefixes(term, machine, formats=bindings)
 
 
 class LoopSpaces(Generic[NS]):
@@ -171,18 +184,23 @@ class LoopSpaces(Generic[NS]):
 
 class PigeonBasis(LoopBasis, LoopOrderedForm):
     """
-    PigeonBasis counts iteration, operation, output, and lookup costs across
-    loop prefixes. Each table reads the field of a loop with its protocol for
-    that field, and a table without protocols walks it.
+    PigeonBasis counts iteration, operation, output, lookup, and dense
+    iteration costs across loop prefixes. Each table reads the field of a loop
+    with its protocol for that field, and a table without protocols walks it.
+    The dense iterations of a loop are those it would make if its tables were
+    dense, so that none could restrict it: its whole extent, wherever its
+    enclosing loops run.
     """
+
+    class_key = "pigeon"
 
     @property
     def n_features(self) -> int:
-        return 4
+        return 5
 
     @property
     def feature_names(self) -> tuple[str, ...]:
-        return ("iterations", "operations", "outputs", "lookups")
+        return ("iterations", "operations", "outputs", "lookups", "dense_iterations")
 
     def get_component_features(
         self,
@@ -219,7 +237,9 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
                 )
             out_space = stats_factory.reorder(out_space, output_vars)
         if not prefix:
-            return np.array([[0.0, 0.0, out_space.estimate_non_fill_values(), 0.0]])
+            return np.array(
+                [[0.0, 0.0, out_space.estimate_non_fill_values(), 0.0, 0.0]]
+            )
         spaces = LoopSpaces(component, machine)
         idx = spaces.idx
         exec_space = spaces.exec_space
@@ -258,6 +278,7 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
                     exec_space.estimate_non_fill_values() * len(inputs),
                     out_cost,
                     lookup_cost,
+                    spaces.count(exec_space),
                 ]
             ]
         )
@@ -267,6 +288,8 @@ class TransposeBasis(LoopBasis, LoopOrderedForm):
     """
     Count dense and sparse transposed entries, charging each input once per query.
     """
+
+    class_key = "transpose"
 
     @property
     def n_features(self) -> int:
@@ -313,8 +336,8 @@ class TransposeBasis(LoopBasis, LoopOrderedForm):
         return features
 
 
-# Allocations are weighted 10x reads and operations, and a lookup costs as
-# much as an iteration.
+# Allocations are weighted 10x reads and operations, a lookup costs as much as
+# an iteration, and dense iterations are free until the model is fitted.
 LOOP_COST_MODEL = LinearCostModel(
-    Concat(PigeonBasis(), TransposeBasis()), [1.0, 1.0, 10.0, 1.0, 0.5, 60.0]
+    Concat(PigeonBasis(), TransposeBasis()), [1.0, 1.0, 10.0, 1.0, 0.0, 0.5, 60.0]
 )

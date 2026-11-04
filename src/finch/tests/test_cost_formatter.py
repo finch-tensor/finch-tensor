@@ -366,13 +366,48 @@ def test_format_access_features_separate_sequential_and_scatter():
             LevelChoice(prgm, A, depth, (1.0,), option, np.dtype(np.intp).itemsize),
             machine,
         )
-        return tuple(features.sum(axis=0)[-4:] > 0)
+        return tuple(features.sum(axis=0)[-6:] > 0)
 
-    # Reading A in loop order walks its levels, and looks up its values.
+    # Reading A in loop order visits its levels at their own loops, densely
+    # or not, and steps through their entries, and looks up its values.
     # Writing A is sequential at i, but the k loop makes it scatter at j.
-    assert accessed(0, DenseLevelOption()) == (True, False, True, False)
-    assert accessed(1, DenseLevelOption()) == (True, False, False, True)
-    assert accessed(2, ElementLevelOption()) == (False, True, False, True)
+    read = (True, True, True, False)
+    assert accessed(0, DenseLevelOption()) == (*read, True, False)
+    assert accessed(1, DenseLevelOption()) == (*read, False, True)
+    assert accessed(2, ElementLevelOption()) == (False, False, False, True, False, True)
+    assert accessed(0, SparseHashLevelOption()) == (*read, True, False)
+
+
+@pytest.mark.parametrize(
+    ("op", "scatters"), [(ffuncs.overwrite, False), (ffuncs.add, True)]
+)
+def test_format_access_features_scatter_reductions_into_a_level(op, scatters):
+    i, j = Field("i"), Field("j")
+    X, A = HardAlias("X"), HardAlias("A")
+    stats_factory = DCStatsFactory()
+    ones = fl.asarray(np.ones((3, 3)))
+    machine = StatsMachine(stats_factory, {X: stats_factory(ones, (i, j))})
+    copy = Query(
+        Table(A, (i, j)),
+        Aggregate(Literal(ffuncs.add), Literal(0.0), Table(X, (i, j)), ()),
+    )
+    update = QueryInto(Table(A, (i, j)), Literal(op), Table(X, (i, j)))
+    prgm = Plan(
+        (
+            fuse_loop_order(copy, (i, j)),
+            fuse_loop_order(update, (i, j)),
+            Produces((A,)),
+        )
+    )
+    features = LevelBasis(DenseLevelOption).get_component_features(
+        LevelChoice(prgm, A, 0, (1.0,), DenseLevelOption(), 8), machine
+    )
+    # Both queries write A in order, but an update which reduces into A
+    # laminates what it stores, as write_protocols says.
+    assert write_protocols(A, 0, prgm) == (
+        {Extrude(), Laminate()} if scatters else {Extrude()}
+    )
+    assert tuple(features.sum(axis=0)[-2:] > 0) == (True, scatters)
 
 
 def test_format_access_features_reach_a_level_through_its_parents():
@@ -394,13 +429,15 @@ def test_format_access_features_reach_a_level_through_its_parents():
             LevelChoice(prgm, X, depth, (1.0,), option, np.dtype(np.intp).itemsize),
             machine,
         )
-        return tuple(features.sum(axis=0)[-4:-2])
+        return tuple(features.sum(axis=0)[-6:-2])
 
-    # The k level and the values of X are reached through i, so each of the 9
-    # iterations reads them, out of order.
-    assert reads(0, DenseLevelOption()) == (9, 0)
-    assert reads(1, DenseLevelOption()) == (0, 9)
-    assert reads(2, ElementLevelOption()) == (0, 9)
+    # The i level is visited at its own loop, which steps through its 9
+    # entries over the iterations of k, while the k level and the values of X
+    # are reached through i, so each of the 9 iterations looks them up.
+    assert reads(0, SparseHashLevelOption()) == (9, 9, 9, 0)
+    assert reads(0, DenseLevelOption()) == (9, 9, 9, 0)
+    assert reads(1, DenseLevelOption()) == (0, 0, 0, 9)
+    assert reads(2, ElementLevelOption()) == (0, 0, 0, 9)
 
 
 def test_fused_alias_levels_describe_the_largest_slice():
@@ -449,9 +486,10 @@ def test_inputs_are_formatted_from_their_bindings():
         (2, (4.0,)),
     ]
     features = basis.get_component_features(dense, StatsMachine(sf, dict(stats)))
-    # The binding allocates the level once, and the copy reads it in order.
+    # The binding allocates the level once, and the copy visits it at its own
+    # loop.
     assert features.shape[0] == 2
-    assert tuple(features[1, -4:] > 0) == (True, False, False, False)
+    assert tuple(features[1, -6:] > 0) == (True, True, True, False, False, False)
 
 
 def test_format_costs_sum_the_union_of_each_block():
@@ -490,16 +528,20 @@ def test_format_costs_sum_the_union_of_each_block():
     choice = LevelChoice(plan, out, 0, (1.0, 1.0), SparseHashLevelOption(), size)
     features = basis.get_component_features(choice, machine)
     # An allocation row for each block, then a write row for each query.
-    assert features.shape == (5, 8)
+    assert features.shape == (5, 10)
     np.testing.assert_array_equal(
         features[:2, :4], [[1, n, 2 * size, n * size] for n in nnz]
     )
     assert not features[:2, 4:].any()
     assert not features[2:, :4].any()
-    assert (features[2:, 6] > 0).all()
+    # The definitions write out in order, and the update reduces into what it
+    # stores, which laminates it.
+    np.testing.assert_array_equal(
+        features[2:, 8:] > 0, [[True, False], [False, True], [True, False]]
+    )
 
 
-def test_format_access_features_walk_or_look_up_a_level():
+def test_format_access_features_ignore_protocols():
     i = Field("i")
     X, Y, C = HardAlias("X"), HardAlias("Y"), HardAlias("C")
     sf = DCStatsFactory()
@@ -522,12 +564,13 @@ def test_format_access_features_walk_or_look_up_a_level():
         features = LevelBasis(DenseLevelOption).get_component_features(
             LevelChoice(prgm, Y, 0, (1.0,), DenseLevelOption(), 8), machine
         )
-        return tuple(features.sum(axis=0)[-4:-2])
+        return tuple(features.sum(axis=0)[-6:-2])
 
-    # A walk of Y steps through its 4 entries, while a follow looks it up where
-    # X stores its 1.
-    assert reads(Walk()) == (4, 0)
-    assert reads(Follow()) == (0, 1)
+    # Y is visited where X stores its 1, even if Y were dense, and stores the
+    # 4 entries a walk would step through, whatever protocol it is read with.
+    assert reads(Walk()) == (1, 1, 4, 0)
+    assert reads(Follow()) == (1, 1, 4, 0)
+    assert reads(DefaultProtocol()) == (1, 1, 4, 0)
 
 
 def test_dense_levels_are_only_followed():
@@ -546,27 +589,30 @@ def test_dense_levels_are_only_followed():
             )
         )
 
-    assert read_protocols(b, 0, plan(())) == {DefaultProtocol()}
+    # A default read takes whichever protocol the level supports, so it
+    # constrains nothing, but a walk rules a dense level out.
+    assert read_protocols(b, 0, plan(())) == set()
     assert read_protocols(b, 0, plan((Follow(),))) == {Follow()}
-    # A default read walks b, so b can't be dense.
+    assert read_protocols(b, 0, plan((Walk(),))) == {Walk()}
     formatter = CostFormatter(options=(DenseLevelOption(),))
     shape_type = (fl.ftype(np.intp),)
     with pytest.raises(ValueError, match="No level option supports"):
         formatter.get_tensor_ftype(
             b,
-            plan(()),
+            plan((Walk(),)),
             StatsMachine(sf, dict(stats)),
             tensor.ftype.fill_type,
             shape_type,
         )
-    fmt = formatter.get_tensor_ftype(
-        b,
-        plan((Follow(),)),
-        StatsMachine(sf, dict(stats)),
-        tensor.ftype.fill_type,
-        shape_type,
-    )
-    assert isinstance(fmt.lvl_t, fl.DenseLevelFType)
+    for protocols in ((), (Follow(),)):
+        fmt = formatter.get_tensor_ftype(
+            b,
+            plan(protocols),
+            StatsMachine(sf, dict(stats)),
+            tensor.ftype.fill_type,
+            shape_type,
+        )
+        assert isinstance(fmt.lvl_t, fl.DenseLevelFType)
 
 
 def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
@@ -578,8 +624,7 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
     plan = Plan(
         (
             fuse_loop_order(Query(Table(b, (i,)), Table(a, (i,))), (i,)),
-            # b is followed, so that it can be dense.
-            fuse_loop_order(Query(Table(c, (i,)), Table(b, (i,), (Follow(),))), (i,)),
+            fuse_loop_order(Query(Table(c, (i,)), Table(b, (i,))), (i,)),
             Produces((c,)),
         )
     )
@@ -589,16 +634,21 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
     }
     basis = ByKind(bases)
     cost = LinearCostModel(
-        ByKind({kind: Quadratic(sub) for kind, sub in bases.items()}), np.ones(85)
+        ByKind({kind: Quadratic(sub) for kind, sub in bases.items()}), np.ones(145)
     )
     formats: dict[Alias, list[LevelOption]] = {
         b: [DenseLevelOption(), ElementLevelOption()]
     }
     features = basis.get_features(plan, formats, stats, sf)
-    # Allocation, write, and lookup rows for both the dense and element levels.
-    assert features.shape == (6, 13)
-    np.testing.assert_array_equal(features[1:3, 3:7], [[0, 0, 3, 0], [0, 3, 0, 0]])
-    np.testing.assert_array_equal(features[4:6, 9:13], [[0, 0, 3, 0], [0, 3, 0, 0]])
+    # Allocation, write, and read rows for both the dense and element levels:
+    # the dense level is visited, and the values are looked up.
+    assert features.shape == (6, 17)
+    np.testing.assert_array_equal(
+        features[1:3, 3:9], [[0, 0, 0, 0, 3, 0], [3, 3, 3, 0, 0, 0]]
+    )
+    np.testing.assert_array_equal(
+        features[4:6, 11:17], [[0, 0, 0, 0, 3, 0], [0, 0, 0, 3, 0, 0]]
+    )
     expected = sum(row.sum() ** 2 for row in features)
     assert cost.predict_cost(plan, formats, stats, sf) == expected
     machine = StatsMachine(sf, dict(stats))
@@ -613,7 +663,7 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
             (1, (3,), ElementLevelOption()),
         )
     )
-    assert cost.get_features(Plan(()), {}, {}, sf).shape == (0, 85)
+    assert cost.get_features(Plan(()), {}, {}, sf).shape == (0, 145)
     assert cost.predict_cost(Plan(()), {}, {}, sf) == 0.0
     formatter = CostFormatter(cost_model=cost, options=(DenseLevelOption(),))
     fmt = formatter.get_tensor_ftype(

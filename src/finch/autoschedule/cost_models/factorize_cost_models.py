@@ -66,6 +66,8 @@ class FlopsBasis(FactorizeBasis, AliasedForm):
     query, and in the output it materializes. Each query is a component.
     """
 
+    class_key = "flops"
+
     @property
     def n_features(self) -> int:
         return 2
@@ -142,6 +144,8 @@ class LoopDepthBasis(FactorizeBasis, AliasedForm):
     search reduces the indices which keep the deepest loop nest shallow. It
     needs only the shapes of its statistics. Each query is a component.
     """
+
+    class_key = "loop_depth"
 
     @property
     def n_features(self) -> int:

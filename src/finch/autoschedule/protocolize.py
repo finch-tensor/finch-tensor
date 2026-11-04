@@ -1,13 +1,24 @@
+from collections import OrderedDict
 from collections.abc import Mapping
+from functools import partial
 
 from finch import finch_logic as lgc
 from finch.algebra import TensorFType
 from finch.finch_assembly import AssemblyLibrary
 from finch.finch_logic import LogicLoader, StatsFactory, TensorStats
-from finch.symbolic import PostWalk, PreWalk, Rewrite
+from finch.symbolic import PostOrderDFS, PostWalk, PreWalk, Rewrite
 
 from .compiler import lower_protocol
+from .cost_models import (
+    PROTOCOL_COST_MODEL,
+    CostModel,
+    Prefix,
+    level_formats,
+    level_reads,
+    read_options,
+)
 from .stages import FormattedForm
+from .tensor_stats.stats_interpreter import StatsMachine
 
 _PROTOCOLS = (lgc.DefaultProtocol(), lgc.Walk(), lgc.Gallop(), lgc.Follow())
 
@@ -73,3 +84,139 @@ class LogicProtocolizer(FormattedForm, LogicLoader):
         stats_factory: StatsFactory,
     ) -> tuple[AssemblyLibrary, dict[lgc.Alias, TensorFType]]:
         return self.ctx(protocolize(prgm, bindings), bindings, stats, stats_factory)
+
+
+def with_protocol(
+    expr: lgc.LogicExpression,
+    tns: lgc.Alias,
+    idxs: tuple[lgc.Field, ...],
+    depth: int,
+    protocol: lgc.Protocol,
+) -> lgc.LogicExpression:
+    """expr, where each table of tns and idxs reads its level at a zero-based
+    stored depth with protocol."""
+
+    def read(node):
+        match node:
+            case lgc.Table(tns_2, idxs_2, protocols) if (tns_2, idxs_2) == (tns, idxs):
+                protocols_2: list[lgc.Protocol] = [*protocols] or [
+                    lgc.DefaultProtocol()
+                ] * len(idxs)
+                protocols_2[tns.nfused + depth] = protocol
+                return lgc.Table(tns, idxs, tuple(protocols_2))
+        return None
+
+    return Rewrite(PostWalk(read))(expr)
+
+
+def optimize_protocols(
+    prgm: lgc.LogicStatement,
+    bindings: Mapping[lgc.Alias, TensorFType],
+    stats: Mapping[lgc.Alias, TensorStats],
+    stats_factory: StatsFactory,
+    cost_model: CostModel[Prefix] = PROTOCOL_COST_MODEL,
+) -> lgc.LogicStatement:
+    """
+    Read each level of each formatted tensor of bindings with the protocol
+    which costs least under cost_model, of those the level supports under the
+    loop order of its query, as read_options lists them. The reads at a loop
+    share its iteration space, so they are chosen in turn, from the outermost
+    loop to the innermost, each given the protocols of the others. A read which
+    gives its protocol keeps it, and every other read keeps the default of its
+    level, as protocolize states it.
+    """
+    formats = level_formats(bindings)
+    given = set()
+    for node in PostOrderDFS(prgm):
+        match node:
+            case lgc.Table(tns, idxs, protocols):
+                given.update(
+                    (tns, idxs, pos)
+                    for pos, proto in enumerate(protocols)
+                    if proto != lgc.DefaultProtocol()
+                )
+    prgm = protocolize(prgm, bindings)
+    machine = StatsMachine(stats_factory, OrderedDict(stats))
+
+    def cost(expr: lgc.LogicExpression, loops, lhs_idxs) -> float:
+        prefix = Prefix(loops, expr, lhs_idxs, formats)
+        return cost_model.predict_component_cost(prefix, machine)
+
+    def choose(stmt: lgc.Query | lgc.QueryInto, loop_order: tuple[lgc.Field, ...]):
+        """stmt, reading each level with the protocol which costs least."""
+        match stmt:
+            case lgc.Query(lgc.Table(_, lhs_idxs) as lhs, rhs):
+                rebuild = partial(lgc.Query, lhs)
+            case lgc.QueryInto(lgc.Table(_, lhs_idxs) as lhs, op, rhs):
+                rebuild = partial(lgc.QueryInto, lhs, op)
+
+        def expr(rhs: lgc.LogicExpression) -> lgc.LogicExpression:
+            # An update reduces into its table, as its aggregate query says.
+            match rebuild(rhs):
+                case lgc.QueryInto() as update:
+                    return update.as_query().rhs
+            return rhs
+
+        for n in range(1, len(loop_order) + 1):
+            loops = loop_order[:n]
+            reads = [
+                (read.alias, read.table.idxs, read.depth, read.option)
+                for read in level_reads(Prefix(loops, expr(rhs), lhs_idxs), formats)
+                if (read.alias, read.table.idxs, read.alias.nfused + read.depth)
+                not in given
+            ]
+            for tns, idxs, depth, option in reads:
+                candidates = [
+                    with_protocol(rhs, tns, idxs, depth, proto)
+                    for proto in read_options(
+                        option, idxs, tns.nfused, depth, loop_order
+                    )
+                ]
+                costs = [cost(expr(rhs_2), loops, lhs_idxs) for rhs_2 in candidates]
+                rhs = candidates[costs.index(min(costs))]
+        return rebuild(rhs)
+
+    def visit(stmt: lgc.LogicStatement, loop_order: tuple[lgc.Field, ...]):
+        match stmt:
+            case lgc.Plan(bodies):
+                return lgc.Plan(tuple(visit(body, loop_order) for body in bodies))
+            case lgc.Fuse(idx, body):
+                return lgc.Fuse(idx, visit(body, (*loop_order, idx)))
+            case lgc.Produces():
+                return stmt
+            case lgc.QueryInto(lgc.Table(), _, lgc.Literal()):
+                pass
+            case lgc.Query() | lgc.QueryInto():
+                stmt = choose(stmt, loop_order)
+            case _:
+                raise ValueError(f"Unsupported statement type: {stmt}")
+        machine(stmt)
+        return stmt
+
+    return visit(prgm, ())
+
+
+class CostProtocolizer(FormattedForm, LogicLoader):
+    """
+    Pass a program in FormattedForm to ctx, after choosing the protocol which
+    each table reads each level of its formatted tensor with, as
+    optimize_protocols does under cost_model.
+    """
+
+    def __init__(
+        self,
+        ctx: LogicLoader,
+        cost_model: CostModel[Prefix] = PROTOCOL_COST_MODEL,
+    ):
+        self.ctx = ctx
+        self.cost_model = cost_model
+
+    def lower(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> tuple[AssemblyLibrary, dict[lgc.Alias, TensorFType]]:
+        prgm = optimize_protocols(prgm, bindings, stats, stats_factory, self.cost_model)
+        return self.ctx(prgm, bindings, stats, stats_factory)

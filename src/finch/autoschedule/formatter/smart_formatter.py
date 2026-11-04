@@ -264,19 +264,21 @@ def linear_level_model(
 ) -> LinearCostModel[LevelChoice]:
     """
     A linear model of LEVEL_BASIS, from the coefficients of the storage features
-    of each option type, and of its walks, lookups, sequential writes, and
-    scatter writes. Accesses are free unless access gives their coefficients.
+    of each option type, and of its visits, dense visits, entries, lookups,
+    sequential writes, and scatter writes. Accesses are free unless access gives
+    their coefficients.
     """
     access = access or {}
     coefficients = [
-        [*storage[option], *access.get(option, (0, 0, 0, 0))]
+        [*storage[option], *access.get(option, (0,) * 6)]
         for option in map(LevelOption.kinds.__getitem__, LEVEL_BASIS.by_kind)
     ]
     return LinearCostModel(LEVEL_BASIS, np.concatenate(coefficients))
 
 
 # Each level option lists its storage features. The access features are
-# sequential reads, scatter reads, sequential writes, and scatter writes.
+# visits, dense visits, entries, lookups, sequential writes, and scatter
+# writes.
 ITER_COST_MODEL = linear_level_model(
     {
         DenseLevelOption: (0, 1, 0),
@@ -311,10 +313,10 @@ WORKSPACE_COST_MODEL = linear_level_model(
         ElementLevelOption: (0, 0),
     },
     {
-        DenseLevelOption: (1, 1, 1, 1),
-        SparseListLevelOption: (1, 8, 1, 0),
-        SparseHashLevelOption: (1, 4, 4, 4),
-        SparseByteMapLevelOption: (1, 1, 2, 2),
+        DenseLevelOption: (0, 0, 1, 1, 1, 1),
+        SparseListLevelOption: (0, 0, 1, 8, 1, 0),
+        SparseHashLevelOption: (0, 0, 1, 4, 4, 4),
+        SparseByteMapLevelOption: (0, 0, 1, 1, 2, 2),
     },
 )
 

@@ -160,7 +160,7 @@ def test_loop_search_minimizes_nonlinear_component_cost(search):
     arg = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), arg, (j,))
     basis = Concat(PigeonBasis(), TransposeBasis())
-    model = LinearCostModel(Quadratic(basis), np.ones(36))
+    model = LinearCostModel(Quadratic(basis), np.ones(49))
 
     def cost(order):
         query = fuse_loop_order(Query(Table(out, (i, k)), expr), order)

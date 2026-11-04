@@ -21,31 +21,28 @@ K = TypeVar("K", bound=Hashable)
 
 class Serializable:
     """
-    An object that to_json describes as a JSON-compatible dict with its type
-    name, which from_json reads back. Subclasses with state extend to_json and
-    override _from_json, which by default constructs the type with no
-    arguments.
+    An object which to_json describes as a JSON-compatible dict under the
+    class_key its class declares, and which from_json reads back as an object
+    of its own class, so that a model built in code loads data saved from one
+    of the same structure, and rejects data of any other class. Subclasses
+    with state extend to_json and override _from_json, which by default
+    constructs the class with no arguments.
     """
 
-    registry: ClassVar[dict[str, type]] = {}
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        Serializable.registry[cls.__name__] = cls
+    class_key: ClassVar[str]
 
     def to_json(self) -> dict[str, Any]:
-        return {"type": type(self).__name__}
+        return {"class_key": self.class_key}
 
-    @classmethod
-    def from_json(cls, data: Mapping[str, Any]) -> Self:
-        subclass = Serializable.registry[data["type"]]
-        if not issubclass(subclass, cls):
-            raise ValueError(f"Expected a {cls.__name__}, got {data['type']}")
-        return subclass._from_json(data)
+    def from_json(self, data: Mapping[str, Any]) -> Self:
+        if data.get("class_key") != self.class_key:
+            raise ValueError(
+                f"Expected {self.class_key} data, got {data.get('class_key')!r}"
+            )
+        return self._from_json(data)
 
-    @classmethod
-    def _from_json(cls, data: Mapping[str, Any]) -> Self:
-        return cls()
+    def _from_json(self, data: Mapping[str, Any]) -> Self:
+        return type(self)()
 
 
 class Basis(Serializable, Form, Generic[C]):
@@ -109,7 +106,6 @@ class Basis(Serializable, Form, Generic[C]):
         stats: Mapping[Alias, TensorStats],
         stats_factory: StatsFactory,
     ) -> np.ndarray:
-        """Return the rows of every component of term, in order."""
         machine = StatsMachine(stats_factory, dict(stats))
         features = [
             self.get_component_features(component, machine)
@@ -142,6 +138,8 @@ class Concat(Basis[C]):
     linear models of each basis.
     """
 
+    class_key = "concat"
+
     def __init__(self, *bases: Basis[C]):
         if not bases:
             raise ValueError(f"{type(self).__name__} requires at least one basis")
@@ -170,9 +168,18 @@ class Concat(Basis[C]):
     def to_json(self) -> dict[str, Any]:
         return {**super().to_json(), "bases": [b.to_json() for b in self.bases]}
 
-    @classmethod
-    def _from_json(cls, data: Mapping[str, Any]) -> Self:
-        return cls(*[Basis.from_json(b) for b in data["bases"]])
+    def _bases_from_json(self, data: Mapping[str, Any]) -> list[Basis[C]]:
+        if len(data["bases"]) != len(self.bases):
+            raise ValueError(
+                f"Expected {len(self.bases)} bases, got {len(data['bases'])}"
+            )
+        return [
+            basis.from_json(b)
+            for basis, b in zip(self.bases, data["bases"], strict=True)
+        ]
+
+    def _from_json(self, data: Mapping[str, Any]) -> Self:
+        return type(self)(*self._bases_from_json(data))
 
     def components(
         self,
@@ -198,8 +205,11 @@ class ByKind(Concat[C], Generic[C, K]):
     The features of each component under the basis of its kind, which key
     returns, by default the kind attribute of the component. The features of a
     component fill the columns of its basis, and the other columns are zero,
-    so a linear model has separate coefficients for each kind.
+    so a linear model has separate coefficients for each kind. The kinds and
+    key are part of the structure of the basis, so from_json keeps them.
     """
+
+    class_key = "by_kind"
 
     def __init__(
         self,
@@ -218,22 +228,9 @@ class ByKind(Concat[C], Generic[C, K]):
             for name in basis.feature_names
         )
 
-    def to_json(self) -> dict[str, Any]:
-        if self.key is not by_kind or not all(
-            isinstance(kind, str) for kind in self.by_kind
-        ):
-            raise ValueError(
-                f"{type(self).__name__} serializes only string kinds "
-                "with the default key"
-            )
-        return {
-            "type": type(self).__name__,
-            "bases": {kind: basis.to_json() for kind, basis in self.by_kind.items()},
-        }
-
-    @classmethod
-    def _from_json(cls, data: Mapping[str, Any]) -> Self:
-        return cls({kind: Basis.from_json(b) for kind, b in data["bases"].items()})
+    def _from_json(self, data: Mapping[str, Any]) -> Self:
+        bases = zip(self.by_kind, self._bases_from_json(data), strict=True)
+        return type(self)(dict(bases), self.key)
 
     def get_component_features(
         self,
@@ -278,9 +275,8 @@ class RowMap(Basis[C]):
     def to_json(self) -> dict[str, Any]:
         return {**super().to_json(), "basis": self.basis.to_json()}
 
-    @classmethod
-    def _from_json(cls, data: Mapping[str, Any]) -> Self:
-        return cls(Basis.from_json(data["basis"]))
+    def _from_json(self, data: Mapping[str, Any]) -> Self:
+        return type(self)(self.basis.from_json(data["basis"]))
 
     def get_component_features(
         self,
@@ -295,6 +291,8 @@ class Quadratic(RowMap[C]):
     The products of each pair of features of each row of a basis, flattened
     row-major, so a linear model of them sums a quadratic form of each row.
     """
+
+    class_key = "quadratic"
 
     @property
     def n_features(self) -> int:
@@ -312,8 +310,12 @@ class Quadratic(RowMap[C]):
 class Affine(RowMap[C]):
     """
     The features of each row of a basis followed by a 1, so a linear model of
-    them adds a constant to the cost of each row.
+    them adds a constant to the cost of each row. Around a ByKind, the
+    constant is shared by every kind, and around the basis of one kind, it is
+    that kind's own.
     """
+
+    class_key = "affine"
 
     @property
     def n_features(self) -> int:
@@ -336,31 +338,6 @@ class Affine(RowMap[C]):
         return np.hstack([rows, np.ones((len(rows), 1))])
 
 
-class GlobalAffine(Affine[C]):
-    """
-    The features of each row of a basis followed by a 0, and one more row of a
-    program which is 0 but for a 1 in that column, so a linear model of them
-    adds a constant to the cost of each program, where Affine adds one to each
-    row. The extra row belongs to no component, so the costs of components
-    exclude the constant, and the basis must be outermost.
-    """
-
-    def transform(self, rows: np.ndarray) -> np.ndarray:
-        return np.hstack([rows, np.zeros((len(rows), 1))])
-
-    def get_features(
-        self,
-        term: LogicStatement,
-        bindings: Mapping[Alias, Any],
-        stats: Mapping[Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ) -> np.ndarray:
-        rows = super().get_features(term, bindings, stats, stats_factory)
-        constant = np.zeros((1, self.n_features))
-        constant[0, -1] = 1.0
-        return np.concatenate([rows, constant])
-
-
 class KNearest(RowMap[C]):
     """
     The weights of the k landmark rows nearest each row of a basis by
@@ -373,6 +350,8 @@ class KNearest(RowMap[C]):
     landmarks are usually rows of the basis from the programs the model is
     fitted to.
     """
+
+    class_key = "k_nearest"
 
     def __init__(self, basis: Basis[C], landmarks: ArrayLike, k: int = 1):
         super().__init__(basis)
@@ -394,9 +373,9 @@ class KNearest(RowMap[C]):
     def to_json(self) -> dict[str, Any]:
         return {**super().to_json(), "landmarks": self.landmarks.tolist(), "k": self.k}
 
-    @classmethod
-    def _from_json(cls, data: Mapping[str, Any]) -> Self:
-        return cls(Basis.from_json(data["basis"]), data["landmarks"], data["k"])
+    def _from_json(self, data: Mapping[str, Any]) -> Self:
+        basis = self.basis.from_json(data["basis"])
+        return type(self)(basis, data["landmarks"], data["k"])
 
     def transform(self, rows: np.ndarray) -> np.ndarray:
         distances = np.linalg.norm(rows[:, None] - self.landmarks[None], axis=2)
@@ -425,6 +404,8 @@ class Stratify(RowMap[C]):
     set exceeds a cache. increasing constrains each coefficient to be
     nondecreasing from each regime to the next.
     """
+
+    class_key = "stratify"
 
     def __init__(
         self,
@@ -456,10 +437,9 @@ class Stratify(RowMap[C]):
             "increasing": self.increasing,
         }
 
-    @classmethod
-    def _from_json(cls, data: Mapping[str, Any]) -> Self:
-        return cls(
-            Basis.from_json(data["basis"]),
+    def _from_json(self, data: Mapping[str, Any]) -> Self:
+        return type(self)(
+            self.basis.from_json(data["basis"]),
             data["feature"],
             data["thresholds"],
             data["increasing"],
@@ -573,11 +553,15 @@ class CostModel(Serializable, Form, Generic[C]):
 class LinearCostModel(CostModel[C]):
     """
     Weight the features of each row by coefficients, and sum over the rows.
-    fit finds nonnegative coefficients by least squares, penalized by alpha
-    times the ridge weights of the basis and subject to its constraints. The
+    fit finds nonnegative coefficients which minimize the sum of the squared
+    relative errors of the predicted runtimes, so that fast programs count as
+    much as slow ones, penalized by alpha times the ridge weights of the basis
+    and subject to its constraints. The runtimes must be positive. The
     coefficients are nonnegative so that the costs of rows of nonnegative
-    features are.
+    features are. A fit to no programs is zero.
     """
+
+    class_key = "linear"
 
     def __init__(self, basis: Basis[C], coefficients: ArrayLike):
         super().__init__(basis)
@@ -594,9 +578,8 @@ class LinearCostModel(CostModel[C]):
     def to_json(self) -> dict[str, Any]:
         return {**super().to_json(), "coefficients": self.coefficients.tolist()}
 
-    @classmethod
-    def _from_json(cls, data: Mapping[str, Any]) -> Self:
-        return cls(Basis.from_json(data["basis"]), data["coefficients"])
+    def _from_json(self, data: Mapping[str, Any]) -> Self:
+        return type(self)(self.basis.from_json(data["basis"]), data["coefficients"])
 
     def fit(
         self,
@@ -605,14 +588,17 @@ class LinearCostModel(CostModel[C]):
         alpha: float = 0.0,
     ) -> Self:
         n = self.basis.n_features
-        # The ridge penalty is least squares against extra rows of zeros.
+        runtimes = np.asarray(runtimes, dtype=float)
+        if np.any(runtimes <= 0):
+            raise ValueError(f"Expected positive runtimes, got {runtimes.min()}")
+        # Dividing the features of each program by its runtime makes the
+        # residuals relative errors, which least squares fits to a target of
+        # ones. The ridge penalty is least squares against extra rows of zeros.
+        sums = np.array([rows.sum(axis=0) for rows in features]).reshape(-1, n)
         design = np.concatenate(
-            [
-                np.stack([rows.sum(axis=0) for rows in features]),
-                np.diag(np.sqrt(alpha * self.basis.ridge)),
-            ]
+            [sums / runtimes[:, None], np.diag(np.sqrt(alpha * self.basis.ridge))]
         )
-        target = np.concatenate([np.asarray(runtimes, dtype=float), np.zeros(n)])
+        target = np.concatenate([np.ones(len(runtimes)), np.zeros(n)])
         constraints = self.basis.constraints
         if not len(constraints):
             coefficients, _ = nnls(design, target)
@@ -625,7 +611,7 @@ class LinearCostModel(CostModel[C]):
             constraints=[
                 LinearConstraint(np.concatenate([constraints, np.eye(n)]), 0, np.inf)
             ],
-            options={"ftol": 1e-12, "maxiter": 1000},
+            options={"ftol": 1e-15, "maxiter": 1000},
         )
         if not result.success:
             raise ValueError(f"Constrained fit failed: {result.message}")

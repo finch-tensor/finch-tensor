@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Show the progress of fitting the protocol cost model to DIR: how many
-# programs each step has finished, of each basis, the models fitted, the states of the Slurm jobs which
-# scripts/launch_protocol_data.sh submitted, the latest progress of each task
-# which hasn't finished, and the logs which report errors.
+# Show the progress of fitting the cost model of a stage to DIR: how many
+# programs each step has finished, of each basis, the models fitted, the
+# states of the Slurm jobs which scripts/fitting/launch_physical_data.sh
+# submitted, the latest progress of each task which hasn't finished, and the
+# logs which report errors.
 #
-#     scripts/status_protocol_data.sh DIR
+#     scripts/fitting/status_physical_data.sh DIR
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
@@ -38,12 +39,13 @@ if [[ -f $directory/jobs.txt ]] && command -v sacct >/dev/null; then
   done <"$directory/jobs.txt"
 fi
 
-# Each step prints [i/n] as it finishes a program.
+# Each step prints [i/n] as it finishes a program, and stopped after its hours.
 running=""
 errors=""
 for log in "$directory"/logs/*.log; do
   [[ -e $log ]] || continue
   progress=$(awk -F'[][/]' '/^\[[0-9]+\/[0-9]+\]/ {line = $0; i = $2; n = $3}
+    /^stopped after/ {line = ""}
     END {if (line != "" && i != n) print line}' "$log")
   [[ -n $progress ]] && running+="  $(basename "$log"): $progress"$'\n'
   error=$(grep -E 'Traceback|Error|error:' "$log" | tail -1 || true)
