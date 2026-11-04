@@ -5,6 +5,8 @@ from typing import Any
 import numpy as np
 import scipy.sparse as sps
 
+import sparse as pydata_sparse
+
 from finch.algebra import (
     ftype,
 )
@@ -24,14 +26,14 @@ from finch.tensor.level import (
 )
 
 
-def _from_numpy(arr: np.ndarray, *, device=None, copy=None) -> BufferizedNDArray:
+def from_numpy(arr: np.ndarray, *, device=None, copy=None) -> BufferizedNDArray:
     """Zero-copy constructor from a NumPy array."""
     if copy is True:
         arr = arr.copy()
     return BufferizedNDArray.from_numpy(arr, device=device)
 
 
-def _from_scipy(obj: sps.spmatrix | sps.sparray, *, device=None, dtype=None, copy=None):
+def from_scipy(obj: sps.spmatrix | sps.sparray, *, device=None, dtype=None, copy=None):
     """Zero-copy constructor from a SciPy sparse matrix or array."""
     obj: Any = obj
     if obj.format == "csc":  # CSC has no native Finch layout yet
@@ -62,22 +64,24 @@ def _from_scipy(obj: sps.spmatrix | sps.sparray, *, device=None, dtype=None, cop
 
     match obj.format:
         case "csr":
-            return FiberTensor.from_scipy_csr(obj, device=device)
+            return from_parts_csr(
+                data=obj.data,
+                indices=obj.indices,
+                indptr=obj.indptr,
+                shape=obj.shape,
+                device=device,
+            )
         case "coo":
-            return FiberTensor.from_scipy_coo(obj, device=device)
+            return from_parts_coo(
+                np.stack([obj.row, obj.col]),
+                obj.data,
+                obj.shape,
+                device=device,
+            )
     raise ValueError(f"Unexpected SciPy format after normalization: {obj.format}")
 
 
-def _is_pydata_sparse(obj: Any) -> bool:
-    return (
-        type(obj).__module__.split(".")[0] == "sparse"
-        and hasattr(obj, "coords")
-        and hasattr(obj, "data")
-        and hasattr(obj, "shape")
-    )
-
-
-def _from_pydata(
+def from_pydata(
     obj: Any,
     *,
     device=None,
@@ -85,12 +89,6 @@ def _from_pydata(
     copy=None,
 ) -> FiberTensor:
     """Zero-copy constructor from a pydata/sparse.COO array."""
-    try:
-        import sparse as pydata_sparse
-    except ImportError as exc:
-        raise ImportError(
-            "pydata/sparse is not installed. Please install it to use this feature."
-        ) from exc
     if not isinstance(obj, pydata_sparse.COO):
         raise TypeError(
             f"Expected pydata/sparse.COO, got {type(obj).__name__}. "
@@ -105,10 +103,10 @@ def _from_pydata(
     elif copy is True:
         obj = obj.copy()
 
-    return FiberTensor.from_pydata_coo(obj, device=device)
+    return from_parts_coo(obj.coords, obj.data, obj.shape, device=device)
 
 
-def _from_parts_csr(data, indices, indptr, shape, *, device=None) -> FiberTensor:
+def from_parts_csr(data, indices, indptr, shape, *, device=None) -> FiberTensor:
     """
     Constructs a FiberTensor from CSR parts.
     """
@@ -123,6 +121,7 @@ def _from_parts_csr(data, indices, indptr, shape, *, device=None) -> FiberTensor
         raise ValueError(
             f"Expected indices length {len(data)} for CSR parts, got {len(indices)}."
         )
+
     element_lvl = element(
         fill_type=np.zeros((), dtype=data.dtype)[()],
         element_type=ftype(data.dtype),
@@ -147,7 +146,7 @@ def _from_parts_csr(data, indices, indptr, shape, *, device=None) -> FiberTensor
     )
 
 
-def _from_parts_coo(coords, data, shape, *, device=None) -> FiberTensor:
+def from_parts_coo(coords, data, shape, *, device=None) -> FiberTensor:
     """
     Constructs a FiberTensor from COO parts.
     """
@@ -181,41 +180,3 @@ def _from_parts_coo(coords, data, shape, *, device=None) -> FiberTensor:
         ),
         _device=device,
     )
-
-
-# def _reformat(tensor: LazyTensor, format: TensorFType) -> LazyTensor:
-#     """Reformat a tensor to a different format using FinchLogic query."""
-#     """
-#     if isinstance(tensor, FiberTensor) and tensor.ftype == format:
-#         return tensor
-#     if isinstance(tensor, BufferizedNDArray) and tensor.ftype == format:
-#         return tensor
-
-#     if isinstance(tensor, FiberTensor):
-#         try:
-#             source_data = tensor.to_scipy()
-#         except NotImplementedError:
-#             source_data = tensor.to_numpy()
-#     elif isinstance(tensor, BufferizedNDArray):
-#         source_data = tensor.to_numpy()
-#     else:
-#         source_data = np.asarray(tensor)
-
-#     if isinstance(format, FiberTensorFType):
-#         if sps.issparse(source_data):
-#             return FiberTensor.from_scipy_csr(source_data)
-#         scipy_mat = sps.csr_matrix(source_data)
-#         return FiberTensor.from_scipy_csr(scipy_mat)
-
-#     return BufferizedNDArray.from_numpy(np.asarray(source_data))
-#     """
-#     idxs = tuple(Field(gensym("i")) for _ in range(tensor.ndim))
-#     data, ctx = tensor.ctx.eval(Table(tensor.data, idxs))
-#     return LazyTensor(
-#         data,
-#         ctx,
-#         tensor.shape,
-#         tensor.fill_value,
-#         tensor.element_type,
-#         tensor.device,
-#     )

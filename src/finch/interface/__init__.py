@@ -4,12 +4,9 @@ from finch.tensor.scalar import Scalar, ScalarFType
 
 from . import fft, linalg
 from .constructor import (
-    _from_numpy,
-    _from_parts_coo,
-    _from_parts_csr,
-    _from_pydata,
-    _from_scipy,
-    _is_pydata_sparse,
+    from_numpy,
+    from_pydata,
+    from_scipy,
 )
 from .eager import (
     abs,
@@ -164,12 +161,6 @@ __all__ = [
     "NumPyWrapper",
     "Scalar",
     "ScalarFType",
-    "_from_numpy",
-    "_from_parts_coo",
-    "_from_parts_csr",
-    "_from_pydata",
-    "_from_scipy",
-    "_is_pydata_sparse",
     "abs",
     "acos",
     "acosh",
@@ -226,8 +217,6 @@ __all__ = [
     "floor",
     "floor_divide",
     "from_numpy",
-    "from_parts_coo",
-    "from_parts_csr",
     "from_pydata",
     "from_scipy",
     "full",

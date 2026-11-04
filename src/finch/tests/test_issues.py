@@ -4,7 +4,7 @@ import numpy as np
 import scipy.sparse as sps
 
 import finch
-from finch.tensor import FiberTensor
+from finch.interface.constructor import from_scipy
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -47,7 +47,7 @@ def test_issue_620(rng, shapes, density):
         sps.random(i, j, density=density, format="csr", random_state=rng)
         for i, j in ((n, m), (m, k), (k, ell))
     )
-    a_f, b_f, c_f = (FiberTensor.from_scipy_csr(x) for x in (a, b, c))
+    a_f, b_f, c_f = (from_scipy(x) for x in (a, b, c))
 
     result = finch.compute(
         finch.matmul(
