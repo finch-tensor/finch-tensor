@@ -6,8 +6,8 @@ from_json. The variants of each example are every option of one decision, so
 the model is also scored by its regret: the runtime of the variant it predicts
 to be fastest over that of the fastest, for each example. To show how the fit
 improves with data, a held-out tenth of the examples scores models fitted to
-growing subsets of the rest, and the R^2 and the median regret of each are
-printed and plotted next to DATA, to DATA.learning_curve.png.
+growing subsets of the rest, and the relative R^2 and the median regret of each
+are printed and plotted next to DATA, to DATA.learning_curve.png.
 
     pixi run -e fitting python -m scripts.fitting.fit_physical_data \\
         DATA [--seed S] [model.json]
@@ -26,9 +26,16 @@ from scripts.fitting.physical_bases import BASES
 
 
 def r_squared(predicted, actual) -> float:
+    """
+    The R^2 of predicted under relative error, which models are fitted to: one
+    minus its squared relative error over that of the best constant, so that
+    the longest runtimes don't outweigh the rest.
+    """
     actual = np.asarray(actual)
-    residual = ((actual - predicted) ** 2).sum()
-    return float(1 - residual / ((actual - actual.mean()) ** 2).sum())
+    inverse = 1 / actual
+    constant = inverse.sum() / (inverse**2).sum()
+    residual = ((predicted * inverse - 1) ** 2).sum()
+    return float(1 - residual / ((constant * inverse - 1) ** 2).sum())
 
 
 def by_example(examples) -> dict[str, list[int]]:
@@ -56,9 +63,9 @@ def regrets(model, features, runtimes, groups) -> np.ndarray:
 
 def learning_curve(basis, features, runtimes, examples, rng, n_points=12):
     """
-    The R^2 and median regret on a held-out tenth of the examples of models
-    fitted to nested, geometrically growing subsets of the others. Examples
-    are held out whole, with all of their variants.
+    The relative R^2 and median regret on a held-out tenth of the examples of
+    models fitted to nested, geometrically growing subsets of the others.
+    Examples are held out whole, with all of their variants.
     """
     groups = by_example(examples)
     names = rng.permutation(list(groups))
@@ -85,10 +92,10 @@ def draw_learning_curve(ax, sizes, scores, n_features, ylabel, medians=None) -> 
     # below -1 are drawn at -1 and marked.
     sizes, scores = np.asarray(sizes), np.asarray(scores)
     clipped = np.maximum(scores, -1)
-    ax.plot(sizes, clipped, marker="o", label="R^2")
+    ax.plot(sizes, clipped, marker="o", label="relative R^2")
     low = scores < -1
     if low.any():
-        ax.plot(sizes[low], clipped[low], "v", color="C3", label="R^2 < -1")
+        ax.plot(sizes[low], clipped[low], "v", color="C3", label="relative R^2 < -1")
     ax.axvline(n_features, color="gray", linestyle="--", label="# features")
     ax.set_xscale("log")
     ax.set_ylim(-1.05, 1.05)
@@ -106,7 +113,12 @@ def draw_learning_curve(ax, sizes, scores, n_features, ylabel, medians=None) -> 
 def plot_learning_curve(sizes, scores, medians, n_test, n_features, path) -> None:
     fig, ax = plt.subplots()
     draw_learning_curve(
-        ax, sizes, scores, n_features, f"R^2 on {n_test} held-out examples", medians
+        ax,
+        sizes,
+        scores,
+        n_features,
+        f"relative R^2 on {n_test} held-out examples",
+        medians,
     )
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -142,7 +154,7 @@ def fit(data: Path, output: Path | None, seed) -> None:
         sizes, scores, medians, n_test = learning_curve(
             basis, features, runtimes, examples, rng
         )
-        print(f"R^2 and median regret on {n_test} held-out examples:")
+        print(f"relative R^2 and median regret on {n_test} held-out examples:")
         for size, score, median in zip(sizes, scores, medians, strict=True):
             print(f"{size:8d} {score:8.3f} {median:8.2f}")
         plot = data.with_suffix(".learning_curve.png")
