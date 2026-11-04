@@ -32,7 +32,7 @@ from typing import Any
 
 import numpy as np
 
-from finch.algebra import Tensor, ftypes
+from finch.algebra import StaticFillFType, ftype, ftypes
 from finch.autoschedule import optimize_protocols
 from finch.autoschedule.cost_models import (
     PROTOCOL_BASIS,
@@ -49,6 +49,7 @@ from finch.autoschedule.cost_models import (
 )
 from finch.autoschedule.formatter.smart_formatter import (
     LEVEL_BASIS,
+    LEVEL_BUILDERS,
     LEVEL_OPTIONS,
     STORAGE_COST_MODEL,
     optimize_format,
@@ -69,7 +70,8 @@ from finch.finch_logic import (
 )
 from finch.finch_logic.parser import PROTOCOLS
 from finch.symbolic import PostOrderDFS, PostWalk, Rewrite
-from finch.tensor import fiber_tensor
+from finch.tensor import element, fiber_tensor
+from scripts.fitting.kronecker_stats import KroneckerStatsFactory, KroneckerTensor
 
 STAGES = ("protocol", "level", "transpose", "loop")
 OPTIONS = {option.kind: option for option in LEVEL_OPTIONS}
@@ -204,23 +206,55 @@ def input_fields(plan: LogicStatement) -> dict[Alias, tuple]:
     return fields
 
 
+def format_ftype(options: list[LevelOption], fill_type, shape_type):
+    """The ftype of a tensor of the level options, fill_type, and shape_type."""
+    lvl = element(fill_type, fill_type.element_type, ftypes.intp)
+    for option, dim in reversed(list(zip(options, shape_type, strict=True))):
+        lvl = LEVEL_BUILDERS[option.kind](lvl, dim)
+    return fiber_tensor(lvl)
+
+
+def input_ftype(options: list[LevelOption], tensor: KroneckerTensor):
+    """The ftype of tensor stored with the level options."""
+    shape_type = (ftype(tensor.idx_type),) * tensor.ndim
+    return format_ftype(options, StaticFillFType(tensor.dtype(0)), shape_type)
+
+
+def read_inputs(
+    record: Mapping[str, Any],
+    plan: LogicStatement,
+    inputs: Mapping[Alias, KroneckerTensor],
+) -> dict[Alias, KroneckerTensor]:
+    """
+    The inputs of the example of record which plan reads, each storing its
+    fields in the order plan reads them.
+    """
+    perms = input_perms(record, plan)
+    return {
+        tns: tensor.transpose(perms[tns])
+        for tns, tensor in inputs.items()
+        if tns in perms
+    }
+
+
 def choose_formats(
     plan: LogicStatement,
-    bindings: Mapping[Alias, Tensor],
+    inputs: Mapping[Alias, KroneckerTensor],
     stats_factory: StatsFactory,
     cost_model: CostModel,
 ) -> dict[Alias, list[LevelOption]]:
     """
     The level options of each tensor of plan under cost_model, as the
-    formatter would choose them from the supports of the inputs of bindings,
-    for the inputs too, which it takes to be unformatted.
+    formatter would choose them from the supports of inputs, which store their
+    fields in the order plan reads them, for the inputs too, which it takes to
+    be unformatted.
     """
     fields = input_fields(plan)
     stats = OrderedDict(
-        (tns, stats_factory(arg, fields[tns])) for tns, arg in bindings.items()
+        (tns, stats_factory(tensor, fields[tns])) for tns, tensor in inputs.items()
     )
     fill_types = plan.infer_fill_type(
-        {tns: arg.ftype.fill_type for tns, arg in bindings.items()}
+        {tns: StaticFillFType(tensor.dtype(0)) for tns, tensor in inputs.items()}
     )
     formats = {}
     for tns, idxs in fields.items():
@@ -242,40 +276,31 @@ def choose_formats(
 def resolve(
     record: Mapping[str, Any],
     variant: Mapping[str, Any],
-    bindings: Mapping[Alias, Tensor],
-    stats_factory: StatsFactory,
+    inputs: Mapping[Alias, KroneckerTensor],
     models: Mapping[str, CostModel],
-    reformat,
-) -> tuple[LogicStatement, dict[Alias, list[LevelOption]], dict[Alias, Tensor]]:
+) -> tuple[LogicStatement, dict[Alias, list[LevelOption]]]:
     """
-    The program, formats, and inputs of a variant of the example of record,
-    once the stages below its stage have made their choices: the formats of
-    every tensor, the inputs of bindings copied into theirs by reformat, in the
-    order the program reads them, which is the loop order in the loop stage,
-    and the protocols each input is read with, which the plan of the protocol
-    stage already gives. reformat takes a tensor, its level options, and the
-    permutation of its fields to store.
+    The program and formats of a variant of the example of record, once the
+    stages below its stage have made their choices from the exact stats of
+    inputs: the formats of every tensor, and the protocols each input is read
+    with, which the plan of the protocol stage already gives. The inputs the
+    program reads are stored in the order it reads them, which is the loop
+    order in the loop stage.
     """
     stage = record["stage"]
     plan = variant_plan(record, variant)
     formats = variant_formats(variant)
+    inputs = read_inputs(record, plan, inputs)
+    stats_factory = KroneckerStatsFactory(record["block_bits"])
     if stage == "loop":
-        formats = choose_formats(plan, bindings, stats_factory, models["level"])
-    # The inputs the program reads are stored in the order it reads them.
-    perms = input_perms(record, plan)
-    bindings = {
-        tns: reformat(arg, formats[tns], perms[tns])
-        for tns, arg in bindings.items()
-        if tns in perms
-    }
+        formats = choose_formats(plan, inputs, stats_factory, models["level"])
     if stage != "protocol":
         fields = input_fields(plan)
-        stats = {tns: stats_factory(arg, fields[tns]) for tns, arg in bindings.items()}
         plan = optimize_protocols(
             plan,
-            {tns: arg.ftype for tns, arg in bindings.items()},
-            stats,
+            {tns: input_ftype(formats[tns], tensor) for tns, tensor in inputs.items()},
+            {tns: stats_factory(tensor, fields[tns]) for tns, tensor in inputs.items()},
             stats_factory,
             models["protocol"],
         )
-    return plan, formats, bindings
+    return plan, formats

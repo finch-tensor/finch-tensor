@@ -1,12 +1,14 @@
 """
 Time the variants of the programs which generate_physical_data wrote to DIR,
 or those of one chunk. The stages below that of DIR make their choices with
-the models of --model, or the built-in ones, as physical_bases resolves them,
-and then each variant is compiled by Finch.jl with its format of C, and reads
-its inputs after they are copied from COO into their formats. The
-variants of the examples of a program compile to the same kernels, which are
-compiled once and kept for as long as this runs. The runtime of each variant
-is written to DIR/data as JSON after it is measured, by its index.
+the models of --model, or the built-in ones, from the exact stats of the
+Kronecker blocks of the inputs, as physical_bases resolves them, and then each
+variant is compiled by Finch.jl with its format of C, and reads its inputs
+after they are materialized as COO from their blocks and copied into their
+formats. The variants of the examples of a program compile to the same
+kernels, which are compiled once and kept for as long as this runs. The
+runtime of each variant is written to DIR/data as JSON after it is measured,
+by its index.
 
     pixi run -e fitting python -m scripts.fitting.time_physical_data \\
         DIR [--model NAME=PATH]... [--chunk K] [--repeat N] [--resume]
@@ -18,18 +20,22 @@ import timeit
 from collections.abc import Mapping
 from pathlib import Path
 
-from finch.algebra import Tensor, ftypes
+from finch.algebra import Tensor
 from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
 from finch.autoschedule.cost_models import CostModel, LevelOption
 from finch.autoschedule.executor import LogicExecutor
-from finch.autoschedule.formatter.smart_formatter import LEVEL_BUILDERS, CostFormatter
+from finch.autoschedule.formatter.smart_formatter import CostFormatter
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.autoschedule.util import fuse_loop_order
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.finch_logic import Alias, Field, HardAlias, Plan, Produces, Query, Table
-from finch.tensor import element, fiber_tensor
-from scripts.fitting.generate_physical_data import examples, load, path
-from scripts.fitting.physical_bases import parse_models, resolve
+from scripts.fitting.generate_physical_data import examples, load, materialize, path
+from scripts.fitting.physical_bases import (
+    format_ftype,
+    input_perms,
+    parse_models,
+    resolve,
+)
 
 
 class FixedFormatter(CostFormatter):
@@ -40,11 +46,7 @@ class FixedFormatter(CostFormatter):
         self.formats = formats
 
     def get_tensor_ftype(self, alias, term, machine, fill_type, shape_type):
-        lvl = element(fill_type, fill_type.element_type, ftypes.intp)
-        options = zip(self.formats[alias], shape_type, strict=True)
-        for option, dim in reversed(list(options)):
-            lvl = LEVEL_BUILDERS[option.kind](lvl, dim)
-        return fiber_tensor(lvl)
+        return format_ftype(self.formats[alias], fill_type, shape_type)
 
 
 def julia_loader():
@@ -119,14 +121,21 @@ class Timer:
         runtimes: dict[str, float] = {}
         if resume and timing_path.exists():
             runtimes = json.loads(timing_path.read_text())["runtimes"]
+        if len(runtimes) == len(record["variants"]):
+            return runtimes
+        materialized = {tns: materialize(tensor) for tns, tensor in inputs.items()}
         reformatter = Reformatter()
-        stats_factory = DCStatsFactory()
         for index, variant in enumerate(record["variants"]):
             if str(index) in runtimes:
                 continue
-            plan, formats, bindings = resolve(
-                record, variant, inputs, stats_factory, self.models, reformatter
-            )
+            plan, formats = resolve(record, variant, inputs, self.models)
+            # The inputs the program reads are stored in the order it reads them.
+            perms = input_perms(record, plan)
+            bindings = {
+                tns: reformatter(tensor, formats[tns], perms[tns])
+                for tns, tensor in materialized.items()
+                if tns in perms
+            }
             runtimes[str(index)] = self.measure(plan, formats, bindings)
             timing_path.write_text(json.dumps({"runtimes": runtimes}))
         return runtimes

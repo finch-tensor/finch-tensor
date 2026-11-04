@@ -2,7 +2,8 @@
 Draw programs for fitting the cost model of a stage of physical_bases, and
 their inputs. Each program is a random subprogram of C_lmq += A_jlpq * B_kmpq,
 which loops in the order its inputs store their fields, and its inputs are
-R-MAT tensors of drawn densities. Its variants are every option of the
+Kronecker products of R-MAT blocks of drawn densities, as kronecker_stats draws
+them. Its variants are every option of the
 decision of the stage: the protocols A and B are read with under drawn
 formats, the formats of A, B, and C, the loop orders of the program, with its
 inputs stored in each, or, in the transpose stage, the orders a copy C of A
@@ -18,11 +19,12 @@ by the same distribution, and each makes an example with the program, whose
 variants compile to the same kernels, so the kernels are compiled once for
 them all.
 Each example is written to DIR/data as JSON, with the text of its query, its
-loop order, its variants, and the R-MAT seed, log shape, and RNG seed of each
-of its inputs, under the name of its chunk and its index in the chunk, so jobs
-of different chunks can share DIR. No tensors are stored: load draws the
-inputs from their seeds again, as COO, in memory proportional to their
-nonzeros.
+loop order, its variants, and the log shape, the R-MAT seed of each block, and
+the RNG seed of each of its inputs, with the version of numpy which drew its
+blocks and their checksum, under the name of its chunk and its index in the
+chunk, so jobs of different chunks can share DIR. No tensors are stored: load
+draws the blocks of the inputs from their seeds again, checking that they
+match, and materialize expands them into COO tensors.
 
     pixi run -e fitting python -m scripts.fitting.generate_physical_data \\
         DIR [--stage S] [--programs N] [--samples N] [--keep N] [--chunk K] \\
@@ -42,7 +44,7 @@ import numpy as np
 
 import finch as fl
 from finch import ffuncs
-from finch.algebra import Tensor, ftype
+from finch.algebra import ftype
 from finch.autoschedule.cost_models import (
     allowed_options,
     read_options,
@@ -63,6 +65,11 @@ from finch.finch_logic import (
     Table,
 )
 from finch.tensor import ElementLevel, FiberTensor, SparseCOOLevel, element
+from scripts.fitting.kronecker_stats import (
+    KroneckerTensor,
+    block_shapes,
+    kronecker_rmat,
+)
 from scripts.fitting.physical_bases import (
     INPUTS,
     OPTIONS,
@@ -90,90 +97,43 @@ def seed(skew, sparsity):
     return S * sparsity
 
 
-def levels(S, lg_shape):
-    """
-    The axes with bits left at each level of R-MAT with the seed S on a tensor
-    of shape 2 ** lg_shape, and the seed over them. At each level a ball picks
-    an entry of S, and each axis with bits left takes that entry's bit along it,
-    so an axis which has run out of bits marginalizes S over it.
-    """
-    S = np.asarray(S) / np.sum(S)
-    for level in range(max(lg_shape, default=0)):
-        done = tuple(d for d, lg in enumerate(lg_shape) if lg <= level)
-        live = tuple(d for d, lg in enumerate(lg_shape) if level < lg)
-        yield live, S.sum(axis=done)
+# Each dimension is split into digits of BLOCK_BITS bits, and the block of each
+# digit is drawn by R-MAT.
+BLOCK_BITS = 4
 
 
-def cell_probabilities(S, lg_shape):
+def block_seeds(S, lg_shape, block_bits) -> list[np.ndarray]:
     """
-    The probability that a ball dropped by R-MAT with the seed S lands in each
-    cell of a tensor of shape 2 ** lg_shape.
+    The seed of each block of a tensor of shape 2 ** lg_shape, with the skew of
+    the seed S and a share of its log density for each bit of the block, so
+    the density of the tensor is that of S.
     """
-    P = np.ones(())
-    bits = []
-    for level, (live, S_level) in enumerate(levels(S, lg_shape)):
-        P = np.multiply.outer(P, S_level)
-        bits += [(d, level) for d in live]
-    # The bits of an axis, from the top, make its coordinate.
-    order = sorted(range(len(bits)), key=bits.__getitem__)
-    return P.transpose(order).reshape(tuple(2**lg for lg in lg_shape))
-
-
-def drop_balls(S, lg_shape, nnz, rng):
-    """
-    The flat indices of the first nnz distinct cells which balls dropped by
-    R-MAT with the seed S land in, in a tensor of shape 2 ** lg_shape.
-    """
-    shape = tuple(2**lg for lg in lg_shape)
-    cells = np.empty(0, np.int64)
-    distinct, first = cells, cells
-    while distinct.size < nnz:
-        need = nnz - distinct.size
-        n = need + need // 4 + 16
-        coords = [np.zeros(n, np.int64) for _ in lg_shape]
-        for live, S_level in levels(S, lg_shape):
-            picks = rng.choice(S_level.size, size=n, p=S_level.ravel())
-            for d, bit in zip(
-                live, np.unravel_index(picks, S_level.shape), strict=True
-            ):
-                coords[d] = coords[d] << 1 | bit
-        cells = np.concatenate([cells, np.ravel_multi_index(coords, shape)])
-        distinct, first = np.unique(cells, return_index=True)
-    return distinct[np.argsort(first)[:nnz]]
-
-
-def rmat(S, lg_shape, dtype, idx_type, rng) -> FiberTensor:
-    """
-    A COO tensor of shape 2 ** lg_shape, indexed by idx_type, whose
-    S.sum() * 2 ** sum(lg_shape) nonzeros are the first distinct cells which
-    balls dropped by R-MAT with the seed S land in.
-    """
-    # Values are in (0, 1], so neither a sum nor a product of them is zero.
-    shape = tuple(2**lg for lg in lg_shape)
-    if not lg_shape:
-        return coo(shape, (), np.array([1 - rng.random()], dtype), idx_type)
+    density = np.sum(S)
     lg_size = sum(lg_shape)
-    nnz = round(np.sum(S) * 2**lg_size)
-    # A ball lands in one of about 2 ** H cells, for the entropy H of the cell
-    # it lands in. When nnz is well under that and under the size, balls are
-    # dropped until nnz cells are hit, and otherwise every cell is ordered,
-    # which takes memory for each cell.
-    with np.errstate(divide="ignore", invalid="ignore"):
-        H = -sum(np.nansum(P * np.log2(P)) for _, P in levels(S, lg_shape))
-    if np.log2(nnz) <= min(H - 2, lg_size - 5):
-        cells = drop_balls(S, lg_shape, nnz, rng)
-    else:
-        # The order in which balls first land in cells is the order of
-        # exponential draws over the probabilities of the cells.
-        with np.errstate(divide="ignore"):
-            keys = (
-                rng.exponential(size=2**lg_size)
-                / cell_probabilities(S, lg_shape).ravel()
-            )
-        cells = np.argpartition(keys, nnz - 1)[:nnz]
-    cells = np.sort(cells)
-    values = (1 - rng.random(nnz)).astype(dtype)
-    return coo(shape, np.unravel_index(cells, shape), values, idx_type)
+    return [
+        S / density * density ** (math.log2(math.prod(shape)) / lg_size)
+        for shape in block_shapes(lg_shape, block_bits)
+    ]
+
+
+def input_record(S, lg_shape, rng) -> dict[str, Any]:
+    """
+    The seeds of an input of shape 2 ** lg_shape with the seed S, and the
+    version of numpy which draws its blocks from them and their checksum, which
+    kronecker_input checks when it draws them again.
+    """
+    seeds = block_seeds(S, lg_shape, BLOCK_BITS)
+    rng_seed = int(rng.integers(2**63))
+    tensor = kronecker_rmat(
+        lg_shape, seeds, np.random.default_rng(rng_seed), BLOCK_BITS
+    )
+    return {
+        "lg_shape": lg_shape,
+        "rmat_seeds": [b.tolist() for b in seeds],
+        "rng_seed": rng_seed,
+        "numpy": np.__version__,
+        "checksum": tensor.checksum(),
+    }
 
 
 def program(rng, lg_max_space, lg_max_dim, size_bias):
@@ -250,11 +210,11 @@ def choose_seed(rng, idxs, lg_dims, density_bias):
 
 def seed_lg_densities(prgm, input_fields, output_fields, lg_dims, seeds):
     """
-    The log nonzeros of the inputs which rmat draws from seeds, and the log
-    expected products of the output of prgm, each as a fraction of its log
-    size. By the mixed product property, the expected products are the product
-    over levels of the sum of prgm run on the seeds of the level, which are the
-    same at levels where the same fields have bits left.
+    The log nonzeros of the inputs whose blocks block_seeds splits from seeds,
+    and the log expected products of the output of prgm, each as a fraction of
+    its log size. By the mixed product property, the expected products are the
+    product over levels of the sum of prgm run on the seeds of the level, which
+    are the same at levels where the same fields have bits left.
     """
     fields = {**input_fields, **output_fields}
     lg_size = {
@@ -467,12 +427,11 @@ def program_inputs(
             **record,
             "dtype": dtype,
             "idx_type": choose(rng, ["int32", "int64"]),
+            "block_bits": BLOCK_BITS,
             "inputs": {
-                tns.name: {
-                    "rmat_seed": seeds[i][tns].tolist(),
-                    "lg_shape": [lg_dims[idx.name] for idx in idxs],
-                    "rng_seed": int(rng.integers(2**63)),
-                }
+                tns.name: input_record(
+                    seeds[i][tns], [lg_dims[idx.name] for idx in idxs], rng
+                )
                 for tns, idxs in input_fields.items()
             },
         }
@@ -513,25 +472,43 @@ def examples(directory: Path, chunk=None) -> list[str]:
     )
 
 
-def expand(record: dict[str, Any], tns: Alias) -> Tensor:
-    """The input tns of the example of record, drawn from its seeds."""
+def kronecker_input(record: dict[str, Any], tns: Alias) -> KroneckerTensor:
+    """
+    The input tns of the example of record, its blocks drawn from their seeds,
+    which must match the checksum of the blocks generate drew.
+    """
     spec = record["inputs"][tns.name]
-    return rmat(
-        np.asarray(spec["rmat_seed"]),
+    tensor = kronecker_rmat(
         spec["lg_shape"],
+        [np.asarray(S) for S in spec["rmat_seeds"]],
+        np.random.default_rng(spec["rng_seed"]),
+        record["block_bits"],
         np.dtype(record["dtype"]).type,
         np.dtype(record["idx_type"]).type,
-        np.random.default_rng(spec["rng_seed"]),
+    )
+    if tensor.checksum() != spec["checksum"]:
+        raise ValueError(
+            f"The blocks of {tns.name} drawn with numpy {np.__version__} differ "
+            f"from those generate drew with numpy {spec['numpy']}"
+        )
+    return tensor
+
+
+def materialize(tensor: KroneckerTensor) -> FiberTensor:
+    """A COO tensor of the support of tensor."""
+    # Values are in (0, 1], so neither a sum nor a product of them is zero.
+    values = 1 - np.random.default_rng(0).random(tensor.nnz)
+    return coo(
+        tensor.shape, tensor.coords(), values.astype(tensor.dtype), tensor.idx_type
     )
 
 
-def load(directory: Path, example) -> tuple[dict[str, Any], dict[Alias, Tensor]]:
-    """
-    The record and the inputs of an example which generate wrote. The inputs
-    are COO, whatever their formats.
-    """
+def load(
+    directory: Path, example
+) -> tuple[dict[str, Any], dict[Alias, KroneckerTensor]]:
+    """The record of an example which generate wrote, and its inputs."""
     record = json.loads(path(directory, example, "program.json").read_text())
-    return record, {tns: expand(record, tns) for tns in INPUTS}
+    return record, {tns: kronecker_input(record, tns) for tns in INPUTS}
 
 
 def write_example(directory: Path, name, record) -> None:

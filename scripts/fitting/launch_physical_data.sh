@@ -126,7 +126,7 @@ time=$(submit "$array" ${generate:+"--dependency=aftercorr:$generate"} \
   "$step" time_physical_data "$directory" "${models[@]}" --repeat "$repeat" $resume)
 echo "time $time" >>"$jobs"
 featurize=$(submit "$array" ${generate:+"--dependency=aftercorr:$generate"} \
-  --job-name=featurize --cpus-per-task=24 --mem=300G --time=16:00:00 \
+  --job-name=featurize --cpus-per-task=2 --mem=16G --time=04:00:00 \
   --output="$logs/featurize-%A_%a.log" \
   "$step" featurize_physical_data "$directory" "${models[@]}" \
   "${basis_options[@]}" $resume)
