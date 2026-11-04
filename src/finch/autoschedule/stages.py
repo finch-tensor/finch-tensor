@@ -107,6 +107,10 @@ class AliasedForm(Form):
                     validate(body, (*fuses, (idx, next(fuse_ids))))
                     if not fuses:
                         FusedForm.validate_inputs(node, bindings, stats, stats_factory)
+                case Query(Table(_, _, (_, *_)) as lhs, _) | QueryInto(
+                    Table(_, _, (_, *_)) as lhs, _, _
+                ):
+                    raise ValueError(f"{lhs} has protocols, which only apply to reads.")
                 case Query(Table(Alias() as lhs, _), rhs):
                     # The rhs is read before the lhs is defined.
                     validate(rhs, fuses)

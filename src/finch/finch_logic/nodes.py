@@ -444,6 +444,42 @@ class Field(LogicNode, NamedTerm):
         return self.name
 
 
+class Protocol(LogicNode):
+    """
+    How a loop visits a field of a table it reads or writes, as in Finch.jl.
+    """
+
+
+@dataclass(eq=True, frozen=True)
+class DefaultProtocol(Protocol):
+    """Lets the tensor choose how the loop visits the field."""
+
+
+@dataclass(eq=True, frozen=True)
+class Walk(Protocol):
+    """Steps through the indices which the tensor stores."""
+
+
+@dataclass(eq=True, frozen=True)
+class Gallop(Protocol):
+    """Skips ahead to the next index which every galloped tensor stores."""
+
+
+@dataclass(eq=True, frozen=True)
+class Follow(Protocol):
+    """Looks up each index which the loop visits."""
+
+
+@dataclass(eq=True, frozen=True)
+class Extrude(Protocol):
+    """Writes each index once, in order."""
+
+
+@dataclass(eq=True, frozen=True)
+class Laminate(Protocol):
+    """Writes indices in any order, and any number of times."""
+
+
 @dataclass(eq=True, frozen=True)
 class Alias(LogicNode, NamedTerm):
     """Shared base for hard and fused aliases referring to tensors."""
@@ -549,20 +585,25 @@ class Table(LogicTree, LogicExpression):
     Attributes:
         tns: The tensor object.
         idxs: The fields indexing the tensor.
+        protocols: How a loop visits each field of the table when it reads it,
+            or none to let the tensor choose every protocol.
     """
 
     tns: Literal | Alias
     idxs: tuple[Field, ...]
+    protocols: tuple[Protocol, ...] = ()
 
     def __post_init__(self):
         match self.tns:
             case FusedAlias(_, n) if n > len(self.idxs):
                 raise ValueError("The fused dimension count exceeds the table rank")
+        if self.protocols and len(self.protocols) != len(self.idxs):
+            raise ValueError("A table needs one protocol for each field")
 
     @property
     def children(self):
         """Returns the children of the node."""
-        return [self.tns, *self.idxs]
+        return [self.tns, *self.idxs, *self.protocols]
 
     def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
@@ -589,8 +630,15 @@ class Table(LogicTree, LogicExpression):
         raise NotImplementedError("Cannot resolve value of Tables")
 
     @classmethod
-    def from_children(cls, tns, *idxs):
-        return cls(tns, idxs)
+    def from_children(cls, tns, *children):
+        idxs, protocols = [], []
+        for child in children:
+            match child:
+                case Field():
+                    idxs.append(child)
+                case Protocol():
+                    protocols.append(child)
+        return cls(tns, tuple(idxs), tuple(protocols))
 
 
 @dataclass(eq=True, frozen=True)
@@ -1162,10 +1210,23 @@ class LogicPrinterContext(Context):
                 return str(name)
             case FusedAlias(alias, n):
                 return f"FusedAlias({self(alias)}, {n})"
+            case DefaultProtocol():
+                return "default"
+            case Walk():
+                return "walk"
+            case Gallop():
+                return "gallop"
+            case Follow():
+                return "follow"
             case Alias(name):
                 return str(name)
-            case Table(tns, idxs):
+            case Table(tns, idxs, protocols):
                 idxs_e = [self(idx) for idx in idxs]
+                if protocols:
+                    idxs_e = [
+                        idx if proto == DefaultProtocol() else f"{self(proto)}({idx})"
+                        for idx, proto in zip(idxs_e, protocols, strict=True)
+                    ]
                 match tns:
                     case FusedAlias(alias, n):
                         return (

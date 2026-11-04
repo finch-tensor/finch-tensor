@@ -42,6 +42,7 @@ from .formatter.formatter import (
 from .formatter.smart_formatter import FDFormatter, SmartFormatter
 from .loop_orderer.loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
+from .protocolize import LogicProtocolizer, protocolize
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 
 __all__ = [
@@ -72,6 +73,7 @@ __all__ = [
     "LogicFormatter",
     "LogicNormalizer",
     "LogicNotationLowerer",
+    "LogicProtocolizer",
     "MapJoin",
     "NotationGenerator",
     "Plan",
@@ -88,6 +90,7 @@ __all__ = [
     "Value",
     "get_default_scheduler",
     "normalize_names",
+    "protocolize",
     "set_default_scheduler",
     "with_default_scheduler",
 ]

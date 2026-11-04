@@ -27,12 +27,12 @@ class LoopletSimplify(UnvalidatedForm, NotationTransform):
                                 ntn.Looplet(
                                     looplets.Run(ntn.Full(ntn.Literal(val))), _
                                 ) as tns,
-                                ntn.Read(),
+                                ntn.Read() as mode,
                                 idxs,
                             )
                         ):
                             if is_annihilator(op_type, val):
-                                return ntn.Unwrap(ntn.Access(tns, ntn.Read(), idxs))
+                                return ntn.Unwrap(ntn.Access(tns, mode, idxs))
             case ntn.If(
                 ntn.Unwrap(
                     ntn.Access(

@@ -10,7 +10,7 @@ eval(let
         v3 .= 0
         for v12 = 1:v6
             for v13 = 1:v7
-                v3[v13,v12] <<Finch.initwrite(0)>>= ((v0[v13,v12] != 0) * (Int64(v1[v12]) * Int64(v2[v13])))
+                v3[extrude(v13),extrude(v12)] <<Finch.initwrite(0)>>= ((v0[v13,v12] != 0) * (Int64(v1[v12]) * Int64(v2[v13])))
             end
         end
         return v3

@@ -485,6 +485,12 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
     def level_format_properties(self) -> list[FormatProperty]:
         return [Dense(tuple(range(n + 1))) for n in range(self.ndim)]
 
+    def default_protocols(self):
+        return self.lvl_t.level_default_protocols()
+
+    def protocols(self):
+        return self.lvl_t.level_protocols()
+
     def lower_dim(self, ctx, obj, r):
         return self.lvl_t.level_lower_dim(ctx, ctx(obj.lvl), r)
 
@@ -777,6 +783,13 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
 
     def level_format_properties(self, n):
         return [Dense(tuple(range(n + r + 1))) for r in range(self.ndim)]
+
+    def level_default_protocols(self):
+        # Each index of the array is looked up.
+        return (ntn.Follow(),) * self.ndim
+
+    def level_protocols(self):
+        return ((ntn.Follow(), ntn.Extrude(), ntn.Laminate()),) * self.ndim
 
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl):
         for r in range(self.ndim):
