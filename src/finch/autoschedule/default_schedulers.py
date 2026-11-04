@@ -3,6 +3,7 @@ from contextlib import contextmanager
 
 from finch.autoschedule.tensor_stats.bound_stats import DCStatsFactory
 from finch.autoschedule.tensor_stats.fd_stats import FDStatsFactory
+from finch.autoschedule.tensor_stats.memo_stats import MemoStatsFactory
 from finch.codegen import MLIRCompiler, NumbaCompiler
 from finch.compile import CompilerMode, NotationCompiler
 from finch.compile_jl.compiler import FinchJLCompiler
@@ -22,6 +23,7 @@ from finch.finch_notation.interpreter import NotationInterpreter
 
 from .compiler import CompilerFormLowerer, LogicCompiler
 from .executor import LogicExecutor
+from .factor_cache import FactorCacheEvaluator
 from .factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
 from .factorizer.optimize import DefaultLogicFactorizer
 from .formatter import DefaultLogicFormatter, FDFormatter, GalleyFormatter
@@ -180,7 +182,7 @@ COMPILE_JULIA_GALLEY = LogicNormalizer(
                 )
             )
         ),
-        stats_factory=DCStatsFactory(),
+        stats_factory=MemoStatsFactory(DCStatsFactory()),
         cache=True,
     )
 )
@@ -205,6 +207,10 @@ NON_RECURSIVE_SCHEDULER = LogicNormalizer(
         cache=True,
     )
 )
+
+# Statistics which evaluate kernels, as exact and sampling statistics do, cache
+# the result of each query for as long as the tensors it reads.
+CACHING_SCHEDULER = LogicNormalizer(FactorCacheEvaluator(NON_RECURSIVE_SCHEDULER))
 
 # Accept already ordered, concordant statistics plans and use dense outputs.
 NON_RECURSIVE_STANDARD_SCHEDULER = LogicNormalizer(

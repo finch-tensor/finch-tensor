@@ -1,3 +1,4 @@
+import gc
 import math
 from collections import OrderedDict
 
@@ -15,7 +16,6 @@ from finch.algebra import (
     ftype,
 )
 from finch.autoschedule.capture import LogicCapture
-from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
 from finch.autoschedule.formatter.smart_formatter import FDFormatter, SmartFormatter
 from finch.autoschedule.tensor_stats import (
     DC,
@@ -32,10 +32,12 @@ from finch.autoschedule.tensor_stats import (
     LPStats,
     LPStatsFactory,
     SamplingStatsFactory,
+    StatsInterpreter,
     UniformStatsFactory,
     VPStatsFactory,
 )
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
+from finch.autoschedule.tensor_stats.memo_stats import MemoStatsFactory
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -363,13 +365,7 @@ def test_sampling_from_tensor():
     data = np.eye(20)
     arr = ft.asarray(data)
     node = Table(Literal(arr), (i, j))
-    stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(SamplingStatsFactory())(node, OrderedDict())
     assert stats.remainder_size == 1.0
     assert stats.remainder_prob == 1.0
     assert stats.estimate_non_fill_values() == pytest.approx(20.0, abs=1.0)
@@ -383,29 +379,8 @@ def test_sampling_mapjoin_join():
     ta = Table(Literal(ft.asarray(data_a)), (i, k))
     tb = Table(Literal(ft.asarray(data_b)), (k, j))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=SamplingStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=SamplingStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
-    stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(),
-        node=node_mul,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    stats = StatsInterpreter(SamplingStatsFactory())(node_mul, OrderedDict())
     assert stats.estimate_non_fill_values() == pytest.approx(20.0, abs=1.0)
 
 
@@ -417,29 +392,8 @@ def test_sampling_mapjoin_elementwise():
     data_b[10:, :] = 1.0
     ta = Table(Literal(ft.asarray(data_a)), (i, j))
     tb = Table(Literal(ft.asarray(data_b)), (i, j))
-    cache = {}
-    insert_statistics(
-        stats_factory=SamplingStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=SamplingStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
     node_mapjoin_elem = MapJoin(Literal(ffuncs.add), (ta, tb))
-    stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(),
-        node=node_mapjoin_elem,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    stats = StatsInterpreter(SamplingStatsFactory())(node_mapjoin_elem, OrderedDict())
 
     assert stats.estimate_non_fill_values() == pytest.approx(
         float(np.count_nonzero(data_a + data_b)), abs=1.0
@@ -459,29 +413,8 @@ def test_sampling_mapjoin_broadcast():
     ta = Table(Literal(ft.asarray(data_a)), (i, k))
     tb = Table(Literal(ft.asarray(data_b)), (k, j))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=SamplingStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=SamplingStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
-    stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(),
-        node=node_mul,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    stats = StatsInterpreter(SamplingStatsFactory())(node_mul, OrderedDict())
 
     true_nnz = float(np.count_nonzero(data_a[:, :, None] * data_b[None, :, :]))
     assert stats.estimate_non_fill_values() == pytest.approx(true_nnz, abs=1.0)
@@ -500,13 +433,7 @@ def test_sampling_aggregate():
         arg=MapJoin(Literal(ffuncs.mul), (ta, tb)),
         idxs=(k,),
     )
-    stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(SamplingStatsFactory())(node, OrderedDict())
 
     assert stats.index_order == (i, j)
     assert stats.remainder_size == 20.0
@@ -518,13 +445,7 @@ def test_sampling_relabel():
     i, j = Field("i"), Field("j")
     data = np.eye(5)
     node = Table(Literal(ft.asarray(data)), (i, j))
-    stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(SamplingStatsFactory())(node, OrderedDict())
     relabled = SamplingStatsFactory().relabel(stats, (Field("row"), Field("col")))
 
     assert relabled.index_order == (Field("row"), Field("col"))
@@ -537,13 +458,7 @@ def test_sampling_reorder():
     i, j = Field("i"), Field("j")
     data = np.eye(5)
     node = Table(Literal(ft.asarray(data)), (i, j))
-    stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(SamplingStatsFactory())(node, OrderedDict())
     reordered = SamplingStatsFactory().reorder(stats, (j, i))
     assert reordered.index_order == (j, i)
     assert reordered.estimate_non_fill_values() == pytest.approx(
@@ -845,13 +760,7 @@ def test_exact_elementwise():
         Literal(ffuncs.mul),
         (Table(Literal(ft.asarray(A)), (i, j)), Table(Literal(ft.asarray(B)), (i, j))),
     )
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     assert stats.estimate_non_fill_values() == pytest.approx(
         float(np.count_nonzero(A * B))
     )
@@ -865,13 +774,7 @@ def test_exact_broadcast():
         Literal(ffuncs.mul),
         (Table(Literal(ft.asarray(A)), (i, j)), Table(Literal(ft.asarray(b)), (j,))),
     )
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     assert stats.estimate_non_fill_values() == pytest.approx(
         float(np.count_nonzero(A * b))
     )
@@ -885,13 +788,7 @@ def test_exact_join():
         Literal(ffuncs.mul),
         (Table(Literal(ft.asarray(A)), (i, j)), Table(Literal(ft.asarray(B)), (j, k))),
     )
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     assert stats.estimate_non_fill_values() == pytest.approx(
         float(np.count_nonzero(A[:, :, None] * B[None, :, :]))
     )
@@ -978,13 +875,7 @@ def test_exact_semiring(reduce_op, reduce_init, join_op, matrices, expected_fn):
     )
     node = MapJoin(Literal(join_op), (ab, cd))
 
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     expected = expected_fn(A, B, C, D)
     assert stats.estimate_non_fill_values() == pytest.approx(expected)
 
@@ -999,13 +890,7 @@ def test_exact_semiring_tropical():
         Table(Literal(A_), (i, j)),
         (j,),
     )
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     expected = float(np.count_nonzero(np.isfinite(np.min(A, axis=1))))
     assert stats.estimate_non_fill_values() == pytest.approx(expected)
 
@@ -1014,13 +899,7 @@ def test_exact_relabel():
     i, j = Field("i"), Field("j")
     data = np.array([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]])
     node = Table(Literal(ft.asarray(data)), (i, j))
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     row, col = Field("row"), Field("col")
     relabeled = ExactStatsFactory().relabel(stats, (row, col))
 
@@ -1033,13 +912,7 @@ def test_exact_reorder():
     i, j = Field("i"), Field("j")
     data = np.array([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]])
     node = Table(Literal(ft.asarray(data)), (i, j))
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     reordered = ExactStatsFactory().reorder(stats, (j, i))
 
     assert reordered.index_order == (j, i)
@@ -1051,13 +924,7 @@ def test_exact_embedding():
     i, j = Field("i"), Field("j")
     data = np.array([[1.0, 0.0], [0.0, 1.0]])
     node = Table(Literal(ft.asarray(data)), (i, j))
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     emb = stats.get_embedding()
 
     assert emb.shape == (3,)
@@ -1072,6 +939,111 @@ def test_exact_embedding():
     assert emb_r[2] == pytest.approx(emb[2])
 
 
+# ─────────────────────────────── MemoStats tests ────────────────────────────────
+
+
+def _random_sparse(rng, *shape):
+    return (rng.random(shape) < 0.3) * (rng.random(shape) + 1.0)
+
+
+@pytest.mark.parametrize(
+    "inner", [ExactStatsFactory, DCStatsFactory, UniformStatsFactory]
+)
+def test_memo_matches_inner(inner):
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
+    rng = np.random.default_rng(0)
+    A, B, C, D = (ft.asarray(_random_sparse(rng, 4, 4)) for _ in range(4))
+    ab = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(
+            Literal(ffuncs.mul), (Table(Literal(A), (i, j)), Table(Literal(B), (j, k)))
+        ),
+        (j,),
+    )
+    cd = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(
+            Literal(ffuncs.mul), (Table(Literal(C), (i, m)), Table(Literal(D), (m, k)))
+        ),
+        (m,),
+    )
+    node = MapJoin(Literal(ffuncs.add), (ab, cd))
+
+    expected = StatsInterpreter(inner())(node, OrderedDict())
+    stats = StatsInterpreter(MemoStatsFactory(inner()))(node, OrderedDict())
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        expected.estimate_non_fill_values()
+    )
+    assert stats.estimate_non_fill_values((i,)) == pytest.approx(
+        expected.estimate_non_fill_values((i,))
+    )
+
+
+def test_memo_computes_each_expression_once():
+    class CountingFactory(ExactStatsFactory):
+        def __init__(self):
+            super().__init__()
+            self.aggregates = 0
+
+        def aggregate(self, *args):
+            self.aggregates += 1
+            return super().aggregate(*args)
+
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
+    A, B, C = np.ones((2, 10)), np.ones((10, 3)), np.ones((3, 4))
+    inner = CountingFactory()
+    factory = MemoStatsFactory(inner)
+    a = factory(ft.asarray(A), (i, j))
+    b = factory(ft.asarray(B), (j, k))
+    c = factory(ft.asarray(C), (k, m))
+
+    def matmul(x, y, idx):
+        return factory.aggregate(
+            ffuncs.add, None, (idx,), factory.mapjoin(ffuncs.mul, x, y)
+        )
+
+    ab_c = matmul(matmul(a, b, j), c, k)
+    assert inner.aggregates == 2
+    again = matmul(matmul(a, b, j), c, k)
+    assert inner.aggregates == 2
+    assert again.inner is ab_c.inner
+    assert ab_c.estimate_non_fill_values() == np.count_nonzero(A @ B @ C)
+
+
+def test_memo_computes_each_estimate_once():
+    i, j = Field("i"), Field("j")
+    factory = MemoStatsFactory()
+    stats = factory(ft.asarray(np.eye(4)), (i, j))
+    again = factory.relabel(stats, (i, j))
+    calls = []
+    estimate = again.inner.estimate_non_fill_values
+
+    def counting(over=()):
+        calls.append(frozenset(over))
+        return estimate(over)
+
+    again.inner.estimate_non_fill_values = counting
+    for _ in range(3):
+        assert factory.relabel(stats, (i, j)).estimate_non_fill_values((j, i)) == 1
+    assert again.estimate_non_fill_values((i, j)) == 1
+    assert calls == [frozenset({i, j})]
+
+
+def test_memo_leaf_cache_is_weak():
+    factory = MemoStatsFactory()
+    tensor = ft.asarray(np.eye(3))
+    stats = factory(tensor, (Field("i"), Field("j")))
+    relabeled = factory(tensor, (Field("k"), Field("l")))
+    assert len(factory.leaves) == 1
+    assert relabeled.estimate_non_fill_values() == 3
+
+    del tensor, stats, relabeled
+    gc.collect()
+    assert not factory.leaves
+
+
 # ─────────────────────────────── DummyStats tests ────────────────────────────────
 
 
@@ -1079,13 +1051,7 @@ def test_dummy_from_tensor_and_getters():
     data = np.zeros((2, 3))
     node = Table(Literal(ft.asarray(data)), (Field("i"), Field("j")))
 
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DummyStatsFactory())(node, OrderedDict())
 
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
@@ -1098,28 +1064,8 @@ def test_dummy_mapjoin_same_axes():
     ta = Table(Literal(ft.asarray(np.ones((4, 5)))), (i, j))
     tb = Table(Literal(ft.asarray(np.ones((4, 5)))), (i, j))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=MapJoin(Literal(ffuncs.add), (ta, tb)),
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
+    stats = StatsInterpreter(DummyStatsFactory())(
+        MapJoin(Literal(ffuncs.add), (ta, tb)), OrderedDict()
     )
 
     assert stats.index_order == (i, j)
@@ -1132,28 +1078,8 @@ def test_dummy_mapjoin_non_same_axes():
     ta = Table(Literal(ft.asarray(np.ones((4, 5)))), (i, j))
     tb = Table(Literal(ft.asarray(np.ones((5, 3)))), (j, k))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=MapJoin(Literal(ffuncs.mul), (ta, tb)),
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
+    stats = StatsInterpreter(DummyStatsFactory())(
+        MapJoin(Literal(ffuncs.mul), (ta, tb)), OrderedDict()
     )
 
     assert set(stats.index_order) == {i, j, k}
@@ -1167,13 +1093,7 @@ def test_dummy_aggregate():
     node_sum = Aggregate(
         op=Literal(ffuncs.add), init=Literal(0.0), arg=table, idxs=(j,)
     )
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=node_sum,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DummyStatsFactory())(node_sum, OrderedDict())
 
     assert stats.index_order == (i,)
     assert stats.get_dim_size(i) == 10.0
@@ -1182,13 +1102,7 @@ def test_dummy_aggregate():
 def test_dummy_copy():
     node = Table(Literal(ft.asarray(np.eye(10))), (Field("i"), Field("j")))
 
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DummyStatsFactory())(node, OrderedDict())
     copy = DummyStatsFactory().copy(stats)
 
     assert copy.dim_sizes == stats.dim_sizes
@@ -1199,13 +1113,7 @@ def test_dummy_copy():
 def test_dummy_relabel():
     node = Table(Literal(ft.asarray(np.eye(10))), (Field("i"), Field("j")))
 
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DummyStatsFactory())(node, OrderedDict())
     relabeled = DummyStatsFactory().relabel(stats, (Field("m"), Field("n")))
 
     assert relabeled.get_dim_size(Field("m")) == stats.get_dim_size(Field("i"))
@@ -1215,13 +1123,7 @@ def test_dummy_relabel():
 def test_dummy_reorder():
     node = Table(Literal(ft.asarray(np.eye(10))), (Field("i"), Field("j")))
 
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DummyStatsFactory())(node, OrderedDict())
     reordered = DummyStatsFactory().reorder(stats, (Field("j"), Field("i")))
 
     assert reordered.get_dim_size(Field("i")) == stats.get_dim_size(Field("i"))
@@ -1238,13 +1140,7 @@ def test_vp_from_tensor_and_getters():
     arr = ft.asarray(data)
 
     node = Table(Literal(arr), (Field("i"), Field("j")))
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(VPStatsFactory())(node, OrderedDict())
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
@@ -1271,13 +1167,7 @@ def test_vp_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
     arr = ft.asarray(data)
     node = Table(Literal(arr), axes)
 
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(VPStatsFactory())(node, OrderedDict())
 
     assert stats.index_order == tuple(axes)
     assert stats.estimate_non_fill_values() == expected_nnz
@@ -1291,30 +1181,8 @@ def test_vp_mapjoin_join():
     ta = Table(Literal(ft.asarray(data_a)), (i, k))
     tb = Table(Literal(ft.asarray(data_b)), (k, j))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=node_mul,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    stats = StatsInterpreter(VPStatsFactory())(node_mul, OrderedDict())
     assert stats.estimate_non_fill_values() == pytest.approx(10.0)
 
 
@@ -1328,28 +1196,8 @@ def test_vp_mapjoin_elementwise():
     ta = Table(Literal(ft.asarray(data_a)), (i, j))
     tb = Table(Literal(ft.asarray(data_b)), (i, j))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=MapJoin(Literal(ffuncs.add), (ta, tb)),
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
+    stats = StatsInterpreter(VPStatsFactory())(
+        MapJoin(Literal(ffuncs.add), (ta, tb)), OrderedDict()
     )
     assert stats.estimate_non_fill_values() == pytest.approx(100.0)
 
@@ -1369,28 +1217,8 @@ def test_vp_mapjoin_broadcast():
     ta = Table(Literal(ft.asarray(data_a)), (i, j))
     tb = Table(Literal(ft.asarray(data_b)), (j, k))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=MapJoin(Literal(ffuncs.add), (ta, tb)),
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
+    stats = StatsInterpreter(VPStatsFactory())(
+        MapJoin(Literal(ffuncs.add), (ta, tb)), OrderedDict()
     )
     assert stats.estimate_non_fill_values() == pytest.approx(2 * 3 + 4 * 3)
     assert stats.V[i] == pytest.approx(4.0)
@@ -1409,13 +1237,7 @@ def test_vp_aggregate():
         arg=table,
         idxs=(j,),
     )
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=node_sum,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(VPStatsFactory())(node_sum, OrderedDict())
     assert stats.index_order == (i,)
     assert stats.get_dim_size(i) == 10.0
     assert stats.estimate_non_fill_values() == pytest.approx(10.0)
@@ -1425,13 +1247,7 @@ def test_vp_copy():
     data = np.eye(10)
     arr = ft.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(VPStatsFactory())(node, OrderedDict())
     copy = VPStatsFactory().copy(stats)
     assert copy.nnz == stats.nnz
     assert copy.V == stats.V
@@ -1442,13 +1258,7 @@ def test_vp_relabel():
     data = np.eye(10)
     arr = ft.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(VPStatsFactory())(node, OrderedDict())
     relabeled = VPStatsFactory().relabel(stats, (Field("row"), Field("col")))
     assert relabeled.index_order == (Field("row"), Field("col"))
     assert relabeled.nnz == stats.nnz
@@ -1462,13 +1272,7 @@ def test_vp_reorder():
     data = np.eye(10)
     arr = ft.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(VPStatsFactory())(node, OrderedDict())
     reordered = VPStatsFactory().reorder(stats, (Field("j"), Field("i")))
     assert reordered.index_order == (Field("j"), Field("i"))
     assert reordered.nnz == stats.nnz
@@ -1484,13 +1288,7 @@ def test_uniform_from_tensor_and_getters():
     arr = ft.asarray(data)
 
     node = Table(Literal(arr), (Field("i"), Field("j")))
-    stats = insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(UniformStatsFactory())(node, OrderedDict())
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
@@ -1515,13 +1313,7 @@ def test_uniform_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
     arr = ft.asarray(data)
     node = Table(Literal(arr), axes)
 
-    stats = insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(UniformStatsFactory())(node, OrderedDict())
 
     assert stats.index_order == tuple(axes)
     assert stats.estimate_non_fill_values() == expected_nnz
@@ -1536,43 +1328,15 @@ def test_uniform_mapjoin_mul_and_add():
     ta = Table(Literal(ft.asarray(data_a)), (Field("i"), Field("j")))
     tb = Table(Literal(ft.asarray(data_b)), (Field("i"), Field("j")))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
     # P(a)*P(b) = 0.5 * 0.5 = 0.25 -> 0.25 * 100 = 25 nnz
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
-    us_mul = insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=node_mul,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    us_mul = StatsInterpreter(UniformStatsFactory())(node_mul, OrderedDict())
     assert us_mul.estimate_non_fill_values() == pytest.approx(25.0)
     assert us_mul.fill_type == StaticFillFType(np.float64(0.0))
 
     # 1 - (1-P(a))(1-P(b)) = 1 - (1-0.5)*(1-0.5) =0.75 -> 0.75 * 100 = 75 nnz
     node_add = MapJoin(Literal(ffuncs.add), (ta, tb))
-    us_add = insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=node_add,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    us_add = StatsInterpreter(UniformStatsFactory())(node_add, OrderedDict())
 
     assert us_add.estimate_non_fill_values() == pytest.approx(75.0)
 
@@ -1586,13 +1350,7 @@ def test_uniform_aggregate():
         arg=table,
         idxs=(Field("j"),),
     )
-    us_agg = insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=node_sum,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    us_agg = StatsInterpreter(UniformStatsFactory())(node_sum, OrderedDict())
     # p=0.1 in our example as only diagonal elements are non zero so 10/100 = 0.1
     expected_prob = 1 - math.pow(1.0 - 0.1, 10)
     # post squashing we have just 10 rows left so new vol = 10x1 = 10
@@ -2011,13 +1769,7 @@ def test_base_aggregate(
 def test_from_tensor_and_getters():
     arr = ft.asarray(np.zeros((2, 3)))
     node = Table(Literal(arr), (Field("i"), Field("j")))
-    stats = insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DenseStatsFactory())(node, OrderedDict())
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
@@ -2039,13 +1791,7 @@ def test_estimate_non_fill_values(shape, expected):
     node = Table(Literal(arr), axes)
     # node = Table(Literal(arr), tuple(Field(a) for a in axes))
 
-    stats = insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DenseStatsFactory())(node, OrderedDict())
 
     assert stats.index_order == tuple(axes)
     assert stats.estimate_non_fill_values() == expected
@@ -2056,39 +1802,12 @@ def test_mapjoin_mul_and_add():
     tb = Table(Literal(ft.asarray(np.ones((3, 4)))), (Field("j"), Field("k")))
     ta2 = Table(Literal(ft.asarray(2 * np.ones((2, 3)))), (Field("i"), Field("j")))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=ta2,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    cache[ta].fill_type = StaticFillFType(1)
-    cache[tb].fill_type = StaticFillFType(1)
-    cache[ta2].fill_type = StaticFillFType(2)
-    node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
-    dsm = insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=node_mul,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    factory = DenseStatsFactory()
+    sa, sb, sa2 = (StatsInterpreter(factory)(t, OrderedDict()) for t in (ta, tb, ta2))
+    sa.fill_type = StaticFillFType(1)
+    sb.fill_type = StaticFillFType(1)
+    sa2.fill_type = StaticFillFType(2)
+    dsm = factory.mapjoin(ffuncs.mul, sa, sb)
 
     assert dsm.index_order == (Field("i"), Field("j"), Field("k"))
     assert dsm.get_dim_size(Field("i")) == 2.0
@@ -2096,14 +1815,7 @@ def test_mapjoin_mul_and_add():
     assert dsm.get_dim_size(Field("k")) == 4.0
     assert dsm.fill_type == StaticFillFType(1)
 
-    node_add = MapJoin(Literal(ffuncs.add), (ta, ta2))
-    ds_sum = insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=node_add,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    ds_sum = factory.mapjoin(ffuncs.add, sa, sa2)
 
     assert ds_sum.index_order == (Field("i"), Field("j"))
     assert ds_sum.get_dim_size(Field("i")) == 2.0
@@ -2117,13 +1829,7 @@ def test_aggregate():
         Literal(ft.asarray(np.ones((2, 3)))),
         (Field("i"), Field("j")),
     )
-    dsa = insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=table,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    dsa = StatsInterpreter(DenseStatsFactory())(table, OrderedDict())
 
     node_add = Aggregate(
         op=Literal(ffuncs.add),
@@ -2132,13 +1838,7 @@ def test_aggregate():
         idxs=(Field("j"),),
     )
 
-    ds_agg = insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=node_add,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    ds_agg = StatsInterpreter(DenseStatsFactory())(node_add, OrderedDict())
 
     assert ds_agg.index_order == (Field("i"),)
     assert ds_agg.get_dim_size(Field("i")) == 2.0
@@ -2149,13 +1849,7 @@ def test_relabel_dense_stats():
     arr = ft.asarray(np.zeros((2, 3)))
     table = Table(Literal(arr), (Field("i"), Field("j")))
 
-    stats = insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=table,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DenseStatsFactory())(table, OrderedDict())
 
     new_stats = DenseStatsFactory().relabel(stats, (Field("row"), Field("col")))
 
@@ -2185,13 +1879,7 @@ def test_dc_stats_scalar(tensor, fields, expected_dcs):
         Literal(ft.asarray(tensor)),
         tuple(fields),
     )
-    stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DCStatsFactory())(node, OrderedDict())
     assert stats.dcs == expected_dcs
 
 
@@ -2221,13 +1909,7 @@ def test_dc_stats_vector(tensor, fields, expected_dcs):
         Literal(tensor),
         tuple(fields),
     )
-    stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DCStatsFactory())(node, OrderedDict())
     assert stats.dcs == expected_dcs
 
 
@@ -2272,13 +1954,7 @@ def test_dc_stats_matrix(tensor, fields, expected_dcs):
         Literal(tensor),
         tuple(fields),
     )
-    stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DCStatsFactory())(node, OrderedDict())
     assert stats.dcs == expected_dcs
 
 
@@ -2350,13 +2026,7 @@ def test_dc_stats_3d(tensor, fields, expected_dcs):
         Literal(tensor),
         tuple(fields),
     )
-    stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DCStatsFactory())(node, OrderedDict())
     assert stats.dcs == expected_dcs
 
 
@@ -2433,13 +2103,7 @@ def test_dc_stats_3d(tensor, fields, expected_dcs):
 )
 def test_dc_card_estimate(fields, dims, dcs, expected_nnz):
     node = Table(Literal(ft.asarray(np.zeros((1,) * len(fields), dtype=int))), fields)
-    stat = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stat = StatsInterpreter(DCStatsFactory())(node, OrderedDict())
 
     _overwrite_def(
         stat,
@@ -2493,13 +2157,7 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
     stats_objs = []
     for dcs in dcs_list:
         node = Table(Literal(ft.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
-        s = insert_statistics(
-            stats_factory=DCStatsFactory(),
-            node=node,
-            bindings=OrderedDict(),
-            replace=False,
-            cache={},
-        )
+        s = StatsInterpreter(DCStatsFactory())(node, OrderedDict())
         _overwrite_def(
             s,
             BaseTensorStats.from_fields(
@@ -2583,20 +2241,8 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
 )
 def test_merge_dc_union(new_dims, inputs, expected_dcs):
     new_dims = {Field(k.name): v for k, v in new_dims.items()}
-    cache = {}
     stats_objs = []
     for idx_set, dcs in inputs:
-        fields = tuple(sorted(idx_set, key=lambda f: f.name))
-        shape = (1,) * max(1, len(fields))
-        node = Table(Literal(ft.asarray(np.zeros(shape, dtype=int))), fields)
-
-        insert_statistics(
-            stats_factory=DCStatsFactory(),
-            node=node,
-            bindings=OrderedDict(),
-            replace=False,
-            cache=cache,
-        )
         field_idx_set = frozenset(idx_set)
         field_dims = {k: new_dims[k] for k in idx_set}
 
@@ -2657,18 +2303,10 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
     ],
 )
 def test_disjunction_dc_card(fields1, dims1, dcs1, fields2, dims2, dcs2, expected_nnz):
-    cache = {}
-
     node1 = Table(
         Literal(ft.asarray(np.zeros((1,) * len(fields1), dtype=int))), fields1
     )
-    s1 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node1,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    s1 = StatsInterpreter(DCStatsFactory())(node1, OrderedDict())
     _overwrite_def(
         s1,
         BaseTensorStats.from_fields(frozenset(fields1), dims1, StaticFillFType(0)),
@@ -2678,27 +2316,14 @@ def test_disjunction_dc_card(fields1, dims1, dcs1, fields2, dims2, dcs2, expecte
     node2 = Table(
         Literal(ft.asarray(np.zeros((1,) * len(fields2), dtype=int))), fields2
     )
-    s2 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node2,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    s2 = StatsInterpreter(DCStatsFactory())(node2, OrderedDict())
     _overwrite_def(
         s2,
         BaseTensorStats.from_fields(frozenset(fields2), dims2, StaticFillFType(0)),
     )
     s2.dcs = set(dcs2)
 
-    parent = MapJoin(Literal(ffuncs.add), (node1, node2))
-    reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=parent,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    reduce_stats = DCStatsFactory().mapjoin(ffuncs.add, s1, s2)
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
 
@@ -2717,18 +2342,11 @@ def test_disjoint_join_dc_card(fill3, expected_nnz):
     dcs2 = [DC(frozenset(), frozenset([Field("j"), Field("k")]), 10)]
     dims3 = {Field("i"): 1000.0, Field("j"): 100.0, Field("k"): 1000.0}
     dcs3 = [DC(frozenset(), frozenset([Field("i"), Field("j"), Field("k")]), 10)]
-    cache = {}
 
     node1 = Table(
         Literal(ft.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
     )
-    s1 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node1,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    s1 = StatsInterpreter(DCStatsFactory())(node1, OrderedDict())
     _overwrite_def(
         s1,
         BaseTensorStats.from_fields(
@@ -2740,13 +2358,7 @@ def test_disjoint_join_dc_card(fill3, expected_nnz):
     node2 = Table(
         Literal(ft.asarray(np.zeros((1, 1), dtype=int))), (Field("j"), Field("k"))
     )
-    s2 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node2,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    s2 = StatsInterpreter(DCStatsFactory())(node2, OrderedDict())
     _overwrite_def(
         s2,
         BaseTensorStats.from_fields(
@@ -2759,13 +2371,7 @@ def test_disjoint_join_dc_card(fill3, expected_nnz):
         Literal(ft.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
     )
-    s3 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node3,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    s3 = StatsInterpreter(DCStatsFactory())(node3, OrderedDict())
     _overwrite_def(
         s3,
         BaseTensorStats.from_fields(
@@ -2776,18 +2382,22 @@ def test_disjoint_join_dc_card(fill3, expected_nnz):
     )
     s3.dcs = set(dcs3)
 
-    map = MapJoin(Literal(ffuncs.mul), (node1, node2))
-    parent = MapJoin(Literal(ffuncs.mul), (map, node3))
-
-    reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=parent,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    factory = DCStatsFactory()
+    reduce_stats = factory.mapjoin(ffuncs.mul, factory.mapjoin(ffuncs.mul, s1, s2), s3)
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
+
+
+@pytest.mark.parametrize("factory", [DCStatsFactory, ExactStatsFactory])
+def test_aggregate_does_not_bound_joins_over_reduced_fields(factory):
+    sf = factory()
+    i, j = Field("i"), Field("j")
+    # Every degree of a single entry is 1, but its projection onto i says
+    # nothing about the j of a tensor it joins.
+    entry = sf(ft.asarray(np.diag([1.0, 0.0, 0.0, 0.0])), (i, j))
+    row = sf.aggregate(ffuncs.or_, False, (j,), sf.support(entry))
+    full = sf.support(sf(ft.asarray(np.ones((4, 4))), (i, j)))
+    assert sf.mapjoin(ffuncs.and_, row, full).estimate_non_fill_values() == 4
 
 
 @pytest.mark.parametrize(
@@ -2885,19 +2495,11 @@ def test_disjoint_join_dc_card(fill3, expected_nnz):
     ],
 )
 def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
-    cache = {}
-
     node = Table(
         Literal(ft.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
     )
-    st = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    st = StatsInterpreter(DCStatsFactory())(node, OrderedDict())
     _overwrite_def(
         st,
         BaseTensorStats.from_fields(
@@ -2907,19 +2509,7 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
     st.dcs = set(dcs)
 
     reduce_fields = tuple(reduce_indices)
-    reduce_node = Aggregate(
-        op=Literal(ffuncs.add),
-        init=Literal(0),
-        idxs=reduce_fields,
-        arg=node,
-    )
-    reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=reduce_node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    reduce_stats = DCStatsFactory().aggregate(ffuncs.add, 0, reduce_fields, st)
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
 
@@ -2932,12 +2522,8 @@ def _lp_table(dense, fields):
 
 
 def _lp_stats(dense, fields, ps=(1.0, 2.0, math.inf)):
-    return insert_statistics(
-        stats_factory=LPStatsFactory(ps=ps),
-        node=_lp_table(dense, fields),
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
+    return StatsInterpreter(LPStatsFactory(ps=ps))(
+        _lp_table(dense, fields), OrderedDict()
     )
 
 
@@ -2953,13 +2539,7 @@ def test_lp_base_tensor_matches_dc():
     i, j = Field("i"), Field("j")
     A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 3.0], [4.0, 0.0, 0.0]])
     lp = _lp_stats(A, (i, j))
-    dc = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=_lp_table(A, (i, j)),
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    dc = StatsInterpreter(DCStatsFactory())(_lp_table(A, (i, j)), OrderedDict())
     assert lp.estimate_non_fill_values() == pytest.approx(dc.estimate_non_fill_values())
 
 
@@ -2971,12 +2551,8 @@ def test_lp_empty_tensor_is_zero():
 
 
 def test_lp_scalar_tensor():
-    stats = insert_statistics(
-        stats_factory=LPStatsFactory(),
-        node=Table(Literal(ft.asarray(np.asarray(5.0))), ()),
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
+    stats = StatsInterpreter(LPStatsFactory())(
+        Table(Literal(ft.asarray(np.asarray(5.0))), ()), OrderedDict()
     )
     assert stats.estimate_non_fill_values() == 1.0
 
@@ -3227,11 +2803,5 @@ def test_exact_idempotent_reduction_of_fills_is_fill():
         Table(Literal(ft.asarray(np.zeros((2, 3)))), (i, j)),
         (j,),
     )
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     assert stats.estimate_non_fill_values() == 0.0

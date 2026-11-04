@@ -6,7 +6,12 @@ from .cost_models import (
     QuadraticPredictor,
     Sum,
 )
-from .factorize_cost_models import FactorizeCostModel, FlopsCostModel, Statement
+from .factorize_cost_models import (
+    FactorizeCostModel,
+    FlopsCostModel,
+    LoopDepthCostModel,
+    Statement,
+)
 from .format_cost_models import (
     DenseLevelOption,
     ElementLevelOption,
@@ -37,6 +42,7 @@ __all__ = [
     "LevelOption",
     "LinearPredictor",
     "LoopCostModel",
+    "LoopDepthCostModel",
     "PigeonCostModel",
     "Prefix",
     "QuadraticPredictor",

@@ -8,9 +8,11 @@ from finch.autoschedule.cost_models import (
     Sum,
     TransposeCostModel,
 )
-from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
-from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
+from finch.autoschedule.tensor_stats.stats_interpreter import (
+    StatsInterpreter,
+    StatsMachine,
+)
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -104,7 +106,7 @@ def set_greedy_loop_order(
             case _:
                 raise Exception(f"Invalid node: {query} in set_greedy_loop_order")
 
-        insert_statistics(stats_factory, query, stats_bindings, replace=False, cache={})
+        StatsInterpreter(stats_factory)(query, stats_bindings)
 
     return Plan(tuple(new_queries + [plan.bodies[-1]]))
 

@@ -134,3 +134,35 @@ class FlopsCostModel(FactorizeCostModel, AliasedForm):
                 return self.get_component_features(Statement(stmt.as_query()), machine)
             case stmt:
                 raise ValueError(f"Unsupported statement type: {stmt}")
+
+
+class LoopDepthCostModel(FactorizeCostModel, AliasedForm):
+    """
+    LoopDepthCostModel counts the fields each query loops over, so that a greedy
+    search reduces the indices which keep the deepest loop nest shallow. It
+    needs only the shapes of its statistics. Each query is a component.
+    """
+
+    @property
+    def n_features(self) -> int:
+        return 1
+
+    def __init__(self, predictor: Callable[[np.ndarray], float] | None = None):
+        super().__init__(
+            predictor if predictor is not None else LinearPredictor(np.array([1.0]))
+        )
+
+    def get_component_features(
+        self,
+        component: Statement,
+        machine: StatsMachine[NS],
+    ) -> np.ndarray:
+        match component.stmt:
+            case Query(Table(Alias()), Aggregate(_, init, arg, _)):
+                return np.array([[len({*arg.fields(), *init.fields()})]], dtype=float)
+            case Query(Table(Alias()), rhs):
+                return np.array([[len(rhs.fields())]], dtype=float)
+            case QueryInto() as stmt:
+                return self.get_component_features(Statement(stmt.as_query()), machine)
+            case stmt:
+                raise ValueError(f"Unsupported statement type: {stmt}")

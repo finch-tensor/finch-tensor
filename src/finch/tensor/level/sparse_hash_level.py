@@ -450,6 +450,15 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
     def level_format_properties(self, n):
         return self.lvl_t.level_format_properties(n + 1)
 
+    def level_default_protocols(self):
+        return (ntn.Walk(), *self.lvl_t.level_default_protocols())
+
+    def level_protocols(self):
+        return (
+            (ntn.Walk(), ntn.Gallop(), ntn.Follow(), ntn.Extrude(), ntn.Laminate()),
+            *self.lvl_t.level_protocols(),
+        )
+
     def construct(self, shape: tuple[Any, ...], *, pos: int) -> "SparseHashLevel":
         lvl = self.lvl_t.construct(shape=shape[1:], pos=0)
         return SparseHashLevel(
@@ -804,6 +813,17 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
                 for r in range(1, self.ndim)
             ),
         )
+        match proto:
+            case ntn.DefaultProtocol() | ntn.Walk():
+                step = lplt.Stepper
+            case ntn.Gallop():
+                step = lplt.Jumper
+            case ntn.Follow():
+                return self._level_unfurl_follow(ctx, fiber, pos, full)
+            case _:
+                raise NotImplementedError(
+                    f"SparseHashLevelFType does not support the {proto} protocol."
+                )
         bindings = {
             "r": hl.var("r"),
             "r_stop": hl.var("r_stop"),
@@ -869,7 +889,7 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
         return lplt.Thunk(
             preamble=thunk_preamble,
             body=lambda ctx, ext: lplt.Sequence(
-                head=lambda ctx, idx: lplt.Stepper(
+                head=lambda ctx, idx: step(
                     preamble=stepper_preamble,
                     stop=lambda ctx: ntn.Variable(i_stop.name, d_t),
                     chunk=lplt.Sequence(
@@ -887,6 +907,69 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
                 tail=lambda ctx, idx: lplt.Run(full),
             ),
         )
+
+    def _level_unfurl_follow(self, ctx, fiber, pos, full):
+        lvl = ctx(fiber.lvl)
+        p_t, d_t = self.position_type, self.dimension_type
+
+        def lookup(ctx, idx):
+            hl = _SparseHashLowering(self, ctx, lvl)
+            p, i, q = hl.var("p", p_t), hl.var("i", d_t), hl.var("q", p_t)
+            found = hl.var("found", ftypes.bool_)
+            hashing, x = hl.key_hash(p, i)
+            finding, h, _ = hl.find(p, i, x)
+            # A table without slots holds no keys, and can't be probed.
+            ctx.exec(
+                asm.Block(
+                    (
+                        *hl.parse(
+                            """
+                            p = to_pos(pos)
+                            i = to_idx(idx)
+                            found = false
+                            q = zero_pos
+                            """,
+                            p=p,
+                            i=i,
+                            q=q,
+                            found=found,
+                            pos=pos,
+                            idx=ctx.ctx(idx),
+                        ),
+                        asm.If(
+                            hl.expr("n_ctrl > 0"),
+                            asm.Block(
+                                (
+                                    *hashing,
+                                    *finding,
+                                    *hl.parse(
+                                        """
+                                        if (tbl_ctrl[h] != EMPTY)
+                                            found = true
+                                            q = tbl[h]
+                                        end
+                                        """,
+                                        h=h,
+                                        q=q,
+                                        found=found,
+                                    ),
+                                )
+                            ),
+                        ),
+                    )
+                )
+            )
+            return lplt.Switch(
+                found,
+                lplt.Run(
+                    ntn.Fiber(
+                        ntn.Child(fiber.lvl), ntn.Value(q, p_t), (*fiber.idxs, idx)
+                    )
+                ),
+                lplt.Run(full),
+            )
+
+        return lplt.Lookup(lookup)
 
     def _lower_scansearch(self, hl, bindings, x):
         """
@@ -935,6 +1018,13 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
         )
 
     def level_unfurl_update(self, ctx, fiber, ext, mode, proto, pos):
+        match proto:
+            case ntn.DefaultProtocol() | ntn.Extrude() | ntn.Laminate():
+                pass
+            case _:
+                raise NotImplementedError(
+                    f"SparseHashLevelFType does not support the {proto} protocol."
+                )
         lvl = ctx(fiber.lvl)
         child = asm.GetAttr(lvl, asm.Literal("lvl"))
         p_t, d_t = self.position_type, self.dimension_type
