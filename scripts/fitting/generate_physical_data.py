@@ -4,16 +4,16 @@ their inputs. Each program is a random subprogram of C_lmq += A_jlpq * B_kmpq,
 which loops in the order its inputs store their fields, and its inputs are
 Kronecker products of R-MAT blocks of drawn densities, as kronecker_stats draws
 them. A and B have at most MAX_RANK fields each, which bounds the variants of
-the joint stage. Its variants are every option of the decision of the stage:
+the format stage. Its variants are every option of the decision of the stage:
 the protocols A and B are read with under drawn formats, the formats and
 protocols of one of A, B, and C with the protocols of the loops over its
-fields, under drawn formats and protocols of the rest, the formats of one of
-A, B, and C under drawn formats of the others, the loop orders of the program,
-with its inputs stored in each, or, in the transpose stage, the orders a copy
-C of A can be stored in, which reads A as it is stored, under drawn formats.
-With --variants N, N of them are drawn without replacement when there are
-more, by default all of them, except 64 of the joint stage, which has up to
-6561, and 16 of the loop orders of the loop stage, which has up to 720.
+fields, under drawn formats and protocols of the rest, the loop orders of the
+program, with its inputs stored in each, or, in the transpose stage, the
+orders a copy C of A can be stored in, which reads A as it is stored, under
+drawn formats. With --variants N, N of them are drawn without replacement when
+there are more, by default all of them, except 64 of the format stage, which
+has up to 6561, and 16 of the loop orders of the loop stage, which has up to
+720.
 The log sizes of the fields of a program add up to a fraction of the most
 they may, under --lg-max-space and --lg-max-dim, and the log nonzeros of each
 input to a fraction of its log size. Each fraction is drawn as the largest of
@@ -21,7 +21,7 @@ input to a fraction of its log size. Each fraction is drawn as the largest of
 and skews toward larger or denser inputs above it. Of the samples draws of the
 inputs of a program, keep are kept, spread over the densities of A, B, and C
 by the same distribution, and each makes an example with the program. In the
-protocol and joint stages, the variants of the examples of a program compile
+protocol and format stages, the variants of the examples of a program compile
 to the same kernels, so they are compiled once for them all, and 10 are kept
 by default.
 The other stages choose protocols from the stats of each example, so their
@@ -89,7 +89,7 @@ from scripts.fitting.physical_bases import (
     with_subsequence,
 )
 
-# The most fields of an input, which bounds the variants of the joint stage.
+# The most fields of an input, which bounds the variants of the format stage.
 MAX_RANK = 3
 
 
@@ -330,7 +330,7 @@ def variant_space(
             return {"formats": formats, "protocols": protocols}
 
         return spaces, make
-    if stage == "joint":
+    if stage == "format":
         # One drawn tensor takes every kind and protocol of its levels, and
         # the formatter re-chooses the protocols of the loops it changes, so
         # the levels of the other input read at the loops over its fields take
@@ -361,25 +361,6 @@ def variant_space(
             return {"formats": formats, "protocols": protocols}
 
         return spaces, make
-    if stage == "level":
-        # The formatter chooses the formats of one tensor at a time, given the
-        # others, so one drawn tensor takes every format of its levels, and
-        # the others take drawn formats.
-        kinds = {
-            tns: [list(OPTIONS) for _ in idxs] for tns, idxs in input_fields.items()
-        }
-        kinds[C] = output_kinds(query, loop_order)
-        varied = choose(rng, [tns for tns, levels in kinds.items() if levels] or [C])
-        formats = {
-            tns.name: [choose(rng, options) for options in levels]
-            for tns, levels in kinds.items()
-            if tns != varied
-        }
-
-        def make(choices):
-            return {"formats": {**formats, varied.name: choices}}
-
-        return kinds[varied], make
     if stage == "loop":
         orders = [
             [idx.name for idx in order] for order in itertools.permutations(loop_order)
@@ -644,7 +625,7 @@ def main() -> None:
         "--keep",
         type=int,
         help="the draws of the inputs of each program which are kept as examples; "
-        "10 in the protocol and joint stages and 1 in the others by default",
+        "10 in the protocol and format stages and 1 in the others by default",
     )
     parser.add_argument(
         "--chunk", type=int, default=0, help="the chunk which names the examples"
@@ -653,7 +634,7 @@ def main() -> None:
         "--variants",
         type=int,
         help="the most variants of a program; all of them by default, except 64 "
-        "in the joint stage and 16 in the loop stage",
+        "in the format stage and 16 in the loop stage",
     )
     parser.add_argument(
         "--lg-max-space",
@@ -682,9 +663,9 @@ def main() -> None:
     parser.add_argument("--seed", type=int)
     args = parser.parse_args()
     if args.keep is None:
-        args.keep = 10 if args.stage in ("protocol", "joint") else 1
+        args.keep = 10 if args.stage in ("protocol", "format") else 1
     if args.variants is None:
-        args.variants = {"joint": 64, "loop": 16}.get(args.stage)
+        args.variants = {"format": 64, "loop": 16}.get(args.stage)
     if args.keep > args.samples:
         parser.error("--keep may be at most --samples")
     # Chunks drawn with one seed still draw different programs.

@@ -9,13 +9,11 @@ examples coalesce_physical_data collects, so a new basis needs no new timings.
 
 - protocol: for a random program with random formats, every assignment of
   the protocols its inputs are read with.
-- joint: for a random program, every assignment of the formats and protocols
+- format: for a random program, every assignment of the formats and protocols
   of one of its tensors, with the protocols of the loops over its fields,
   under random formats and protocols of the rest, as the formatter re-chooses
   the protocols of the loops a format changes. It fits the protocol basis
   from the same examples as the protocol stage, with formats too.
-- level: for a random program, every assignment of the formats of its tensors,
-  with the protocols the protocol optimizer chooses.
 - transpose: for a random input, every order a copy of it can be stored in,
   which the copy reads out of order, as the loop orderer transposes an input
   it would read out of order. The loop orderer charges such copies with the
@@ -73,17 +71,16 @@ from finch.finch_logic.parser import PROTOCOLS
 from finch.symbolic import PostOrderDFS, PostWalk, Rewrite
 from scripts.fitting.kronecker_stats import KroneckerStatsFactory, KroneckerTensor
 
-STAGES = ("protocol", "joint", "level", "transpose", "loop")
+STAGES = ("protocol", "format", "transpose", "loop")
 OPTIONS = {option.kind: option for option in LEVEL_OPTIONS}
 A, B, C = HardAlias("A"), HardAlias("B"), HardAlias("C")
 INPUTS = (A, B)
 
-# The formatter and the protocol optimizer price the same basis, so the joint
-# and level stages fit it again, to examples whose formats vary.
+# The formatter and the protocol optimizer price the same basis, so the format
+# stage fits it again, to examples whose formats vary.
 BASES: dict[str, Basis] = {
     "protocol": PROTOCOL_BASIS,
-    "joint": PROTOCOL_BASIS,
-    "level": PROTOCOL_BASIS,
+    "format": PROTOCOL_BASIS,
     "transpose": Affine(TransposeBasis()),
     "loop": Affine(PigeonBasis()),
 }
@@ -91,8 +88,7 @@ BASES: dict[str, Basis] = {
 # The models the optimizers of each stage use until they are fitted.
 DEFAULT_MODELS: dict[str, CostModel] = {
     "protocol": PROTOCOL_COST_MODEL,
-    "joint": PROTOCOL_COST_MODEL,
-    "level": PROTOCOL_COST_MODEL,
+    "format": PROTOCOL_COST_MODEL,
 }
 
 
@@ -268,7 +264,7 @@ def resolve(
     The program and formats of a variant of the example of record, once the
     stages below its stage have made their choices from the exact stats of
     inputs: the formats of every tensor, and the protocols each input is read
-    with, which the plans of the protocol and joint stages already give. The
+    with, which the plans of the protocol and format stages already give. The
     inputs the program reads are stored in the order it reads them, which is
     the loop order in the loop stage.
     """
@@ -278,8 +274,8 @@ def resolve(
     inputs = read_inputs(record, plan, inputs)
     stats_factory = KroneckerStatsFactory(record["block_bits"])
     if stage == "loop":
-        formats = choose_formats(plan, inputs, stats_factory, models["level"])
-    if stage not in ("protocol", "joint"):
+        formats = choose_formats(plan, inputs, stats_factory, models["format"])
+    if stage not in ("protocol", "format"):
         fields = input_fields(plan)
         plan = optimize_protocols(
             plan,
