@@ -200,15 +200,8 @@ class ElementLevelOption(LevelOption):
 
     kind = "element"
     feature_names = ("values", "value_bytes")
-    protocols = (
-        DefaultProtocol(),
-        Walk(),
-        Gallop(),
-        Follow(),
-        Extrude(),
-        Laminate(),
-    )
-    # A value is looked up at the position of its parent.
+    # A value is looked up at the position of its parent, and written with it.
+    protocols = (Follow(), Extrude(), Laminate())
     default_protocol = Follow()
     # An element has no field, and a value at every position.
     filters = False
@@ -514,20 +507,11 @@ def level_accesses(
                     yield ProtocolChoice(prefix, table, rank, options, write=True)
 
 
-FEATURES = (
-    "executions",
-    "iterations",
-    "seeks",
-    "parents",
-    "follow_visits",
-    "walk_visits",
-    "gallop_visits",
-    "dense_visits",
-    "distinct_reads",
-    "extrude_visits",
-    "laminate_visits",
-    "distinct_writes",
-)
+# The features of an access: the times its loop is entered, each a seek of a
+# fiber, the points the loop visits, the visits of its protocol, which are the
+# entries a walk steps through, the jumps of a gallop, or the lookups or
+# writes of the rest, and the distinct fibers entered and entries touched.
+FEATURES = ("executions", "iterations", "visits", "parents", "distinct")
 
 
 def accesses(
@@ -585,30 +569,22 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
     ) -> np.ndarray:
         prefix, table = component.prefix, component.table
         spaces = LoopSpaces(prefix, machine)
-        features = dict.fromkeys(FEATURES, 0.0)
-        features["executions"] = spaces.executions()
-        features["iterations"] = spaces.iterations()
-        features["seeks"] = spaces.executions()
         visited = spaces.visited()
-        features["parents"] = parents(component, spaces)
+        visits = spaces.count(visited)
         if component.write:
-            match component.protocol:
-                case Extrude():
-                    features["extrude_visits"] = spaces.count(visited)
-                case Laminate():
-                    features["laminate_visits"] = spaces.count(visited)
-            features["distinct_writes"] = spaces.located(visited, component.fields)
+            distinct = spaces.located(visited, component.fields)
         else:
-            dense = LoopSpaces(
-                replace(prefix, expr=followed(prefix.expr, table)), machine
-            )
-            dense_visits = dense.count(dense.visited())
+            distinct = spaces.located(spaces.stepped(table), component.fields)
             match component.protocol:
-                case Follow():
-                    features["follow_visits"] = spaces.count(visited)
                 case Walk():
-                    features["walk_visits"] = spaces.walk(table)
+                    visits = spaces.walk(table)
                 case Gallop():
+                    # A gallop jumps at most once for each visit the loop would
+                    # make if the level were dense, and for each step of the
+                    # smallest walk among the gallops.
+                    dense = LoopSpaces(
+                        replace(prefix, expr=followed(prefix.expr, table)), machine
+                    )
                     galloped = []
                     for node in dict.fromkeys(PostOrderDFS(spaces.arg)):
                         match node:
@@ -617,20 +593,53 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
                     smallest = min(
                         (spaces.walk(node) for node in galloped), default=0.0
                     )
-                    features["gallop_visits"] = min(dense_visits, smallest)
-            features["dense_visits"] = dense_visits
-            features["distinct_reads"] = spaces.located(
-                spaces.stepped(table), component.fields
-            )
-        return np.array([list(features.values())])
+                    visits = min(dense.count(dense.visited()), smallest)
+        return np.array(
+            [
+                [
+                    spaces.executions(),
+                    spaces.iterations(),
+                    visits,
+                    parents(component, spaces),
+                    distinct,
+                ]
+            ]
+        )
+
+
+def protocol_name(protocol: Protocol) -> str:
+    return type(protocol).__name__.lower()
+
+
+def access_protocol(access: ProtocolChoice) -> str:
+    return protocol_name(access.protocol)
+
+
+def protocol_names(option: LevelOption) -> list[str]:
+    """The protocols a level of option is accessed with, once chosen."""
+    return [
+        protocol_name(proto) for proto in option.protocols if proto != DefaultProtocol()
+    ]
 
 
 class ProtocolBasis(ByKind[ProtocolChoice, str]):
-    """The accesses of the levels of each formatted tensor, each under the
-    basis of the kind of its level."""
+    """
+    The accesses of the levels of each formatted tensor, each under the basis
+    of the kind of its level and, within it, of its protocol, so that a
+    linear model prices each feature of an access by both.
+    """
 
     def __init__(self):
-        super().__init__({option.kind: AccessBasis() for option in KINDS}, option_kind)
+        super().__init__(
+            {
+                option.kind: ByKind(
+                    dict.fromkeys(protocol_names(option), AccessBasis()),
+                    access_protocol,
+                )
+                for option in KINDS
+            },
+            option_kind,
+        )
 
 
 class LevelBasis(Basis[ProtocolChoice], LoopOrderedForm):
@@ -719,16 +728,16 @@ STORAGE_BASIS = StorageBasis()
 PROTOCOL_BASIS = Affine(Concat(STORAGE_BASIS, ProtocolBasis()))
 
 # Until the model is fitted, each byte a level stores costs 1, a byte of flags
-# among them, and its positions and entries nothing more. Seeking a fiber
-# costs 1, and entering a loop or iterating it nothing more. A walk costs 1
-# for each entry it steps through, a gallop costs 4 for each jump, and a
-# follow costs a lookup for each visit: 1 in a dense level or a bytemap, 3 in
-# a hash table, and 4 in a list, which is searched. The fibers entered, the
-# visits a dense level would make, and the distinct entries read are free,
-# since the seeks and visits already count them. A write costs a lookup, a
-# lamination of a list costs a search like a follow, and each distinct entry
-# written costs 1 more to insert, except in a dense level, which has a slot
-# for each.
+# among them, and its positions and entries nothing more. Each execution of
+# an access seeks a fiber, which costs 1, and entering a loop or iterating it
+# costs nothing more. A walk costs 1 for each entry it steps through, a gallop
+# costs 4 for each jump, and a follow costs a lookup for each visit: 1 in a
+# dense level or a bytemap, 3 in a hash table, and 4 in a list, which is
+# searched. A write costs a lookup, a lamination of a list costs a search like
+# a follow, and each distinct entry written costs 1 more to insert, except in
+# a dense level, which has a slot for each. The fibers entered and the
+# distinct entries read are free, since the seeks and visits already count
+# them, and the element level costs nothing beyond its storage.
 _STORAGE_COSTS: dict[str, tuple[float, ...]] = {
     "dense": (0, 0),
     "sparse_list": (0, 0, 1, 1),
@@ -736,19 +745,43 @@ _STORAGE_COSTS: dict[str, tuple[float, ...]] = {
     "sparse_bytemap": (0, 1, 0, 1),
     "element": (0, 1),
 }
-_PROTOCOL_COSTS: dict[str, tuple[float, ...]] = {
-    "dense": (0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 0),
-    "sparse_list": (0, 0, 1, 0, 4, 1, 4, 0, 0, 1, 4, 1),
-    "sparse_hash": (0, 0, 1, 0, 3, 1, 0, 0, 0, 3, 3, 1),
-    "sparse_bytemap": (0, 0, 1, 0, 1, 1, 4, 0, 0, 1, 1, 1),
-    "element": (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+# The costs of an execution, a visit, and a distinct entry written, by the kind
+# of the level and the protocol.
+_ACCESS_COSTS: dict[tuple[str, str], tuple[float, float, float]] = {
+    ("dense", "follow"): (1, 1, 0),
+    ("dense", "extrude"): (1, 1, 0),
+    ("dense", "laminate"): (1, 1, 0),
+    ("sparse_list", "walk"): (1, 1, 0),
+    ("sparse_list", "gallop"): (1, 4, 0),
+    ("sparse_list", "follow"): (1, 4, 0),
+    ("sparse_list", "extrude"): (1, 1, 1),
+    ("sparse_hash", "walk"): (1, 1, 0),
+    ("sparse_hash", "follow"): (1, 3, 0),
+    ("sparse_hash", "extrude"): (1, 3, 1),
+    ("sparse_hash", "laminate"): (1, 3, 1),
+    ("sparse_bytemap", "walk"): (1, 1, 0),
+    ("sparse_bytemap", "gallop"): (1, 4, 0),
+    ("sparse_bytemap", "follow"): (1, 1, 0),
+    ("sparse_bytemap", "extrude"): (1, 1, 1),
+    ("sparse_bytemap", "laminate"): (1, 1, 1),
 }
+
+
+def _access_costs(kind: str, protocol: str) -> tuple[float, ...]:
+    executions, visits, distinct = _ACCESS_COSTS.get((kind, protocol), (0, 0, 0))
+    return (executions, 0, visits, 0, distinct)
+
+
 PROTOCOL_COST_MODEL = CostModel(
     PROTOCOL_BASIS,
     np.concatenate(
         [
             *(_STORAGE_COSTS[option.kind] for option in KINDS),
-            *(_PROTOCOL_COSTS[option.kind] for option in KINDS),
+            *(
+                _access_costs(option.kind, protocol)
+                for option in KINDS
+                for protocol in protocol_names(option)
+            ),
             [0.0],
         ]
     ),

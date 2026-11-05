@@ -307,9 +307,14 @@ def test_format_selection_uses_custom_model():
     prgm = Plan((copy, sums, Produces((y,))))
 
     def model(weights):
+        """A model which charges a feature of a kind of level, whatever the
+        protocol, as weights say."""
         return CostModel(
             PROTOCOL_BASIS,
-            [weights.get(name, 0.0) for name in PROTOCOL_BASIS.feature_names],
+            [
+                weights.get((name.partition(".")[0], name.rpartition(".")[2]), 0.0)
+                for name in PROTOCOL_BASIS.feature_names
+            ],
         )
 
     def choose(weights):
@@ -319,10 +324,10 @@ def test_format_selection_uses_custom_model():
         )
         return formats[T]
 
-    # Charging only the seeks of lists makes a dense T free, and charging only
-    # the seeks of dense levels makes lists free.
-    assert choose({"sparse_list.seeks": 1.0}) == ["dense", "dense"]
-    assert choose({"dense.seeks": 1.0}) == ["sparse_list", "sparse_list"]
+    # Charging only the executions of accesses of lists makes a dense T free,
+    # and charging only those of dense levels makes lists free.
+    assert choose({("sparse_list", "executions"): 1.0}) == ["dense", "dense"]
+    assert choose({("dense", "executions"): 1.0}) == ["sparse_list", "sparse_list"]
 
 
 def test_storage_is_priced_at_the_writes_in_the_largest_fused_slice():

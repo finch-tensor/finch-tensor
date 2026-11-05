@@ -246,7 +246,7 @@ def test_dense_levels_are_looked_up_at_every_visit():
         return Plan((fuse_loop_order(query, (i,)), Produces((c,))))
 
     def reads(option, protocol=None):
-        """The steps and lookups of x, stored as a level of option."""
+        """The visits of x, stored as a level of option, under its protocol."""
         formats: dict[Alias, list[LevelOption]] = {
             x: [option],
             y: [SparseListLevelOption()],
@@ -256,15 +256,13 @@ def test_dense_levels_are_looked_up_at_every_visit():
             match component:
                 case ProtocolChoice(table=Table(tns)) if tns == x:
                     row = basis.get_component_features(component, machine)[0]
-        return [
-            row[names.index(f"{option.kind}.{name}")]
-            for name in ("walk_visits", "follow_visits")
-        ]
+                    name = type(component.protocol).__name__.lower()
+        return row[names.index(f"{option.kind}.{name}.visits")]
 
     # A list of x is stepped through at its 4 entries, while a dense x is
-    # looked up at every entry of y, which the dense term counts.
-    assert reads(SparseListLevelOption()) == [4, 0]
-    assert reads(DenseLevelOption(), Follow()) == [0, n]
+    # looked up at every entry of y.
+    assert reads(SparseListLevelOption()) == 4
+    assert reads(DenseLevelOption(), Follow()) == n
     counts, _ = run(plan(), {x: stored("S", xd), y: stored("S", yd)}, {c: ()})
     assert loads(counts, "x", "val") == 4
     counts, _ = run(plan(), {x: stored("D", xd), y: stored("S", yd)}, {c: ()})
@@ -302,7 +300,7 @@ def test_gallops_jump_within_the_smallest_support():
             basis.get_component_features(component, machine)[0]
             for component in basis.components(program(px, py), formats, machine)
         ]
-        return sum(rows)[basis.feature_names.index("sparse_list.gallop_visits")]
+        return sum(rows)[basis.feature_names.index("sparse_list.gallop.visits")]
 
     # Two gallops each jump at most as often as the smaller list has entries,
     # and a gallop driven by a walk jumps once for each step of the walk.
