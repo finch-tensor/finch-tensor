@@ -12,7 +12,7 @@ from finch.algebra import (
 )
 from finch.algebra.tensor import Tensor
 from finch.autoschedule.capture import LogicCapture
-from finch.autoschedule.cost_models import LoopDepthCostModel
+from finch.autoschedule.cost_models import LOOP_DEPTH_COST_MODEL
 from finch.autoschedule.executor import extract_tensors
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.util import push_relabels
@@ -177,7 +177,7 @@ class FactorCacheEvaluator(UnvalidatedForm, LogicEvaluator):
         self.capture = LogicCapture()
         if factorizer is None:
             self.factorizer: LogicLoader = GalleyLogicFactorizer(
-                self.capture, optimizer="greedy", cost_model=LoopDepthCostModel()
+                self.capture, optimizer="greedy", cost_model=LOOP_DEPTH_COST_MODEL
             )
         else:
             self.factorizer = factorizer(self.capture)
