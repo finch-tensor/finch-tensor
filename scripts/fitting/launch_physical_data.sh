@@ -129,13 +129,14 @@ if [[ ! $resume ]]; then
     "$step" generate_physical_data "$directory" --stage "$stage" "$@")
   record generate "$generate"
 fi
-# Each timing task takes a whole node, so other jobs don't disturb it. A task
-# stops starting variants after its hours, and the limit leaves two more for
-# installing and starting Julia and finishing the last variant, which can run
-# for minutes.
+# Each timing task takes a whole node, with all of its memory, so other jobs
+# don't disturb it and large inputs and outputs fit. A task stops starting
+# variants after its hours, and the limit leaves two more for installing and
+# starting Julia and finishing the last variant, which can run for minutes.
 limit=$((hours + 2)):00:00
 time=$(submit "$array" ${generate:+"--dependency=aftercorr:$generate"} \
-  --job-name=time --exclusive --time="$limit" --output="$logs/time-%A_%a.log" \
+  --job-name=time --exclusive --mem=0 --time="$limit" \
+  --output="$logs/time-%A_%a.log" \
   "$step" time_physical_data "$directory" "${models[@]}" --repeat "$repeat" \
   --hours "$hours" $resume)
 record time "$time"

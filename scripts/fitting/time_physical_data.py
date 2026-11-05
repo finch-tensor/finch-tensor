@@ -77,17 +77,24 @@ def reformat(tns: Tensor, options: list[LevelOption], perm=()) -> Tensor:
 
 
 class Reformatter:
-    """Copies tensors into formats and field orders with copy, each once."""
+    """
+    Copies tensors into formats and field orders with copy, keeping the last
+    copy of each tensor: the variants of an example mostly keep the format of
+    each input from one to the next, and every copy of a large input takes
+    its memory.
+    """
 
     def __init__(self, copy=reformat):
         self.copy = copy
-        self.copies: dict[tuple, Tensor] = {}
+        self.copies: dict[int, tuple[tuple, Tensor]] = {}
 
     def __call__(self, tns: Tensor, options: list[LevelOption], perm=()) -> Tensor:
-        key = (id(tns), tuple(option.kind for option in options), tuple(perm))
-        if key not in self.copies:
-            self.copies[key] = self.copy(tns, options, perm)
-        return self.copies[key]
+        key = (tuple(option.kind for option in options), tuple(perm))
+        cached = self.copies.get(id(tns))
+        if cached is None or cached[0] != key:
+            cached = (key, self.copy(tns, options, perm))
+            self.copies[id(tns)] = cached
+        return cached[1]
 
 
 class Timer:
