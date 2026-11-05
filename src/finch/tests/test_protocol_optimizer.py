@@ -152,9 +152,10 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
     }
     basis = ProtocolBasis()
     names = basis.feature_names
-    block = [name.removeprefix("sparse_list.") for name in names[9:18]]
+    block = [name.removeprefix("sparse_list.") for name in names[10:20]]
     assert block == [
         "seeks",
+        "parents",
         "follow_visits",
         "walk_visits",
         "gallop_visits",
@@ -176,24 +177,24 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
         # the columns of its kind. c has no format, so it isn't written.
         assert len(rows) == 2
         total = sum(rows)
-        assert not total[:9].any() and not total[18:].any()
-        return total[9:15].tolist()
+        assert not total[:10].any() and not total[20:].any()
+        return total[10:17].tolist()
 
     # Each list seeks one fiber. Walks step through the 5 entries of each,
     # and either would visit the 5 of the other if it were dense. Each has 5
     # distinct entries, whatever reads them.
-    assert lists((Walk(), Walk())) == [2, 0, 10, 0, 10, 10]
+    assert lists((Walk(), Walk())) == [2, 2, 0, 10, 0, 10, 10]
     # Gallops jump to the entries they share, within the 5 of the smaller.
-    assert lists((Gallop(), Gallop())) == [2, 0, 0, 10, 10, 10]
+    assert lists((Gallop(), Gallop())) == [2, 2, 0, 0, 10, 10, 10]
     # A followed y is looked up at each of the 5 entries of x, and a dense x
     # would visit all 10.
-    assert lists((Walk(), Follow())) == [2, 5, 5, 0, 15, 10]
+    assert lists((Walk(), Follow())) == [2, 2, 5, 5, 0, 15, 10]
     # A gallop of y alone jumps to each of the 5 entries x walks, and a dense
     # x would visit the 5 entries y gallops to.
-    assert lists((Walk(), Gallop())) == [2, 0, 5, 5, 10, 10]
+    assert lists((Walk(), Gallop())) == [2, 2, 0, 5, 5, 10, 10]
     plan = product_plan(x, y, c, i, ((Walk(),), (Follow(),)))
     rows = Affine(PROTOCOL_BASIS).get_features(plan, formats, stats, sf)
-    assert rows.shape == (2, 37)
+    assert rows.shape == (2, 41)
     assert PROTOCOL_COST_MODEL.predict(rows[:, :-1]) > 0
 
 
@@ -235,6 +236,7 @@ def test_protocol_basis_counts_writes_apart_from_their_locations():
             row[names.index(f"sparse_hash.{name}")]
             for name in (
                 "seeks",
+                "parents",
                 "extrude_visits",
                 "laminate_visits",
                 "distinct_writes",
@@ -244,13 +246,14 @@ def test_protocol_basis_counts_writes_apart_from_their_locations():
     # Looping over j outside, c is reached at the loop over i, which runs in
     # the 3 rows of x, and laminated at each of the 5 entries of x, to 3
     # distinct entries. Looping over i outside, it is extruded once per row.
-    assert writes((j, i)) == [3, 0, 5, 3]
-    assert writes((i, j)) == [1, 3, 0, 3]
+    # The level is the root of c, so it is one fiber.
+    assert writes((j, i)) == [3, 1, 0, 5, 3]
+    assert writes((i, j)) == [1, 1, 3, 0, 3]
     # If the choices above make the loop over i run in 6 rows, c is laminated
-    # twice as often, at the same 3 entries. If instead the level is entered
-    # as 2 fibers, it has twice the entries, written as often.
-    assert writes((j, i), executions=6.0) == [6, 0, 10, 3]
-    assert writes((j, i), parents=2.0) == [3, 0, 5, 6]
+    # twice as often, at the same 3 entries. The fibers the level is entered
+    # as are a feature of their own, which changes nothing else.
+    assert writes((j, i), executions=6.0) == [6, 1, 0, 10, 3]
+    assert writes((j, i), parents=2.0) == [3, 2, 0, 5, 3]
 
 
 def test_optimize_protocols_chooses_the_cheaper_read():

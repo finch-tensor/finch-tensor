@@ -110,16 +110,20 @@ class LoopBasis(Basis[Prefix]):
 class LoopSpaces(Generic[NS]):
     """
     The spaces of the last loop of a nonempty loop prefix. Execution is where a
-    merge of the inputs, which can't look ahead, visits the enclosing loops. A
-    table walks the field of a loop unless it gallops or follows it, as its
-    protocol for that field says. A walk steps through the entries of a fiber,
-    so a table restricts the loops to its support down to the last field it
-    walks, and doesn't restrict the fields it follows after that, at the last
-    loop or at enclosing ones, so a loop whose tables all follow its field
-    spans all of it. The counts are taken over the executions of the enclosing
-    loops which the stats estimate, and are scaled to the executions the
-    prefix gives, when it does, since the loops run as often as the choices at
-    the enclosing loops make them, whatever the stats of the tables say.
+    merge of the inputs, which can't look ahead, visits the enclosing loops.
+    The formats of the prefix decide where the loop is entered: a sparse level
+    has a fiber only where it has an entry, and a lookup which finds none runs
+    nothing within it, so a table restricts the enclosing loops to its support
+    over the fields of its sparse levels, whatever protocols it reads them
+    with, while a dense level has a fiber at every slot, so its field never
+    restricts, and a table whose formats the prefix doesn't list is taken to
+    be sparse. A table walks the field of the loop unless it gallops or
+    follows it, as its protocol for that field says, and a followed table is
+    looked up wherever the others go, so it doesn't restrict the loop, and a
+    loop whose tables all follow its field spans all of it. The counts are
+    taken over the executions of the enclosing loops which the stats
+    estimate, and are scaled to the executions the prefix gives, when it
+    does, as the level basis gives them.
     """
 
     def __init__(self, component: Prefix, machine: StatsMachine[NS]):
@@ -132,12 +136,23 @@ class LoopSpaces(Generic[NS]):
                 self.arg = arg
             case expr:
                 self.arg = expr
-        # The extent of each field, from the tables which read it.
+        # The extent of each field, from the tables which read it, and the
+        # fields of the dense levels of each, where the formats list levels.
         self.dims: dict[Field, float] = {}
+        self.dense: dict[Table, set[Field]] = {}
+        formats = component.formats or {}
         for node in PostOrderDFS(self.arg):
             match node:
-                case Table(_, idxs) if idxs:
+                case Table(Alias() as tns, idxs) if idxs:
                     self.dims.update(self.machine(node).dim_sizes)
+                    match formats.get(tns.unfused):
+                        case [*options]:
+                            self.dense[node] = {
+                                idxs[tns.nfused + depth]
+                                for depth, option in enumerate(options)
+                                if tns.nfused + depth < len(idxs)
+                                and getattr(option, "kind", None) == "dense"
+                            }
         self.exec_space = self.stats_factory.support(self.merged(self.arg))
         self.scale = 1.0
         if component.executions is not None:
@@ -166,25 +181,16 @@ class LoopSpaces(Generic[NS]):
                 return protocols[idxs.index(idx)]
         return DefaultProtocol()
 
-    def followed(self, node: LogicExpression, fields) -> set[Field]:
+    def unrestricted(self, table: Table, fields) -> set[Field]:
         """
-        The fields of fields which node doesn't restrict: those a table of
-        node follows after the last of them it walks, in its order.
+        The fields of fields which table doesn't restrict: those of its dense
+        levels, which have a fiber at every slot, and the field of the loop
+        where table follows it, since it is looked up wherever the others go.
         """
-        followed = set()
-        for table in PostOrderDFS(node):
-            match table:
-                case Table(_, idxs):
-                    trailing = set()
-                    for idx in idxs:
-                        if idx not in fields:
-                            continue
-                        if self.protocol(table, idx) == Follow():
-                            trailing.add(idx)
-                        else:
-                            trailing.clear()
-                    followed |= trailing
-        return followed
+        unrestricted = set(self.dense.get(table, ()))
+        if self.idx in fields and self.protocol(table) == Follow():
+            unrestricted.add(self.idx)
+        return unrestricted
 
     def merged(self, node: LogicExpression, fields=()) -> NS:
         # A merge coiterates the projections of the inputs, so it visits more
@@ -194,13 +200,17 @@ class LoopSpaces(Generic[NS]):
                 return self.stats_factory.mapjoin(
                     op, *(self.merged(arg, fields) for arg in args)
                 )
-            case _:
+            case Table():
                 stat = self.machine(node)
-                # A followed field is looked up wherever the others go.
                 projected = self.project(
-                    stat, fields, self.followed(node, {*self.parent, *fields})
+                    stat, fields, self.unrestricted(node, {*self.parent, *fields})
                 )
                 # The fill decides whether a mapjoin joins or unions it.
+                projected.fill_type = stat.fill_type
+                return projected
+            case _:
+                stat = self.machine(node)
+                projected = self.project(stat, fields)
                 projected.fill_type = stat.fill_type
                 return projected
 

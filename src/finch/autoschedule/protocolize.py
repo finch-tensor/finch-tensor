@@ -13,12 +13,11 @@ from .compiler import lower_protocol
 from .cost_models import (
     PROTOCOL_COST_MODEL,
     CostModel,
-    LoopSpaces,
     Prefix,
-    ProtocolChoice,
-    level_accesses,
+    ProtocolComponent,
     level_formats,
     level_reads,
+    loop_components,
     read_options,
 )
 from .stages import FormattedForm
@@ -161,18 +160,7 @@ def optimize_protocols(
                     return update.as_query().rhs
             return rhs
 
-        # The loops within a loop cost the same under every choice at it which
-        # makes it iterate as often, so they are priced once for each count.
-        memo: dict[tuple[int, float], tuple[float, list]] = {}
-
-        def rec(n: int, rhs: lgc.LogicExpression, executions: float):
-            """The least cost of the loops from the n-th in, the enclosing
-            ones running executions times and rhs reading as chosen at them,
-            and the choices of each read which cost it."""
-            if n == len(loop_order):
-                return 0.0, []
-            if (n, executions) in memo:
-                return memo[n, executions]
+        for n in range(len(loop_order)):
             loops = loop_order[: n + 1]
             options = [
                 [
@@ -189,28 +177,21 @@ def optimize_protocols(
                 if (read.alias, read.table.idxs, read.alias.nfused + read.depth)
                 not in given
             ]
-            best: tuple[float, list] = (float("inf"), [])
+            if not options:
+                continue
+            best: tuple[float, lgc.LogicExpression] = (float("inf"), rhs)
             for choice in product(*options):
                 rhs_2 = rhs
                 for tns, idxs, depth, proto in choice:
                     rhs_2 = with_protocol(rhs_2, tns, idxs, depth, proto)
-                prefix = Prefix(
-                    loops, expr(rhs_2), lhs_idxs, formats, executions, lhs.tns
-                )
+                prefix = Prefix(loops, expr(rhs_2), lhs_idxs, formats, output=lhs.tns)
                 total = sum(
-                    cost_model.predict_component_cost(access, machine)
-                    for access in level_accesses(prefix, formats)
+                    cost_model.predict_component_cost(component, machine)
+                    for component in loop_components(prefix, formats)
                 )
-                iterations = LoopSpaces(prefix, machine).iterations()
-                total_2, rest = rec(n + 1, rhs_2, iterations)
-                if total + total_2 < best[0]:
-                    best = (total + total_2, [*choice, *rest])
-            memo[n, executions] = best
-            return best
-
-        _, choices = rec(0, rhs, 1.0)
-        for tns, idxs, depth, proto in choices:
-            rhs = with_protocol(rhs, tns, idxs, depth, proto)
+                if total < best[0]:
+                    best = (total, rhs_2)
+            _, rhs = best
         return rebuild(rhs)
 
     def visit(stmt: lgc.LogicStatement, loop_order: tuple[lgc.Field, ...]):

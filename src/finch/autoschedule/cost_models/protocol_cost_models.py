@@ -1,10 +1,10 @@
 """
-The protocol cost model prices the accesses of the levels of the formatted
-tensors of a query, loop by loop, so that the protocol optimizer can choose
-the protocol of each read. Where the level cost model of format_cost_models
-prices the levels a tensor stores, this prices each read of a level with its
-protocol, and each write of a level of the output, each kind of level
-differently.
+The protocol cost model prices the loops of a query and the accesses of the
+levels of its formatted tensors at them, so that the protocol optimizer can
+choose the protocol of each read. Where the level cost model of
+format_cost_models prices the levels a tensor stores, this prices each entry
+of a loop, each read of a level with its protocol, and each write of a level
+of the output, each kind of level differently.
 """
 
 from collections.abc import Iterator, Mapping, Sequence
@@ -75,6 +75,13 @@ def read_options(
 
 
 @dataclass(frozen=True)
+class LoopEntry:
+    """The entry of the last loop of a nonempty loop prefix."""
+
+    prefix: Prefix
+
+
+@dataclass(frozen=True)
 class ProtocolChoice:
     """
     An access of the level of a tensor at a zero-based stored depth by a query,
@@ -87,13 +94,13 @@ class ProtocolChoice:
     reduces into its output, or where the loops up to the level aren't its
     fields in storage order, and otherwise extrudes it, as util.write_protocols
     infers. The kind of the access names the kind of the level and the
-    protocol. Two counts describe how the access reaches the level, as the
-    choices above it make them: the executions of prefix, which are how often
-    the loop enters a fiber of the level, and parents, which is how many
-    distinct fibers it enters, the positions of the level above it reaches.
-    Each defaults to what the stats say. The visits of the access scale with
-    the executions, and the distinct entries it reaches with the parents, so
-    a level entered more often reads and writes no more entries.
+    protocol. parents is how many distinct fibers of the level the access
+    enters, the positions of the level above it reaches: every slot of a
+    dense level, which has a fiber at each, or only the entries of a sparse
+    one, since a lookup which finds none runs nothing within it. It defaults
+    to what the stats say, and is a feature of its own, while the entries the
+    access reaches are the tensor's at the fields of the level, however many
+    fibers hold them.
     """
 
     prefix: Prefix
@@ -137,6 +144,9 @@ class ProtocolChoice:
     @property
     def kind(self) -> str:
         return f"{self.option.kind}.{self.protocol}"
+
+
+ProtocolComponent = LoopEntry | ProtocolChoice
 
 
 def reached_depths(
@@ -203,14 +213,29 @@ def level_accesses(
     yield from level_writes(prefix, formats)
 
 
+def loop_components(
+    prefix: Prefix, formats: Mapping[Alias, Sequence[LevelOption]]
+) -> Iterator[ProtocolComponent]:
+    """
+    The components of the last loop of prefix: its entry, then the accesses
+    at it. The empty prefix has none.
+    """
+    if not prefix.prefix:
+        return
+    yield LoopEntry(prefix)
+    yield from level_accesses(prefix, formats)
+
+
 KINDS: tuple[LevelOption, ...] = (
     DenseLevelOption(),
     SparseListLevelOption(),
     SparseHashLevelOption(),
     SparseByteMapLevelOption(),
 )
+LOOP_FEATURES = ("executions", "iterations")
 FEATURES = (
     "seeks",
+    "parents",
     "follow_visits",
     "walk_visits",
     "gallop_visits",
@@ -222,12 +247,15 @@ FEATURES = (
 )
 
 
-class ProtocolBasis(Basis[ProtocolChoice], LoopOrderedForm):
+class ProtocolBasis(Basis[ProtocolComponent], LoopOrderedForm):
     """
-    A basis where each access of a level at a loop is a component, as
-    level_accesses lists them for each loop prefix, whose row describes the
-    access in the block of columns of the kind of the level. Every access
-    seeks a fiber of the level each time the loop is entered. A read counts
+    A basis where each loop, and each access of a level at it, is a
+    component, as loop_components lists them for each loop prefix. The row of
+    a loop counts its executions, how often it is entered, and its
+    iterations, in the first block of columns. The row of an access describes
+    it in the block of columns of the kind of the level. Every access seeks a
+    fiber of the level each time the loop is entered, and counts its parents,
+    the distinct fibers it enters, as ProtocolChoice takes them. A read counts
     the visits of the loop where the level is followed, which look it up, the
     entries its walk steps through, or the jumps of its gallop, which are
     bounded by the visits the other tables impose and by the smallest
@@ -238,13 +266,11 @@ class ProtocolBasis(Basis[ProtocolChoice], LoopOrderedForm):
     entries they write, which are fewer where the loop laminates the level,
     reducing into it or writing it out of order; the level stores an entry
     wherever it is written, even with its fill, so they are the visits of the
-    loop at the fields of the level. The distinct entries are those of the
-    fibers the access enters, so they scale with its parents rather than with
-    the executions of its loop, as ProtocolChoice takes them. The loops of a
-    query run as often as the loop enclosing them iterates, as
-    optimize_protocols prices them, and each access enters the fibers the
-    stats say it reaches. The formats of each prefix list the level options
-    of each alias, as level_formats reads them from bindings.
+    loop at the fields of the level. The loops within a loop are entered
+    where the formats say, as LoopSpaces counts them, whatever the protocols
+    at it, so the protocols at a loop only change its own rows. The formats
+    of each prefix list the level options of each alias, as level_formats
+    reads them from bindings.
     """
 
     class_key = "protocol"
@@ -254,61 +280,52 @@ class ProtocolBasis(Basis[ProtocolChoice], LoopOrderedForm):
         term: LogicStatement,
         bindings: Mapping[Alias, Any],
         machine: StatsMachine[NS],
-    ) -> Iterator[ProtocolChoice]:
-        # The prefixes of a query follow its empty prefix, and the machine
-        # advances past it only after them, so the loop enclosing a prefix is
-        # priced on the stats of its query.
+    ) -> Iterator[ProtocolComponent]:
         formats = level_formats(bindings)
-        parent = None
         for prefix in prefixes(term, machine, formats=formats):
-            if not prefix.prefix:
-                parent = None
-                continue
-            executions = 1.0
-            if parent is not None:
-                executions = LoopSpaces(parent, machine).iterations()
-            parent = replace(prefix, executions=executions)
-            yield from level_accesses(parent, formats)
+            yield from loop_components(prefix, formats)
 
     @property
     def n_features(self) -> int:
-        return len(KINDS) * len(FEATURES)
+        return len(LOOP_FEATURES) + len(KINDS) * len(FEATURES)
 
     @property
     def feature_names(self) -> tuple[str, ...]:
-        return tuple(f"{option.kind}.{name}" for option in KINDS for name in FEATURES)
+        return (
+            *(f"loop.{name}" for name in LOOP_FEATURES),
+            *(f"{option.kind}.{name}" for option in KINDS for name in FEATURES),
+        )
 
     def get_component_features(
         self,
-        component: ProtocolChoice,
+        component: ProtocolComponent,
         machine: StatsMachine[NS],
     ) -> np.ndarray:
         row = np.zeros((1, self.n_features))
-        prefix, table = component.prefix, component.table
-        spaces = LoopSpaces(prefix, machine)
+        spaces = LoopSpaces(component.prefix, machine)
+        match component:
+            case LoopEntry():
+                row[0, : len(LOOP_FEATURES)] = [
+                    spaces.executions(),
+                    spaces.iterations(),
+                ]
+                return row
+            case ProtocolChoice(prefix=prefix, table=table):
+                pass
         block = [option.kind for option in KINDS].index(component.option.kind)
         features = dict.fromkeys(FEATURES, 0.0)
         features["seeks"] = spaces.executions()
-
-        def distinct(stat: NS) -> float:
-            """The points of stat at the fields of the level, in the fibers
-            the access enters: those the stats say the loop reaches, scaled
-            to the parents given."""
-            count = spaces.located(stat, component.fields)
-            if component.parents is not None:
-                estimated = spaces.located(spaces.visited(), component.fields[:-1])
-                if estimated:
-                    count *= component.parents / estimated
-            return count
-
+        visited = spaces.visited()
+        features["parents"] = spaces.located(visited, component.fields[:-1])
+        if component.parents is not None:
+            features["parents"] = component.parents
         if component.write:
-            visited = spaces.visited()
             match component.protocol:
                 case Extrude():
                     features["extrude_visits"] = spaces.count(visited)
                 case Laminate():
                     features["laminate_visits"] = spaces.count(visited)
-            features["distinct_writes"] = distinct(visited)
+            features["distinct_writes"] = spaces.located(visited, component.fields)
         else:
             dense = LoopSpaces(
                 replace(prefix, expr=followed(prefix.expr, table)), machine
@@ -316,7 +333,7 @@ class ProtocolBasis(Basis[ProtocolChoice], LoopOrderedForm):
             dense_visits = dense.count(dense.visited())
             match component.protocol:
                 case Follow():
-                    features["follow_visits"] = spaces.count(spaces.visited())
+                    features["follow_visits"] = spaces.count(visited)
                 case Walk():
                     features["walk_visits"] = spaces.walk(table)
                 case Gallop():
@@ -330,30 +347,35 @@ class ProtocolBasis(Basis[ProtocolChoice], LoopOrderedForm):
                     )
                     features["gallop_visits"] = min(dense_visits, smallest)
             features["dense_visits"] = dense_visits
-            features["distinct_reads"] = distinct(spaces.stepped(table))
-        row[0, block * len(FEATURES) : (block + 1) * len(FEATURES)] = list(
-            features.values()
-        )
+            features["distinct_reads"] = spaces.located(
+                spaces.stepped(table), component.fields
+            )
+        start = len(LOOP_FEATURES) + block * len(FEATURES)
+        row[0, start : start + len(FEATURES)] = list(features.values())
         return row
 
 
 PROTOCOL_BASIS = ProtocolBasis()
 
-# Until the model is fitted, seeking a fiber costs 1, a walk costs 1 for each
-# entry it steps through, a gallop costs 4 for each jump, and a follow costs a
-# lookup for each visit: 1 in a dense level or a bytemap, 3 in a hash table,
-# and 4 in a list, which is searched. The visits a dense level would make and
-# the distinct entries read are free, since the visits already count them. A
-# write costs a lookup, a lamination of a list costs a search like a follow,
-# and each distinct entry written costs 1 more to insert, except in a dense
-# level, which has a slot for each.
+# Until the model is fitted, entering a loop and each of its iterations cost
+# 1, as does seeking a fiber. A walk costs 1 for each entry it steps through,
+# a gallop costs 4 for each jump, and a follow costs a lookup for each visit:
+# 1 in a dense level or a bytemap, 3 in a hash table, and 4 in a list, which
+# is searched. The fibers entered, the visits a dense level would make, and
+# the distinct entries read are free, since the seeks and visits already
+# count them. A write costs a lookup, a lamination of a list costs a search
+# like a follow, and each distinct entry written costs 1 more to insert,
+# except in a dense level, which has a slot for each.
+_LOOP_COSTS: tuple[float, ...] = (1, 1)
 _PROTOCOL_COSTS: dict[str, tuple[float, ...]] = {
-    "dense": (1, 1, 0, 0, 0, 0, 1, 1, 0),
-    "sparse_list": (1, 4, 1, 4, 0, 0, 1, 4, 1),
-    "sparse_hash": (1, 3, 1, 0, 0, 0, 3, 3, 1),
-    "sparse_bytemap": (1, 1, 1, 4, 0, 0, 1, 1, 1),
+    "dense": (1, 0, 1, 0, 0, 0, 0, 1, 1, 0),
+    "sparse_list": (1, 0, 4, 1, 4, 0, 0, 1, 4, 1),
+    "sparse_hash": (1, 0, 3, 1, 0, 0, 0, 3, 3, 1),
+    "sparse_bytemap": (1, 0, 1, 1, 4, 0, 0, 1, 1, 1),
 }
 PROTOCOL_COST_MODEL = LinearCostModel(
     PROTOCOL_BASIS,
-    np.concatenate([_PROTOCOL_COSTS[option.kind] for option in KINDS]),
+    np.concatenate(
+        [_LOOP_COSTS, *(_PROTOCOL_COSTS[option.kind] for option in KINDS)]
+    ),
 )
