@@ -144,7 +144,8 @@ def _order(orderer_cls, data_a, data_b):
 def test_workspace_loop_orderer_accumulates_rows_in_a_workspace():
     i, j, k = Field("i"), Field("j"), Field("k")
     c = HardAlias("c")
-    data_a, data_b = _sparse_matmul(64, 3)
+    # The output is sparse enough that its rows aren't dense.
+    data_a, data_b = _sparse_matmul(256, 3)
 
     # The search scatters into the columns of c, for each of its rows.
     capture = _order(BFSLoopOrderer, data_a, data_b)

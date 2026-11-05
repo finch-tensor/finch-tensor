@@ -98,7 +98,7 @@ class KroneckerTensor:
         self,
         lg_shape: Sequence[int],
         blocks: Sequence[np.ndarray],
-        block_bits: int = 4,
+        block_bits: int,
         dtype=np.float64,
         idx_type=np.intp,
     ):
@@ -167,7 +167,7 @@ def kronecker_rmat(
     lg_shape: Sequence[int],
     seeds: Sequence[Any],
     rng,
-    block_bits: int = 4,
+    block_bits: int,
     dtype=np.float64,
     idx_type=np.intp,
 ) -> KroneckerTensor:
@@ -279,7 +279,7 @@ class KroneckerStatsFactory(
 ):
     """The exact stats of KroneckerTensors with digits of block_bits, and scalars."""
 
-    def __init__(self, block_bits: int = 4):
+    def __init__(self, block_bits: int):
         super().__init__(KroneckerStats)
         self.block_bits = block_bits
 

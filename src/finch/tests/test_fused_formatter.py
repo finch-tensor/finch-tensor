@@ -8,9 +8,8 @@ from finch.algebra import StaticFillFType
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.formatter.galley_formatter import GalleyFormatter
 from finch.autoschedule.formatter.smart_formatter import (
+    CostFormatter,
     FDFormatter,
-    IterCostFormatter,
-    StorageCostFormatter,
 )
 from finch.autoschedule.tensor_stats import (
     BaseTensorStats,
@@ -20,7 +19,6 @@ from finch.autoschedule.tensor_stats import (
     StatsInterpreter,
 )
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
-from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.util import fuse_loop_order
 
 
@@ -30,8 +28,7 @@ from finch.autoschedule.util import fuse_loop_order
     "formatter_cls,factory_cls",
     [
         (FDFormatter, FDStatsFactory),
-        (StorageCostFormatter, DenseStatsFactory),
-        (IterCostFormatter, DenseStatsFactory),
+        (CostFormatter, DenseStatsFactory),
         (GalleyFormatter, DenseStatsFactory),
     ],
 )
@@ -72,7 +69,7 @@ def test_formatters_keep_logical_stats_and_format_stored_dimensions(
     assert scratch_tensor.shape == tensor.shape[nfused:]
 
 
-@pytest.mark.parametrize("formatter_cls", [GalleyFormatter, StorageCostFormatter])
+@pytest.mark.parametrize("formatter_cls", [GalleyFormatter, CostFormatter])
 def test_statistics_for_alias_views_do_not_collide(monkeypatch, formatter_cls):
     i, j = lgc.Field("i"), lgc.Field("j")
     a, scratch = lgc.HardAlias("a"), lgc.HardAlias("scratch")
@@ -143,7 +140,7 @@ def test_galley_uses_support_projected_over_fused_dimensions(
     assert stats.index_order == fields
 
 
-@pytest.mark.parametrize("formatter_cls", [StorageCostFormatter, IterCostFormatter])
+@pytest.mark.parametrize("formatter_cls", [CostFormatter])
 def test_cost_formatters_format_the_largest_fused_slice(monkeypatch, formatter_cls):
     # Each slice of the diagonal holds one value, though every slice together
     # covers the whole of each row.
@@ -164,22 +161,12 @@ def test_cost_formatters_format_the_largest_fused_slice(monkeypatch, formatter_c
         )
     )
     formatter_cls(capture).lower(plan, {a: tensor.ftype}, {a: stats}, factory)
+    # The slice is stored, as one level over i. a is stored densely, so every
+    # slot of each slice is written, which a dense level has ready.
     fmt = capture.last_bindings[scratch]
     assert isinstance(fmt, ft.FiberTensorFType)
-    assert isinstance(fmt.lvl_t, ft.SparseListLevelFType)
-
-    # The support projected over the fused dimension would be dense.
-    support, projected = lgc.HardAlias("support"), lgc.HardAlias("projected")
-    query = fuse_loop_order(
-        lgc.Query(lgc.Table(projected, (i,)), lgc.Table(support, (i,))), (i,)
-    )
-    machine = StatsMachine(factory, {support: factory(ft.asarray(np.ones(8)), (i,))})
-    machine(query)
-    projected_fmt = formatter_cls().get_tensor_ftype(
-        projected, query, machine, stats.fill_type, tensor.shape_type[1:]
-    )
-    assert isinstance(projected_fmt, ft.FiberTensorFType)
-    assert isinstance(projected_fmt.lvl_t, ft.DenseLevelFType)
+    assert isinstance(fmt.lvl_t, ft.DenseLevelFType)
+    assert isinstance(fmt.lvl_t.lvl_t, ft.ElementLevelFType)
 
 
 @pytest.mark.parametrize("transpose", [False, True])

@@ -4,14 +4,16 @@ innermost decision out. Each stage enumerates every option of its own decision
 for random programs, and the stages below it, which are already fitted, make
 theirs, so the runtime of each option is what the optimizer would get by
 choosing it, and the best option of each example is known. Each stage names
-the basis its model is fitted to, which featurize_physical_data extracts and
-condense_physical_data collects under the name of the stage, so several stages
-can share DIR, and a new basis needs no new timings.
+the basis its model is fitted to, which fit_physical_data extracts from the
+examples coalesce_physical_data collects, so a new basis needs no new timings.
 
 - protocol: for a random program with random formats, every assignment of
   the protocols its inputs are read with.
-- level: for a random program, every assignment of the formats of its tensors,
-  with the protocols the protocol optimizer chooses.
+- format: for a random program, every assignment of the formats and protocols
+  of one of its tensors, with the protocols of the loops over its fields,
+  under random formats and protocols of the rest, as the formatter re-chooses
+  the protocols of the loops a format changes. It fits the protocol basis
+  from the same examples as the protocol stage, with formats too.
 - transpose: for a random input, every order a copy of it can be stored in,
   which the copy reads out of order, as the loop orderer transposes an input
   it would read out of order. The loop orderer charges such copies with the
@@ -20,12 +22,10 @@ can share DIR, and a new basis needs no new timings.
   that order, so that the program is concordant, the formats the formatter
   chooses, from the supports of its inputs, and the protocols the protocol
   optimizer chooses. Its features are those of the supports, before the
-  formatter and the protocol optimizer run. loop_orderer_model puts the loop
-  and transpose models together for the loop orderer.
+  formatter and the protocol optimizer run.
 """
 
 import json
-from collections import OrderedDict
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -33,28 +33,24 @@ from typing import Any
 import numpy as np
 
 from finch.algebra import StaticFillFType, ftype, ftypes
-from finch.autoschedule import optimize_protocols
+from finch.autoschedule import optimize_protocols, protocolize
 from finch.autoschedule.cost_models import (
     PROTOCOL_BASIS,
     PROTOCOL_COST_MODEL,
     Affine,
     Basis,
-    Concat,
     CostModel,
+    ElementLevelOption,
     LevelOption,
-    LinearCostModel,
     PigeonBasis,
     TransposeBasis,
     level_options,
 )
 from finch.autoschedule.formatter.smart_formatter import (
-    LEVEL_BASIS,
-    LEVEL_BUILDERS,
     LEVEL_OPTIONS,
-    STORAGE_COST_MODEL,
-    optimize_format,
+    format_ftype,
+    optimize_formats,
 )
-from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
     Alias,
@@ -70,64 +66,39 @@ from finch.finch_logic import (
 )
 from finch.finch_logic.parser import PROTOCOLS
 from finch.symbolic import PostOrderDFS, PostWalk, Rewrite
-from finch.tensor import element, fiber_tensor
 from scripts.fitting.kronecker_stats import KroneckerStatsFactory, KroneckerTensor
 
-STAGES = ("protocol", "level", "transpose", "loop")
+STAGES = ("protocol", "format", "transpose", "loop")
 OPTIONS = {option.kind: option for option in LEVEL_OPTIONS}
 A, B, C = HardAlias("A"), HardAlias("B"), HardAlias("C")
 INPUTS = (A, B)
 
+# The formatter and the protocol optimizer price the same basis, so the format
+# stage fits it again, to examples whose formats vary.
 BASES: dict[str, Basis] = {
-    "protocol": Affine(PROTOCOL_BASIS),
-    "level": Affine(LEVEL_BASIS),
+    "protocol": PROTOCOL_BASIS,
+    "format": PROTOCOL_BASIS,
     "transpose": Affine(TransposeBasis()),
     "loop": Affine(PigeonBasis()),
 }
 
-# The models the optimizers of each stage use until they are fitted.
-DEFAULT_MODELS: dict[str, CostModel] = {
-    "protocol": PROTOCOL_COST_MODEL,
-    "level": STORAGE_COST_MODEL,
-}
-
-
-def features_kind(name: str) -> str:
-    return f"{name}.features.json"
-
-
-def load_model(name: str, path: Path) -> LinearCostModel:
-    """The model of the basis name which fit_physical_data wrote to path."""
-    basis = BASES[name]
-    untrained = LinearCostModel(basis, np.zeros(basis.n_features))
-    return untrained.from_json(json.loads(path.read_text()))
-
 
 def parse_models(args: list[str] | None) -> dict[str, CostModel]:
-    """The models of NAME=PATH arguments, over the defaults."""
-    models = dict(DEFAULT_MODELS)
+    """
+    The models of NAME=PATH arguments, which fit_physical_data wrote, over the
+    models the optimizers use until they are fitted.
+    """
+    models = {"protocol": PROTOCOL_COST_MODEL, "format": PROTOCOL_COST_MODEL}
     for arg in args or ():
         name, _, path = arg.partition("=")
         if name not in BASES or not path:
             raise ValueError(
                 f"Expected NAME=PATH with NAME of {list(BASES)}, got {arg}"
             )
-        models[name] = load_model(name, Path(path))
+        basis = BASES[name]
+        untrained = CostModel(basis, np.zeros(basis.n_features))
+        models[name] = untrained.from_json(json.loads(Path(path).read_text()))
     return models
-
-
-def loop_orderer_model(
-    loop: LinearCostModel, transpose: LinearCostModel
-) -> LinearCostModel:
-    """
-    The model of the loop orderer, which prices a loop order by the loop model
-    on the concordant program and the transpose model on the inputs it would
-    have to transpose, as LOOP_COST_MODEL does with the built-in weights.
-    """
-    return LinearCostModel(
-        Concat(loop.basis, transpose.basis),
-        np.concatenate([loop.coefficients, transpose.coefficients]),
-    )
 
 
 def with_subsequence(order, fields):
@@ -172,14 +143,6 @@ def variant_plan(record: Mapping[str, Any], variant: Mapping[str, Any]) -> Plan:
     return fused_plan(query, order)
 
 
-def variant_formats(variant: Mapping[str, Any]) -> dict[Alias, list[LevelOption]]:
-    """The level options of each tensor which a variant gives a format."""
-    return {
-        HardAlias(name): [OPTIONS[kind] for kind in kinds]
-        for name, kinds in variant.get("formats", {}).items()
-    }
-
-
 def input_perms(
     record: Mapping[str, Any], plan: LogicStatement
 ) -> dict[Alias, tuple[int, ...]]:
@@ -197,7 +160,6 @@ def input_perms(
 
 
 def input_fields(plan: LogicStatement) -> dict[Alias, tuple]:
-    """The fields of the table of each alias plan reads, in field order."""
     fields = {}
     for node in PostOrderDFS(plan):
         match node:
@@ -206,16 +168,7 @@ def input_fields(plan: LogicStatement) -> dict[Alias, tuple]:
     return fields
 
 
-def format_ftype(options: list[LevelOption], fill_type, shape_type):
-    """The ftype of a tensor of the level options, fill_type, and shape_type."""
-    lvl = element(fill_type, fill_type.element_type, ftypes.intp)
-    for option, dim in reversed(list(zip(options, shape_type, strict=True))):
-        lvl = LEVEL_BUILDERS[option.kind](lvl, dim)
-    return fiber_tensor(lvl)
-
-
 def input_ftype(options: list[LevelOption], tensor: KroneckerTensor):
-    """The ftype of tensor stored with the level options."""
     shape_type = (ftype(tensor.idx_type),) * tensor.ndim
     return format_ftype(options, StaticFillFType(tensor.dtype(0)), shape_type)
 
@@ -250,24 +203,17 @@ def choose_formats(
     be unformatted.
     """
     fields = input_fields(plan)
-    stats = OrderedDict(
-        (tns, stats_factory(tensor, fields[tns])) for tns, tensor in inputs.items()
-    )
+    stats = {tns: stats_factory(tensor, fields[tns]) for tns, tensor in inputs.items()}
     fill_types = plan.infer_fill_type(
         {tns: StaticFillFType(tensor.dtype(0)) for tns, tensor in inputs.items()}
     )
+    stored = {tns: (ftypes.intp,) * len(idxs) for tns, idxs in fields.items()}
+    ftypes_2 = optimize_formats(
+        plan, {}, stats, stats_factory, stored, fill_types, cost_model, LEVEL_OPTIONS
+    )
     formats = {}
-    for tns, idxs in fields.items():
-        lvl = optimize_format(
-            tns,
-            (ftypes.intp,) * len(idxs),
-            StatsMachine(stats_factory, OrderedDict(stats)),
-            fill_types[tns],
-            cost_model,
-            plan,
-            LEVEL_OPTIONS,
-        )
-        options = level_options(fiber_tensor(lvl))
+    for tns, fmt in ftypes_2.items():
+        options = level_options(fmt)
         assert options is not None
         formats[tns] = options
     return formats
@@ -282,19 +228,22 @@ def resolve(
     """
     The program and formats of a variant of the example of record, once the
     stages below its stage have made their choices from the exact stats of
-    inputs: the formats of every tensor, and the protocols each input is read
-    with, which the plan of the protocol stage already gives. The inputs the
+    inputs: the formats of every tensor, unless the variant gives them, and
+    the protocols each input is read with, unless the variant gives those too,
+    as the variants of the protocol and format stages do. The inputs the
     program reads are stored in the order it reads them, which is the loop
     order in the loop stage.
     """
-    stage = record["stage"]
     plan = variant_plan(record, variant)
-    formats = variant_formats(variant)
+    formats = {
+        HardAlias(name): [OPTIONS[kind] for kind in kinds]
+        for name, kinds in variant.get("formats", {}).items()
+    }
     inputs = read_inputs(record, plan, inputs)
     stats_factory = KroneckerStatsFactory(record["block_bits"])
-    if stage == "loop":
-        formats = choose_formats(plan, inputs, stats_factory, models["level"])
-    if stage != "protocol":
+    if "formats" not in variant:
+        formats = choose_formats(plan, inputs, stats_factory, models["format"])
+    if "protocols" not in variant:
         fields = input_fields(plan)
         plan = optimize_protocols(
             plan,
@@ -304,3 +253,60 @@ def resolve(
             models["protocol"],
         )
     return plan, formats
+
+
+def features(
+    basis: Basis, plan, formats, inputs, stats_factory, protocols=True
+) -> np.ndarray:
+    """
+    The features of basis of plan, with the level options of formats, from the
+    stats of inputs, which store their fields in the order plan reads them.
+    Unless protocols is false, each read without a protocol takes the default
+    of its level, as Finch.jl reads it.
+    """
+    fields = input_fields(plan)
+    stats = {tns: stats_factory(tensor, fields[tns]) for tns, tensor in inputs.items()}
+    if protocols:
+        ftypes = {
+            tns: input_ftype(formats[tns], tensor) for tns, tensor in inputs.items()
+        }
+        plan = protocolize(plan, ftypes)
+    formats = {
+        alias: [*options, ElementLevelOption()] for alias, options in formats.items()
+    }
+    return basis.get_features(plan, formats, stats, stats_factory)
+
+
+def featurize_record(
+    record: Mapping[str, Any],
+    inputs: Mapping[Alias, KroneckerTensor],
+    name: str,
+    models: Mapping[str, CostModel],
+) -> list[np.ndarray]:
+    """
+    The features of the basis name of each variant of the example of record,
+    whose inputs are inputs, as it was timed: the stages below make their
+    choices with models, as time_physical_data makes them, so nothing is
+    compiled or run. The loop stage orders loops before its inputs are
+    formatted, so it reads them without protocols.
+    """
+    stage = record["stage"]
+    stats_factory = KroneckerStatsFactory(record["block_bits"])
+    rows = []
+    for variant in record["variants"]:
+        plan, formats = resolve(record, variant, inputs, models)
+        if stage == "loop":
+            # The loop orderer prices the concordant program before the
+            # formatter and the protocol optimizer run, without protocols.
+            plan = variant_plan(record, variant)
+        rows.append(
+            features(
+                BASES[name],
+                plan,
+                formats,
+                read_inputs(record, plan, inputs),
+                stats_factory,
+                protocols=stage != "loop",
+            )
+        )
+    return rows

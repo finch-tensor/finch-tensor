@@ -23,7 +23,7 @@ from finch.finch_logic import (
     Table,
 )
 
-from .cost_models import NS, Basis, LinearCostModel
+from .cost_models import NS, Basis, CostModel
 
 
 @dataclass(frozen=True)
@@ -65,8 +65,6 @@ class FlopsBasis(FactorizeBasis, AliasedForm):
     FlopsBasis counts the non-fill values in the iteration space of each
     query, and in the output it materializes. Each query is a component.
     """
-
-    class_key = "flops"
 
     @property
     def n_features(self) -> int:
@@ -135,7 +133,7 @@ class FlopsBasis(FactorizeBasis, AliasedForm):
 
 
 # Allocations are weighted 10x iterations.
-FLOPS_COST_MODEL = LinearCostModel(FlopsBasis(), [1.0, 10.0])
+FLOPS_COST_MODEL = CostModel(FlopsBasis(), [1.0, 10.0])
 
 
 class LoopDepthBasis(FactorizeBasis, AliasedForm):
@@ -144,8 +142,6 @@ class LoopDepthBasis(FactorizeBasis, AliasedForm):
     search reduces the indices which keep the deepest loop nest shallow. It
     needs only the shapes of its statistics. Each query is a component.
     """
-
-    class_key = "loop_depth"
 
     @property
     def n_features(self) -> int:
@@ -171,4 +167,4 @@ class LoopDepthBasis(FactorizeBasis, AliasedForm):
                 raise ValueError(f"Unsupported statement type: {stmt}")
 
 
-LOOP_DEPTH_COST_MODEL = LinearCostModel(LoopDepthBasis(), [1.0])
+LOOP_DEPTH_COST_MODEL = CostModel(LoopDepthBasis(), [1.0])

@@ -4,6 +4,7 @@ import logging
 from abc import abstractmethod
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
+from itertools import product
 from typing import TypeVar
 
 import numpy as np
@@ -15,27 +16,21 @@ from finch.algebra import (
     TensorFType,
     ftype,
     ftypes,
-    np_dtype,
 )
 from finch.autoschedule.cost_models import (
-    ByKind,
+    PROTOCOL_BASIS,
+    PROTOCOL_COST_MODEL,
     CostModel,
-    DenseLevelOption,
-    ElementLevelOption,
-    LevelBasis,
-    LevelChoice,
     LevelOption,
-    LinearCostModel,
-    SparseByteMapLevelOption,
-    SparseHashLevelOption,
-    SparseListLevelOption,
+    ProtocolComponent,
     allowed_options,
-)
-from finch.autoschedule.cost_models.format_cost_models import (
-    alias_blocks,
+    level_formats,
     read_protocols,
+    storage_choices,
     write_protocols,
 )
+from finch.autoschedule.cost_models.protocol_cost_models import KINDS, STORAGE_KINDS
+from finch.autoschedule.protocolizer.protocolize import choose_protocols
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
@@ -59,12 +54,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 # The level options CostFormatter chooses from by default, and their builders.
 # Of options which cost the same, the earliest is chosen, so a list is chosen
 # over a hash wherever it can be written.
-LEVEL_OPTIONS = (
-    DenseLevelOption(),
-    SparseListLevelOption(),
-    SparseHashLevelOption(),
-    SparseByteMapLevelOption(),
-)
+LEVEL_OPTIONS = KINDS
 LEVEL_BUILDERS = {
     "dense": dense,
     "sparse_list": sparse_list,
@@ -73,58 +63,108 @@ LEVEL_BUILDERS = {
 }
 
 
-def optimize_format(
-    alias, shape_type, machine, fill_type, cost_model, term, options=LEVEL_OPTIONS
-):
-    blocks = alias_blocks(alias, term, machine)
-    n = len(shape_type)
-    allowed = [allowed_options(alias, depth, term, options) for depth in range(n)]
-    for depth, level_options in enumerate(allowed):
-        if not level_options:
-            raise ValueError(
-                f"No level option supports reading level {depth} of {alias} with "
-                f"{read_protocols(alias, depth, term)} and writing it with "
-                f"{write_protocols(alias, depth, term)}."
-            )
-    position_type = ftypes.intp
-    leaf = element(fill_type, fill_type.element_type, position_type)
-    pos_size = np_dtype(position_type).itemsize
-    memo = {}
+def format_ftype(
+    options: Sequence[LevelOption], fill_type: AbstractFillFType, shape_type
+) -> FiberTensorFType:
+    """The format of a tensor of the level options, fill_type, and shape_type."""
+    lvl = element(fill_type, fill_type.element_type, ftypes.intp)
+    for option, dim in reversed(list(zip(options, shape_type, strict=True))):
+        lvl = LEVEL_BUILDERS[option.kind](lvl, dim)
+    return fiber_tensor(lvl)
 
-    def cost(level, num_pos, option):
-        choice = LevelChoice(term, alias, level, num_pos, option, pos_size)
-        return cost_model.predict_component_cost(choice, machine)
 
-    def rec(level, num_pos):
-        if level == n:
-            return cost(level, num_pos, ElementLevelOption()), leaf
-
-        key = (level, num_pos)
-        if key in memo:
-            return memo[key]
-
-        best_cost = None
-        best_format = None
-        for option in allowed[level]:
-            local = cost(level, num_pos, option)
-            child_num_pos = tuple(
-                option.next_num_pos(
-                    stats, machine.stats_factory, len(over) + level, n, over
-                )
-                for (stats, over), n in zip(blocks, num_pos, strict=True)
-            )
-            child_cost, child_fmt = rec(level + 1, child_num_pos)
-            total = local + child_cost
-            if best_cost is None or total < best_cost:
-                best_cost, best_format = (
-                    total,
-                    LEVEL_BUILDERS[option.kind](child_fmt, shape_type[level]),
+def optimize_formats(
+    prgm: lgc.LogicStatement,
+    bindings: Mapping[lgc.Alias, TensorFType],
+    stats: Mapping[lgc.Alias, TensorStats],
+    stats_factory: StatsFactory,
+    stored: Mapping[lgc.Alias, tuple[FType, ...]],
+    fill_types: Mapping[lgc.Alias, AbstractFillFType],
+    cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
+    options: Sequence[LevelOption] = LEVEL_OPTIONS,
+) -> dict[lgc.Alias, TensorFType]:
+    """
+    The format of each alias of stored, whose levels have the shape types it
+    gives and the fill of fill_types, under which prgm costs least by
+    cost_model, with its other tensors formatted as bindings says, by
+    coordinate descent: each alias in turn tries every product of the options
+    its levels allow, re-choosing protocols only for the queries which touch
+    it, for two sweeps or until none changes. Each starts from the first
+    allowed option of each level which filters.
+    """
+    allowed = {
+        alias: [
+            allowed_options(alias, depth, prgm, options)
+            for depth in range(len(shape_type))
+        ]
+        for alias, shape_type in stored.items()
+    }
+    for alias, levels in allowed.items():
+        for depth, level_options in enumerate(levels):
+            if not level_options:
+                raise ValueError(
+                    f"No level option supports reading level {depth} of {alias} "
+                    f"with {read_protocols(alias, depth, prgm)} and writing it "
+                    f"with {write_protocols(alias, depth, prgm)}."
                 )
 
-        memo[key] = (best_cost, best_format)
-        return best_cost, best_format
+    def ftype_of(alias, kinds):
+        return format_ftype(kinds, fill_types[alias], stored[alias])
 
-    return rec(0, (1.0,) * len(blocks))
+    formats = {
+        alias: ftype_of(
+            alias,
+            [
+                next((option for option in level if option.filters), level[0])
+                for level in levels
+            ],
+        )
+        for alias, levels in allowed.items()
+    }
+
+    def storage_cost(alias, fmt):
+        machine = StatsMachine(stats_factory, OrderedDict(stats))
+        options = level_formats({alias: fmt})[alias]
+        return sum(
+            cost_model.predict_component_cost(choice, machine)
+            for choice in storage_choices(alias, options, prgm, machine)
+        )
+
+    bindings = {**bindings, **formats}
+    storage = {alias: storage_cost(alias, fmt) for alias, fmt in formats.items()}
+    _, costs = choose_protocols(prgm, bindings, stats, stats_factory, cost_model)
+    # A second sweep lets each alias answer the formats chosen after it.
+    for _ in range(2):
+        changed = False
+        for alias, levels in allowed.items():
+            best = (sum(costs) + storage[alias], bindings[alias], costs, storage[alias])
+            for kinds in product(*levels):
+                fmt = ftype_of(alias, kinds)
+                if fmt == bindings[alias]:
+                    continue
+                _, costs_2 = choose_protocols(
+                    prgm,
+                    {**bindings, alias: fmt},
+                    stats,
+                    stats_factory,
+                    cost_model,
+                    only={alias},
+                    costs=costs,
+                )
+                storage_2 = storage_cost(alias, fmt)
+                if sum(costs_2) + storage_2 < best[0]:
+                    best = (sum(costs_2) + storage_2, fmt, costs_2, storage_2)
+            _, best_fmt, best_costs, best_storage = best
+            if best_fmt != bindings[alias]:
+                bindings[alias], costs, storage[alias] = (
+                    best_fmt,
+                    best_costs,
+                    best_storage,
+                )
+                changed = True
+        if not changed:
+            break
+    return {alias: bindings[alias] for alias in stored}
 
 
 TS = TypeVar("TS", bound=TensorStats)
@@ -248,134 +288,19 @@ class FDFormatter(SmartFormatter):
         return fiber_tensor(lvl)
 
 
-# The basis of the levels of each kind of option, which cost models of the
-# formatter describe.
-LEVEL_BASIS = ByKind(
-    {
-        option.kind: LevelBasis(type(option))
-        for option in (*LEVEL_OPTIONS, ElementLevelOption())
-    }
-)
-
-
-def linear_level_model(
-    storage: Mapping[type[LevelOption], Sequence[float]],
-    access: Mapping[type[LevelOption], Sequence[float]] | None = None,
-) -> LinearCostModel[LevelChoice]:
-    """
-    A linear model of LEVEL_BASIS, from the coefficients of the storage features
-    of each option type, and of its visits, dense visits, entries, lookups,
-    sequential writes, and scatter writes. Accesses are free unless access gives
-    their coefficients.
-    """
-    access = access or {}
-    coefficients = [
-        [*storage[option], *access.get(option, (0,) * 6)]
-        for option in map(LevelOption.kinds.__getitem__, LEVEL_BASIS.by_kind)
-    ]
-    return LinearCostModel(LEVEL_BASIS, np.concatenate(coefficients))
-
-
-# Each level option lists its storage features. The access features are
-# visits, dense visits, entries, lookups, sequential writes, and scatter
-# writes.
-ITER_COST_MODEL = linear_level_model(
-    {
-        DenseLevelOption: (0, 1, 0),
-        SparseListLevelOption: (1, 1, 0, 0),
-        SparseHashLevelOption: (1, 1, 0, 0),
-        SparseByteMapLevelOption: (1, 0, 1, 0, 0, 0),
-        ElementLevelOption: (0, 0),
-    }
-)
-STORAGE_COST_MODEL = linear_level_model(
-    {
-        DenseLevelOption: (0, 0, 0),
-        SparseListLevelOption: (0, 0, 1, 1),
-        SparseHashLevelOption: (0, 0, 1, 1),
-        # Each slot is flagged with a byte.
-        SparseByteMapLevelOption: (0, 1, 0, 1, 0, 0),
-        ElementLevelOption: (0, 1),
-    }
-)
-
-
-# Costs are in resets of a dense slot, as fit to Gustavson SpGEMM on Finch.jl.
-# Dense levels pay to reset every slot of each slice, but take writes in any
-# order almost for free. A byte map allocates a flag and a child for each of its
-# slots, like a dense level, but clears and sorts only the entries of each
-# slice. A hash pays for a probe at every write and lookup, and a sorted list
-# appends cheaply but binary searches to look up out of order.
-WORKSPACE_COST_MODEL = linear_level_model(
-    {
-        DenseLevelOption: (0, 0, 1),
-        SparseListLevelOption: (0, 0, 0, 0),
-        SparseHashLevelOption: (0, 0, 0, 0),
-        SparseByteMapLevelOption: (0, 1, 0, 0, 1, 1.6),
-        ElementLevelOption: (0, 0),
-    },
-    {
-        DenseLevelOption: (0, 0, 1, 1, 0.1, 0.1),
-        SparseListLevelOption: (0, 0, 1, 8, 1.3, 1.3),
-        SparseHashLevelOption: (0, 0, 1, 15, 15, 15),
-        SparseByteMapLevelOption: (0, 0, 1, 1, 1, 1),
-    },
-)
-
-
-def stored_shape_types(
-    prgm: lgc.LogicStatement,
-    bindings: dict[lgc.Alias, TensorFType],
-    machine: StatsMachine,
-) -> dict[lgc.Alias, tuple[FType, ...]]:
-    """
-    Return the dimensions each new alias of prgm stores, at its first
-    definition, advancing machine past prgm.
-    """
-    shape_types: dict[lgc.Alias, tuple[FType | None, ...]] = {
-        var: val.shape_type for var, val in bindings.items()
-    }
-    stored: dict[lgc.Alias, tuple[FType, ...]] = {}
-
-    def visit(node: lgc.LogicStatement):
-        match node:
-            case lgc.Plan(bodies):
-                for body in bodies:
-                    visit(body)
-            case lgc.Fuse(_, body):
-                visit(body)
-            case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
-                lgc.Table(lgc.Alias() as lhs, _), _, _
-            ):
-                node.infer_shape_type(shape_types)
-                machine(node)
-                alias, nfused = lhs.unfused, lhs.nfused
-                if alias not in bindings and alias not in stored:
-                    stored[alias] = tuple(
-                        ftype(dim) if dim is not None else ftypes.intp
-                        for dim in shape_types[alias][nfused:]
-                    )
-            case lgc.Produces():
-                return
-            case _:
-                raise ValueError(f"Unsupported logic statement for formatting: {node}")
-
-    visit(prgm)
-    return stored
-
-
 class CostFormatter(LogicFormatter):
     """
-    CostFormatter chooses the format of each alias from the level options with
-    the lowest cost under cost_model, memoizing the best format for each depth and
-    input position count. The cost of a level is summed over the blocks of its
-    alias in the program.
+    CostFormatter chooses the format of each alias the program defines from
+    the level options, as optimize_formats does under cost_model, a model of
+    the protocol basis, which prices the loops of the program with the
+    protocols chosen for each format. The inputs keep the formats of their
+    bindings.
     """
 
     def __init__(
         self,
         loader: LogicLoader | None = None,
-        cost_model: CostModel[LevelChoice] = STORAGE_COST_MODEL,
+        cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
         options: Sequence[LevelOption] = LEVEL_OPTIONS,
     ):
         super().__init__()
@@ -385,18 +310,27 @@ class CostFormatter(LogicFormatter):
         self.cost_model = cost_model
         self.options = options
 
-    def get_tensor_ftype(
+    def choose_formats(
         self,
-        alias: lgc.Alias,
-        term: lgc.LogicStatement,
-        machine: StatsMachine,
-        fill_type: AbstractFillFType,
-        shape_type: tuple[FType, ...],
-    ) -> FiberTensorFType:
-        _, lvl = optimize_format(
-            alias, shape_type, machine, fill_type, self.cost_model, term, self.options
+        prgm: lgc.LogicStatement,
+        bindings: Mapping[lgc.Alias, TensorFType],
+        stats: Mapping[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
+        stored: Mapping[lgc.Alias, tuple[FType, ...]],
+        fill_types: Mapping[lgc.Alias, AbstractFillFType],
+    ) -> dict[lgc.Alias, TensorFType]:
+        """The format of each alias of stored, whose levels have the shape
+        types it gives, from the stats before prgm."""
+        return optimize_formats(
+            prgm,
+            bindings,
+            stats,
+            stats_factory,
+            stored,
+            fill_types,
+            self.cost_model,
+            self.options,
         )
-        return fiber_tensor(lvl)
 
     def lower(
         self,
@@ -407,31 +341,97 @@ class CostFormatter(LogicFormatter):
     ):
         bindings = bindings.copy()
         machine = StatsMachine(stats_factory, OrderedDict(stats))
-        stored = stored_shape_types(prgm, bindings, machine)
+        shape_types: dict[lgc.Alias, tuple[FType | None, ...]] = {
+            var: val.shape_type for var, val in bindings.items()
+        }
         fill_types = prgm.infer_fill_type(
             {var: val.fill_type for var, val in bindings.items()}
         )
-        # Each alias is formatted for all of its blocks in the program, which
-        # are replayed from the stats before it.
-        initial = StatsMachine(stats_factory, OrderedDict(stats))
-        for alias, shape_type in stored.items():
-            bindings[alias] = self.get_tensor_ftype(
-                alias, prgm, initial, fill_types[alias], shape_type
+        # The dimensions each new alias stores, at its first definition, and
+        # the rank each alias stores, which no definition may change.
+        stored_shape_types: dict[lgc.Alias, tuple[FType, ...]] = {}
+        ranks = {var: len(val.shape_type) for var, val in bindings.items()}
+
+        def formatter(node: lgc.LogicStatement):
+            match node:
+                case lgc.Plan(bodies):
+                    for body in bodies:
+                        formatter(body)
+                case lgc.Fuse(_, body):
+                    formatter(body)
+                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
+                    lgc.Table(lgc.Alias() as lhs, _), _, _
+                ):
+                    node.infer_shape_type(shape_types)
+                    machine(node)
+                    alias, nfused = lhs.unfused, lhs.nfused
+                    shape_type = tuple(
+                        ftype(dim) if dim is not None else ftypes.intp
+                        for dim in shape_types[alias][nfused:]
+                    )
+                    if ranks.setdefault(alias, len(shape_type)) != len(shape_type):
+                        raise ValueError(
+                            f"Cannot change the rank of allocated tensor {alias}."
+                        )
+                    if alias not in bindings and alias not in stored_shape_types:
+                        stored_shape_types[alias] = shape_type
+                case lgc.Produces():
+                    return
+                case _:
+                    raise ValueError(
+                        f"Unsupported logic statement for formatting: {node}"
+                    )
+
+        formatter(prgm)
+        bindings.update(
+            self.choose_formats(
+                prgm, bindings, stats, stats_factory, stored_shape_types, fill_types
             )
+        )
 
         logger.debug(prgm)
 
         return self.ctx(prgm, bindings, machine.bindings, stats_factory)
 
 
-class StorageCostFormatter(CostFormatter):
-    def __init__(self, loader: LogicLoader | None = None):
-        super().__init__(loader, STORAGE_COST_MODEL)
+# Costs are in resets of a dense slot, as fit to Gustavson SpGEMM on Finch.jl.
+# Dense levels pay to reset every slot of each slice, but take writes in any
+# order almost for free. A byte map allocates a flag and a child for each of its
+# slots, like a dense level, but clears and sorts only the entries of each
+# slice. A hash pays for a probe at every write and lookup, and a sorted list
+# appends cheaply but binary searches to look up out of order. A walk costs 1
+# for each entry it steps through, and a gallop 4 for each jump.
+_WORKSPACE_STORAGE_COSTS: dict[str, tuple[float, ...]] = {
+    "dense": (0, 0, 1),
+    "sparse_list": (0, 0, 0, 0),
+    "sparse_hash": (0, 0, 0, 0),
+    "sparse_bytemap": (0, 1, 0, 0, 1, 1.6),
+    "element": (0, 0),
+}
+# The follow, walk, gallop, extrude, and laminate visits of each kind of level.
+_WORKSPACE_ACCESS_COSTS: dict[str, tuple[float, ...]] = {
+    "dense": (1, 1, 0, 0.1, 0.1),
+    "sparse_list": (8, 1, 4, 1.3, 1.3),
+    "sparse_hash": (15, 1, 0, 15, 15),
+    "sparse_bytemap": (1, 1, 4, 1, 1),
+}
 
 
-class IterCostFormatter(CostFormatter):
-    def __init__(self, loader: LogicLoader | None = None):
-        super().__init__(loader, ITER_COST_MODEL)
+def _workspace_access_costs(kind: str) -> tuple[float, ...]:
+    follow, walk, gallop, extrude, laminate = _WORKSPACE_ACCESS_COSTS[kind]
+    return (0, 0, 0, 0, follow, walk, gallop, 0, 0, extrude, laminate, 0)
+
+
+WORKSPACE_COST_MODEL = CostModel(
+    PROTOCOL_BASIS,
+    np.concatenate(
+        [
+            *(_WORKSPACE_STORAGE_COSTS[option.kind] for option in STORAGE_KINDS),
+            *(_workspace_access_costs(option.kind) for option in KINDS),
+            [0.0],
+        ]
+    ),
+)
 
 
 class WorkspaceCostFormatter(CostFormatter):

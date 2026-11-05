@@ -14,11 +14,12 @@ from finch.autoschedule import (
 from finch.autoschedule.cost_models import (
     PROTOCOL_BASIS,
     PROTOCOL_COST_MODEL,
-    Affine,
+    CostModel,
     DenseLevelOption,
     LevelOption,
     Prefix,
     ProtocolBasis,
+    ProtocolChoice,
     SparseHashLevelOption,
     SparseListLevelOption,
     level_options,
@@ -116,7 +117,12 @@ def test_level_reads_reach_each_level_at_its_loop():
 
     def reads(loops):
         return [
-            (read.alias, read.depth, read.field, read.kind)
+            (
+                read.alias,
+                read.depth,
+                read.fields[-1],
+                f"{read.option.kind}.{read.protocol}",
+            )
             for read in level_reads(Prefix(loops, expr, (i,)), formats)
         ]
 
@@ -149,43 +155,106 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
     }
     basis = ProtocolBasis()
     names = basis.feature_names
-    block = [name.removeprefix("sparse_list.") for name in names[5:10]]
+    assert names[:2] == ("dense.positions", "dense.slots")
+    start = names.index("sparse_list.executions")
+    block = [name.removeprefix("sparse_list.") for name in names[start : start + 12]]
     assert block == [
+        "executions",
+        "iterations",
         "seeks",
+        "parents",
         "follow_visits",
         "walk_visits",
         "gallop_visits",
         "dense_visits",
+        "distinct_reads",
+        "extrude_visits",
+        "laminate_visits",
+        "distinct_writes",
     ]
 
     def lists(protocols):
         plan = product_plan(x, y, c, i, [(proto,) for proto in protocols])
         machine = StatsMachine(sf, dict(stats))
-        rows = [
-            basis.get_component_features(prefix, machine)[0]
-            for prefix in basis.components(plan, formats, machine)
-        ]
-        # The empty prefix reads nothing, and the loop over i reads both
-        # lists, which only fill the columns of their kind.
-        assert len(rows) == 2 and not rows[0].any()
-        assert not rows[1][:5].any() and not rows[1][10:].any()
-        return rows[1][5:10].tolist()
+        accesses = []
+        for component in basis.components(plan, formats, machine):
+            match component:
+                case ProtocolChoice():
+                    accesses.append(basis.get_component_features(component, machine)[0])
+        # The loop over i reads both lists, each an access which only fills
+        # the columns of its kind. c has no format, so it isn't written.
+        assert len(accesses) == 2
+        total = sum(accesses)
+        assert not total[:start].any() and not total[start + 12 :].any()
+        return total[start + 2 : start + 9].tolist()
 
     # Each list seeks one fiber. Walks step through the 5 entries of each,
-    # and either would visit the 5 of the other if it were dense.
-    assert lists((Walk(), Walk())) == [2, 0, 10, 0, 10]
+    # and either would visit the 5 of the other if it were dense. Each has 5
+    # distinct entries, whatever reads them.
+    assert lists((Walk(), Walk())) == [2, 2, 0, 10, 0, 10, 10]
     # Gallops jump to the entries they share, within the 5 of the smaller.
-    assert lists((Gallop(), Gallop())) == [2, 0, 0, 10, 10]
+    assert lists((Gallop(), Gallop())) == [2, 2, 0, 0, 10, 10, 10]
     # A followed y is looked up at each of the 5 entries of x, and a dense x
     # would visit all 10.
-    assert lists((Walk(), Follow())) == [2, 5, 5, 0, 15]
+    assert lists((Walk(), Follow())) == [2, 2, 5, 5, 0, 15, 10]
     # A gallop of y alone jumps to each of the 5 entries x walks, and a dense
     # x would visit the 5 entries y gallops to.
-    assert lists((Walk(), Gallop())) == [2, 0, 5, 5, 10]
+    assert lists((Walk(), Gallop())) == [2, 2, 0, 5, 5, 10, 10]
     plan = product_plan(x, y, c, i, ((Walk(),), (Follow(),)))
-    rows = Affine(PROTOCOL_BASIS).get_features(plan, formats, stats, sf)
-    assert rows.shape == (2, 21)
-    assert PROTOCOL_COST_MODEL.predict(rows[:, :-1]) > 0
+    # The reads of the lists, with the constant; the lists are already stored,
+    # so their levels cost nothing.
+    rows = PROTOCOL_BASIS.get_features(plan, formats, stats, sf)
+    assert rows.shape == (2, PROTOCOL_BASIS.n_features)
+    assert PROTOCOL_COST_MODEL.predict(rows) > 0
+
+
+def test_protocol_basis_counts_writes_apart_from_their_locations():
+    # c[i] = sum_j x[j, i], with 5 entries of x in the rows 0, 2, and 5 of c.
+    sf = ExactStatsFactory()
+    i, j = Field("i"), Field("j")
+    x, c = HardAlias("x"), HardAlias("c")
+    xd = np.zeros((8, 8))
+    xd[[0, 1, 1, 3, 3], [0, 0, 2, 2, 5]] = 1.0
+    stats: dict[Alias, TensorStats] = {x: sf(fl.asarray(xd), (j, i))}
+    formats: dict[Alias, list[LevelOption]] = {
+        x: [SparseListLevelOption(), SparseListLevelOption()],
+        c: [SparseHashLevelOption()],
+    }
+    query = Query(
+        Table(c, (i,)),
+        Aggregate(Literal(ffuncs.add), Literal(0.0), Table(x, (j, i)), (j,)),
+    )
+    basis = ProtocolBasis()
+    names = basis.feature_names
+
+    def writes(loop_order):
+        plan = Plan((fuse_loop_order(query, loop_order), Produces((c,))))
+        machine = StatsMachine(sf, dict(stats))
+        accesses = []
+        for component in basis.components(plan, formats, machine):
+            match component:
+                case ProtocolChoice(write=True):
+                    accesses.append(component)
+        # c has one level, written at one loop.
+        (access,) = accesses
+        row = basis.get_component_features(access, machine)
+        return [
+            row[0, names.index(f"sparse_hash.{name}")]
+            for name in (
+                "seeks",
+                "parents",
+                "extrude_visits",
+                "laminate_visits",
+                "distinct_writes",
+            )
+        ]
+
+    # Looping over j outside, c is reached at the loop over i, which runs in
+    # the 3 rows of x, and laminated at each of the 5 entries of x, to 3
+    # distinct entries. Looping over i outside, it is extruded once per row.
+    # The level is the root of c, so it is one fiber.
+    assert writes((j, i)) == [3, 1, 0, 5, 3]
+    assert writes((i, j)) == [1, 1, 3, 0, 3]
 
 
 def test_optimize_protocols_chooses_the_cheaper_read():
@@ -246,6 +315,178 @@ def test_optimize_protocols_only_follows_levels_read_out_of_order():
     plan = Plan((fuse_loop_order(query, (i, j)), Produces((C,))))
     out = optimize_protocols(plan, {A: fmt}, stats, sf)
     assert read_protocols(out, A) == [(Walk(), Walk())]
+
+
+def product_of_matrices(x, y, c, i, j, protocols=((), ())):
+    """c[i] = sum_j x[i, j] * y[i, j], under the loop order (i, j)."""
+    tables = tuple(
+        Table(tns, (i, j), protos)
+        for tns, protos in zip((x, y), protocols, strict=True)
+    )
+    query = Query(
+        Table(c, (i,)),
+        Aggregate(
+            Literal(ffuncs.add),
+            Literal(0.0),
+            MapJoin(Literal(ffuncs.mul), tables),
+            (j,),
+        ),
+    )
+    return Plan((fuse_loop_order(query, (i, j)), Produces((c,))))
+
+
+def test_optimize_protocols_prices_a_follow_by_its_lookups():
+    sf = ExactStatsFactory()
+    i, j = Field("i"), Field("j")
+    x, y, c = HardAlias("x"), HardAlias("y"), HardAlias("c")
+    # x has a diagonal entry in rows 0-59, and y in rows 40-99.
+    n = 100
+    xd, yd = np.zeros((n, n)), np.zeros((n, n))
+    xd[np.arange(60), np.arange(60)] = 1.0
+    yd[np.arange(40, n), np.arange(40, n)] = 1.0
+    stats: dict[Alias, TensorStats] = {
+        x: sf(fl.asarray(xd), (i, j)),
+        y: sf(fl.asarray(yd), (i, j)),
+    }
+    lists = fiber_tensor(
+        sparse_list(sparse_list(element(0.0), ftype(np.intp)), ftype(np.intp))
+    )
+    lst = SparseListLevelOption()
+    formats: dict[Alias, list[LevelOption]] = {x: [lst, lst], y: [lst, lst]}
+    basis = ProtocolBasis()
+    names = basis.feature_names
+
+    def inner(protocols):
+        """The seeks and steps of the lists at the loop over j."""
+        plan = product_of_matrices(x, y, c, i, j, protocols)
+        machine = StatsMachine(sf, dict(stats))
+        total = np.zeros(basis.n_features)
+        for component in basis.components(plan, formats, machine):
+            match component:
+                case ProtocolChoice(prefix=Prefix(prefix=(_, _))):
+                    total += basis.get_component_features(component, machine)[0]
+        return [
+            total[names.index(f"sparse_list.{name}")]
+            for name in ("seeks", "walk_visits")
+        ]
+
+    # Whether the lists are walked or followed at i, the loop over j runs only
+    # in the 20 rows both have, since a lookup which finds no row runs nothing
+    # within it, and there seeks a fiber of each and steps through its entry.
+    assert inner(((Walk(), Walk()), (Walk(), Walk()))) == [40, 40]
+    assert inner(((Follow(), Walk()), (Follow(), Walk()))) == [40, 40]
+
+    def model(lookup):
+        weights = {"follow_visits": lookup, "walk_visits": 1.0, "gallop_visits": 4.0}
+        return CostModel(
+            PROTOCOL_BASIS,
+            [
+                weights.get(name.partition(".")[2], 0.0)
+                for name in PROTOCOL_BASIS.feature_names
+            ],
+        )
+
+    # So the choice at i is priced by its own steps and lookups: walking both
+    # steps through 120 rows, and following both looks each up at all 100.
+    plan = product_of_matrices(x, y, c, i, j)
+    out = optimize_protocols(plan, {x: lists, y: lists}, stats, sf, model(0.0))
+    assert [protos[0] for protos in read_protocols(out, x, y)] == [Follow(), Follow()]
+    out = optimize_protocols(plan, {x: lists, y: lists}, stats, sf, model(2.0))
+    assert [protos[0] for protos in read_protocols(out, x, y)] == [Walk(), Walk()]
+
+
+def test_a_dense_level_above_is_entered_at_every_slot():
+    sf = ExactStatsFactory()
+    i, j = Field("i"), Field("j")
+    x, y, c = HardAlias("x"), HardAlias("y"), HardAlias("c")
+    # x has 3 entries in each of rows 0-3, and y 5 in each of rows 2-9, of 10.
+    n = 10
+    xd, yd = np.zeros((n, n)), np.zeros((n, n))
+    xd[:4, :3] = 1.0
+    yd[2:, :5] = 1.0
+    stats: dict[Alias, TensorStats] = {
+        x: sf(fl.asarray(xd), (i, j)),
+        y: sf(fl.asarray(yd), (i, j)),
+    }
+    plan = product_of_matrices(x, y, c, i, j)
+    lst = SparseListLevelOption()
+    basis = ProtocolBasis()
+    names = basis.feature_names
+
+    def inner(above):
+        """The seeks, parents, and steps of each list at the loop over j,
+        with the first level of x of the option above."""
+        formats: dict[Alias, list[LevelOption]] = {x: [above, lst], y: [lst, lst]}
+        machine = StatsMachine(sf, dict(stats))
+        rows = {}
+        for component in basis.components(plan, formats, machine):
+            match component:
+                case ProtocolChoice(prefix=Prefix(prefix=(_, _))) as access:
+                    rows[access.alias] = basis.get_component_features(access, machine)[
+                        0
+                    ]
+        return {
+            tns: [
+                row[names.index(f"sparse_list.{name}")]
+                for name in ("seeks", "parents", "walk_visits")
+            ]
+            for tns, row in rows.items()
+        }
+
+    # A list above x has a row only where x has entries, and a lookup which
+    # finds none runs nothing within it, so the loop over j is entered in the
+    # 2 rows both have. A dense level above x has a fiber at every slot, so
+    # the loop over j is entered in all 8 rows of y, and seeks an empty fiber
+    # of x in 6 of them, where the merge steps through nothing of either.
+    assert inner(lst) == {x: [2, 2, 6], y: [2, 2, 10]}
+    assert inner(DenseLevelOption()) == {x: [8, 8, 6], y: [8, 8, 10]}
+
+
+def test_a_dense_tensor_never_filters_the_loops_within_it():
+    sf = ExactStatsFactory()
+    i, j = Field("i"), Field("j")
+    x, y, c = HardAlias("x"), HardAlias("y"), HardAlias("c")
+    # x has 3 entries in each of rows 0-3, and y 5 in each of rows 2-9, of 10.
+    n = 10
+    xd, yd = np.zeros((n, n)), np.zeros((n, n))
+    xd[:4, :3] = 1.0
+    yd[2:, :5] = 1.0
+    stats: dict[Alias, TensorStats] = {
+        x: sf(fl.asarray(xd), (i, j)),
+        y: sf(fl.asarray(yd), (i, j)),
+    }
+    lst, dense_ = SparseListLevelOption(), DenseLevelOption()
+    basis = ProtocolBasis()
+    names = basis.feature_names
+
+    def inner(formats, protocols):
+        """The iterations of the loop over j and the visits of each table."""
+        plan = product_of_matrices(x, y, c, i, j, protocols)
+        machine = StatsMachine(sf, dict(stats))
+        rows = {}
+        for component in basis.components(plan, formats, machine):
+            match component:
+                case ProtocolChoice(prefix=Prefix(prefix=(_, _))) as access:
+                    row = basis.get_component_features(access, machine)[0]
+                    kind = access.option.kind
+                    rows[access.alias] = [
+                        row[names.index(f"{kind}.{name}")]
+                        for name in ("iterations", "follow_visits", "walk_visits")
+                    ]
+        return rows
+
+    # A dense x is looked up at every entry of y, whatever its rows hold, so
+    # the walk of y steps through all 40 of its entries, with x's fill where x
+    # has none, and the loop over j runs at each of them.
+    assert inner(
+        {x: [dense_, dense_], y: [lst, lst]}, ((Follow(), Follow()), (Walk(), Walk()))
+    ) == {x: [40, 40, 0], y: [40, 0, 40]}
+    # A list below the dense level of x has entries only in the 4 rows of x,
+    # so the merge steps through y only in the 2 rows both have, and runs at
+    # the 3 entries of each they share.
+    assert inner(
+        {x: [dense_, lst], y: [lst, lst]}, ((Follow(), Walk()), (Walk(), Walk()))
+    ) == {x: [6, 0, 6], y: [6, 0, 10]}
 
 
 def test_cost_protocolizer_states_the_protocols_it_chooses():

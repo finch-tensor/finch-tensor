@@ -10,7 +10,7 @@ from finch import ffuncs
 from finch.autoschedule.cost_models import (
     LOOP_COST_MODEL,
     Concat,
-    LinearCostModel,
+    CostModel,
     LoopBasis,
     PigeonBasis,
     Prefix,
@@ -161,7 +161,7 @@ def test_loop_search_minimizes_nonlinear_component_cost(search):
     arg = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), arg, (j,))
     basis = Concat(PigeonBasis(), TransposeBasis())
-    model = LinearCostModel(Quadratic(basis), np.ones(49))
+    model = CostModel(Quadratic(basis), np.ones(49))
 
     def cost(order):
         query = fuse_loop_order(Query(Table(out, (i, k)), expr), order)
@@ -210,7 +210,7 @@ def test_loop_orderers_use_selected_model(search, orderer, inplace):
     a, out = HardAlias("a"), HardAlias("out")
     expr = Table(a, (i, j))
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((16, 16))), (i, j))}
-    model = LinearCostModel(PreferFieldBasis(j), [1.0])
+    model = CostModel(PreferFieldBasis(j), [1.0])
     assert search(expr, sf, stats, cost_model=model) == (j, i)
     if inplace:
         stats[out] = sf(fl.asarray(np.ones(())), ())
@@ -243,7 +243,7 @@ def test_loop_orderers_may_visit_outputs_out_of_order(search):
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), Table(a, (i, j)), (j,))
     # Without a cost for writes, the output's fields may come in any order.
-    prefer_i = LinearCostModel(PreferFieldBasis(i), [1.0])
+    prefer_i = CostModel(PreferFieldBasis(i), [1.0])
     assert search(expr, sf, stats, (unit, i), cost_model=prefer_i) == (i, j, unit)
 
 
@@ -260,7 +260,7 @@ def test_loop_orderers_write_outputs_in_order_when_it_pays(search):
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), Table(a, (i, j)), (j,))
     # Scattering into the output costs more than looping over i first saves.
     basis = Concat(PreferFieldBasis(i), WriteBasis())
-    writes = LinearCostModel(basis, [1.0, 0.0, 100.0, 100.0])
+    writes = CostModel(basis, [1.0, 0.0, 100.0, 100.0])
     assert search(expr, sf, stats, (unit, i), cost_model=writes) == (unit, i, j)
 
 

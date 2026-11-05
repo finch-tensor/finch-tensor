@@ -14,9 +14,10 @@ from finch import finch_assembly as asm
 from finch.algebra import TensorFType
 from finch.autoschedule import CompilerFormLowerer, LogicCapture, NotationGenerator
 from finch.autoschedule.cost_models import (
-    LevelBasis,
-    LevelChoice,
+    DenseLevelOption,
+    LevelOption,
     ProtocolBasis,
+    ProtocolChoice,
     SparseListLevelOption,
     TransposeBasis,
 )
@@ -231,25 +232,42 @@ def test_dense_levels_are_looked_up_at_every_visit():
     yd = np.ones(n, np.int64)
     sf = ExactStatsFactory()
     stats = {x: sf(fl.asarray(xd), (i,)), y: sf(fl.asarray(yd), (i,))}
-    product = MapJoin(Literal(ffuncs.mul), (Table(x, (i,)), Table(y, (i,))))
-    query = Query(
-        Table(c, ()), Aggregate(Literal(ffuncs.add), Literal(0), product, (i,))
-    )
-    plan = Plan((fuse_loop_order(query, (i,)), Produces((c,))))
-    machine = StatsMachine(sf, dict(stats))
-    choice = LevelChoice(plan, x, 0, (1.0,), SparseListLevelOption(), 8)
-    row = LevelBasis(type(choice.option)).get_component_features(choice, machine)
-    features = dict(
-        zip(LevelBasis(type(choice.option)).feature_names, row.sum(axis=0), strict=True)
-    )
-    assert features["visits"] == 4
-    assert features["dense_visits"] == n
+    basis = ProtocolBasis()
+    names = basis.feature_names
+
+    def plan(protocol=None):
+        protocols = () if protocol is None else (protocol,)
+        product = MapJoin(
+            Literal(ffuncs.mul), (Table(x, (i,), protocols), Table(y, (i,)))
+        )
+        query = Query(
+            Table(c, ()), Aggregate(Literal(ffuncs.add), Literal(0), product, (i,))
+        )
+        return Plan((fuse_loop_order(query, (i,)), Produces((c,))))
+
+    def reads(option, protocol=None):
+        """The steps and lookups of x, stored as a level of option."""
+        formats: dict[Alias, list[LevelOption]] = {
+            x: [option],
+            y: [SparseListLevelOption()],
+        }
+        machine = StatsMachine(sf, dict(stats))
+        for component in basis.components(plan(protocol), formats, machine):
+            match component:
+                case ProtocolChoice(table=Table(tns)) if tns == x:
+                    row = basis.get_component_features(component, machine)[0]
+        return [
+            row[names.index(f"{option.kind}.{name}")]
+            for name in ("walk_visits", "follow_visits")
+        ]
 
     # A list of x is stepped through at its 4 entries, while a dense x is
     # looked up at every entry of y, which the dense term counts.
-    counts, _ = run(plan, {x: stored("S", xd), y: stored("S", yd)}, {c: ()})
+    assert reads(SparseListLevelOption()) == [4, 0]
+    assert reads(DenseLevelOption(), Follow()) == [0, n]
+    counts, _ = run(plan(), {x: stored("S", xd), y: stored("S", yd)}, {c: ()})
     assert loads(counts, "x", "val") == 4
-    counts, _ = run(plan, {x: stored("D", xd), y: stored("S", yd)}, {c: ()})
+    counts, _ = run(plan(), {x: stored("D", xd), y: stored("S", yd)}, {c: ()})
     assert loads(counts, "x", "val") == n
 
 
@@ -279,9 +297,13 @@ def test_gallops_jump_within_the_smallest_support():
     def jumps(px, py):
         machine = StatsMachine(sf, dict(stats))
         basis = ProtocolBasis()
-        _, prefix = basis.components(program(px, py), formats, machine)
-        row = basis.get_component_features(prefix, machine)[0]
-        return row[basis.feature_names.index("sparse_list.gallop_visits")]
+        # The levels of x and y, and the reads of them at the loop over i, are
+        # components, of which only the reads fill the gallop column.
+        rows = [
+            basis.get_component_features(component, machine)[0]
+            for component in basis.components(program(px, py), formats, machine)
+        ]
+        return sum(rows)[basis.feature_names.index("sparse_list.gallop_visits")]
 
     # Two gallops each jump at most as often as the smaller list has entries,
     # and a gallop driven by a walk jumps once for each step of the walk.

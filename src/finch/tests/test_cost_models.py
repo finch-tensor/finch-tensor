@@ -14,20 +14,16 @@ from finch.autoschedule.cost_models import (
     FLOPS_COST_MODEL,
     LOOP_COST_MODEL,
     PROTOCOL_COST_MODEL,
+    STORAGE_BASIS,
     Affine,
-    Basis,
     ByKind,
     Concat,
-    DenseLevelOption,
+    CostModel,
     FlopsBasis,
-    KNearest,
-    LevelBasis,
-    LinearCostModel,
     PigeonBasis,
     Prefix,
     Quadratic,
     RowMap,
-    SparseHashLevelOption,
     Statement,
     Stratify,
     TransposeBasis,
@@ -56,12 +52,12 @@ from finch.finch_logic import (
     Walk,
 )
 
-PIGEON = LinearCostModel(PigeonBasis(), [1.0, 1.0, 10.0, 1.0, 0.0])
-TRANSPOSE = LinearCostModel(TransposeBasis(), [0.5, 60.0])
+PIGEON = CostModel(PigeonBasis(), [1.0, 1.0, 10.0, 1.0, 0.0])
+TRANSPOSE = CostModel(TransposeBasis(), [0.5, 60.0])
 
 
 def test_linear_model_sums_row_predictions():
-    model = LinearCostModel(TransposeBasis(), [2.0, 3.0])
+    model = CostModel(TransposeBasis(), [2.0, 3.0])
     rows = np.array([[1.0, 2.0], [3.0, 4.0]])
     assert model.predict(rows) == 26.0
     assert model.predict(rows) == sum(model.predict(row[None, :]) for row in rows)
@@ -79,11 +75,6 @@ def random_programs(rng, n_features, n_programs=40):
         Quadratic(PigeonBasis()),
         Concat(PigeonBasis(), TransposeBasis()),
         Concat(PigeonBasis(), Quadratic(PigeonBasis())),
-        KNearest(PigeonBasis(), np.random.default_rng(0).random((6, 5)), 2),
-        Concat(
-            PigeonBasis(),
-            KNearest(PigeonBasis(), np.random.default_rng(1).random((4, 5))),
-        ),
         Stratify(PigeonBasis(), 0, [0.3, 0.7]),
         Stratify(Quadratic(TransposeBasis()), 0, [0.5]),
         Affine(PigeonBasis()),
@@ -92,10 +83,10 @@ def random_programs(rng, n_features, n_programs=40):
 )
 def test_linear_model_fits_program_runtimes(rng, basis):
     # Only the runtimes of whole programs are known, not those of their rows.
-    true = LinearCostModel(basis, rng.random(basis.n_features))
+    true = CostModel(basis, rng.random(basis.n_features))
     features = random_programs(rng, basis.n_features)
     runtimes = [true.predict(rows) for rows in features]
-    untrained = LinearCostModel(basis, np.zeros(basis.n_features))
+    untrained = CostModel(basis, np.zeros(basis.n_features))
     fitted = untrained.fit(features, runtimes)
     assert fitted.basis is basis
     np.testing.assert_allclose(untrained.coefficients, 0)
@@ -105,14 +96,13 @@ def test_linear_model_fits_program_runtimes(rng, basis):
 
 def test_linear_model_checks_coefficients():
     with pytest.raises(ValueError, match="Expected 5 coefficients"):
-        LinearCostModel(PigeonBasis(), [1.0, 2.0])
+        CostModel(PigeonBasis(), [1.0, 2.0])
 
 
 def test_stratify_places_rows_in_regime_blocks():
     basis = Stratify(TransposeBasis(), 1, [1.0, 3.0])
     assert basis.n_regimes == 3
     assert basis.n_features == 6
-    np.testing.assert_array_equal(basis.ridge, np.ones(6))
     rows = np.array([[5.0, 0.5], [6.0, 1.0], [7.0, 2.0], [8.0, 3.5]])
     np.testing.assert_array_equal(
         basis.transform(rows),
@@ -138,7 +128,7 @@ def test_stratify_fits_separate_coefficients_per_regime(rng):
     programs = random_programs(rng, 2)
     features = [basis.transform(rows) for rows in programs]
     runtimes = [rows.sum(axis=0) @ coefficients for rows in features]
-    fitted = LinearCostModel(basis, np.zeros(4)).fit(features, runtimes)
+    fitted = CostModel(basis, np.zeros(4)).fit(features, runtimes)
     np.testing.assert_allclose(fitted.coefficients, coefficients, atol=1e-9)
 
 
@@ -147,50 +137,29 @@ def test_stratify_fits_separate_coefficients_per_regime(rng):
     [
         FLOPS_COST_MODEL,
         LOOP_COST_MODEL,
-        LinearCostModel(Affine(PigeonBasis()), np.arange(6)),
+        CostModel(Affine(PigeonBasis()), np.arange(6)),
         PROTOCOL_COST_MODEL,
-        LinearCostModel(
-            Affine(ByKind({"dense": Affine(LevelBasis(DenseLevelOption))})),
-            np.arange(11),
-        ),
-        LinearCostModel(
-            Concat(
-                Stratify(Quadratic(PigeonBasis()), 0, [2.0, 4.0], increasing=True),
-                KNearest(TransposeBasis(), [[0.0, 0.0], [1.0, 2.0]], 2),
-            ),
+        CostModel(Affine(STORAGE_BASIS), np.arange(20)),
+        CostModel(
+            Concat(Stratify(Quadratic(PigeonBasis()), 0, [2.0, 4.0]), TransposeBasis()),
             np.arange(77),
-        ),
-        LinearCostModel(
-            ByKind(
-                {
-                    "dense": LevelBasis(DenseLevelOption),
-                    "sparse_hash": LevelBasis(SparseHashLevelOption),
-                }
-            ),
-            np.arange(19),
         ),
     ],
 )
 def test_models_round_trip_through_json(rng, model):
     data = json.loads(json.dumps(model.to_json()))
+    assert data["feature_names"] == list(model.basis.feature_names)
+    assert len(data["feature_names"]) == model.basis.n_features
     restored = model.from_json(data)
-    assert type(restored) is type(model)
-    assert restored.to_json() == model.to_json()
+    assert restored.basis is model.basis
+    np.testing.assert_array_equal(restored.coefficients, model.coefficients)
     for rows in random_programs(rng, model.basis.n_features, 3):
         assert restored.predict(rows) == model.predict(rows)
-    assert type(restored.basis) is type(model.basis)
-    assert restored.basis.n_features == model.basis.n_features
-    np.testing.assert_array_equal(restored.basis.ridge, model.basis.ridge)
-    np.testing.assert_array_equal(restored.basis.constraints, model.basis.constraints)
-    assert restored.basis.feature_names == model.basis.feature_names
-    assert len(model.basis.feature_names) == model.basis.n_features
-    features = random_programs(rng, model.basis.n_features, 3)
-    saved = json.loads(json.dumps(model.basis.features_to_json(features)))
-    assert saved["feature_names"] == list(model.basis.feature_names)
-    for rows, loaded in zip(
-        features, restored.basis.features_from_json(saved), strict=True
-    ):
-        np.testing.assert_array_equal(loaded, rows.reshape(-1, model.basis.n_features))
+
+
+def test_from_json_rejects_other_bases():
+    with pytest.raises(ValueError, match="Expected the coefficients of"):
+        LOOP_COST_MODEL.from_json(PIGEON.to_json())
 
 
 def test_feature_names_compose():
@@ -214,161 +183,27 @@ def test_feature_names_compose():
         "regime1.dense_transposes",
         "regime1.sparse_transposes",
     )
-    assert ByKind({"dense": LevelBasis(DenseLevelOption)}).feature_names == (
+    assert ByKind({"a": TransposeBasis(), "b": PigeonBasis()}).feature_names[:3] == (
+        "a.dense_transposes",
+        "a.sparse_transposes",
+        "b.iterations",
+    )
+    assert STORAGE_BASIS.feature_names == PROTOCOL_COST_MODEL.basis.feature_names[:19]
+    assert STORAGE_BASIS.feature_names[:6] == (
         "dense.positions",
         "dense.slots",
         "dense.reset_slots",
-        "dense.visits",
-        "dense.dense_visits",
-        "dense.entries",
-        "dense.lookups",
-        "dense.sequential_writes",
-        "dense.scatter_writes",
+        "sparse_list.positions",
+        "sparse_list.entries",
+        "sparse_list.position_bytes",
     )
-
-
-def test_features_from_json_rejects_other_bases():
-    saved = PigeonBasis().features_to_json([np.ones((1, 5))])
-    with pytest.raises(ValueError, match="Expected features of"):
-        Affine(PigeonBasis()).features_from_json(saved)
-
-
-def test_from_json_rejects_other_classes():
-    with pytest.raises(ValueError, match="Expected linear data, got 'pigeon'"):
-        LOOP_COST_MODEL.from_json(PigeonBasis().to_json())
-    with pytest.raises(ValueError, match="Expected pigeon data, got None"):
-        PigeonBasis().from_json({})
-    with pytest.raises(ValueError, match="Expected 2 bases, got 1"):
-        Concat(PigeonBasis(), TransposeBasis()).from_json(
-            Concat(PigeonBasis()).to_json()
-        )
-    with pytest.raises(ValueError, match="levels of dense, got 'sparse_hash'"):
-        LevelBasis(DenseLevelOption).from_json(
-            LevelBasis(SparseHashLevelOption).to_json()
-        )
-    # The kinds and key of a ByKind are those of the basis which reads it.
-    bases: dict[int, Basis] = {0: PigeonBasis(), 1: TransposeBasis()}
-    custom = ByKind(bases, key=len)
-    restored = custom.from_json(json.loads(json.dumps(custom.to_json())))
-    assert restored.key is len
-    assert list(restored.by_kind) == [0, 1]
-    assert restored.to_json() == custom.to_json()
 
 
 def test_fit_to_no_programs_is_zero():
     basis = Affine(PigeonBasis())
-    fitted = LinearCostModel(basis, np.ones(6)).fit([], [])
+    fitted = CostModel(basis, np.ones(6)).fit([], [])
     np.testing.assert_array_equal(fitted.coefficients, np.zeros(6))
     assert fitted.predict(np.ones((2, 6))) == 0.0
-
-
-def test_stratify_increasing_orders_regimes(rng):
-    basis = Stratify(TransposeBasis(), 0, [0.5], increasing=True)
-    np.testing.assert_array_equal(basis.constraints, [[-1, 0, 1, 0], [0, -1, 0, 1]])
-    np.testing.assert_array_equal(
-        Stratify(TransposeBasis(), 0, [0.3, 0.6], increasing=True).constraints,
-        [
-            [-1, 0, 1, 0, 0, 0],
-            [0, -1, 0, 1, 0, 0],
-            [0, 0, -1, 0, 1, 0],
-            [0, 0, 0, -1, 0, 1],
-        ],
-    )
-    programs = random_programs(rng, 2)
-    features = [basis.transform(rows) for rows in programs]
-    design = np.stack([rows.sum(axis=0) for rows in features])
-    # Costs that rise with the regime are fitted exactly.
-    fitted = LinearCostModel(basis, np.zeros(4)).fit(features, design @ [1, 2, 3, 2])
-    np.testing.assert_allclose(fitted.coefficients, [1, 2, 3, 2], atol=1e-7)
-    # Costs that fall with the regime are tied between the regimes.
-    runtimes = design @ [3.0, 2.0, 1.0, 2.0]
-    fitted = LinearCostModel(basis, np.zeros(4)).fit(features, runtimes)
-    assert fitted.coefficients[2] >= fitted.coefficients[0] - 1e-9
-    assert fitted.coefficients[2] == pytest.approx(fitted.coefficients[0])
-    assert fitted.coefficients[3] == pytest.approx(fitted.coefficients[1])
-
-
-def test_knearest_basis_interpolates_nearest_landmark_costs():
-    # A linear model of KNearest is k nearest neighbors over the landmarks,
-    # weighted by inverse distance.
-    basis = KNearest(TransposeBasis(), [[0.0, 0.0], [1.0, 0.0], [5.0, 5.0]], 2)
-    rows = np.array([[0.2, 0.0], [5.0, 4.0], [1.0, 0.0]])
-    far = 1 / np.sqrt(32)
-    expected = [
-        [0.8, 0.2, 0.0],
-        [0.0, far / (1 + far), 1 / (1 + far)],
-        [0.0, 1.0, 0.0],
-    ]
-    np.testing.assert_allclose(basis.transform(rows), expected)
-    model = LinearCostModel(basis, [1.0, 3.0, 100.0])
-    assert model.predict(basis.transform(rows)) == pytest.approx(
-        (np.asarray(expected) @ [1.0, 3.0, 100.0]).sum()
-    )
-    assert basis.transform(np.empty((0, 2))).shape == (0, 3)
-    # Rows on several coincident landmarks share their weight.
-    tied = KNearest(TransposeBasis(), [[0.0, 0.0], [0.0, 0.0], [1.0, 1.0]], 3)
-    np.testing.assert_allclose(tied.transform(np.zeros((1, 2))), [[0.5, 0.5, 0.0]])
-    with pytest.raises(ValueError, match="Expected 1 <= k <= 3"):
-        KNearest(TransposeBasis(), np.zeros((3, 2)), 4)
-
-
-class Increasing(RowMap):
-    """The rows of a basis, with nondecreasing coefficients."""
-
-    @property
-    def n_features(self):
-        return self.basis.n_features
-
-    @property
-    def constraints(self):
-        return np.diff(np.eye(self.n_features), axis=0)
-
-    def transform(self, rows):
-        return rows
-
-
-def test_constraints_compose_and_bind_fit(rng):
-    basis = Concat(PigeonBasis(), Increasing(TransposeBasis()))
-    np.testing.assert_array_equal(basis.constraints, [[0, 0, 0, 0, 0, -1, 1]])
-    assert PigeonBasis().constraints.shape == (0, 5)
-    np.testing.assert_array_equal(
-        Stratify(Increasing(TransposeBasis()), 0, [0.5]).constraints,
-        [[-1, 1, 0, 0], [0, 0, -1, 1]],
-    )
-    programs = random_programs(rng, 7)
-    design = np.stack([rows.sum(axis=0) for rows in programs])
-    # The true coefficients of the constrained block decrease, so the fit can
-    # do no better than equal coefficients there, and no worse either.
-    runtimes = design @ [1.0, 2.0, 3.0, 4.0, 0.5, 5.0, 1.0]
-    relative = design / runtimes[:, None]
-    ones = np.ones(len(runtimes))
-    loss = lambda c: np.sum((relative @ c - 1) ** 2)  # noqa: E731
-    fitted = LinearCostModel(basis, np.zeros(7)).fit(programs, runtimes)
-    assert fitted.coefficients[6] - fitted.coefficients[5] >= -1e-9
-    assert fitted.coefficients.min() >= 0
-    tied = nnls(np.column_stack([relative[:, :5], relative[:, 5:].sum(axis=1)]), ones)[
-        0
-    ]
-    assert loss(fitted.coefficients) == pytest.approx(
-        loss(np.repeat(tied, [1, 1, 1, 1, 1, 2]))
-    )
-    assert loss(nnls(relative, ones)[0]) < loss(fitted.coefficients)
-
-
-def test_knearest_fit_apportions_program_runtimes(rng):
-    # Each program's runtime is the sum of the costs of the landmarks nearest
-    # its rows, and least squares recovers those costs from the sums alone.
-    landmarks = rng.random((5, 2)) * 10
-    costs = rng.random(5)
-    basis = KNearest(TransposeBasis(), landmarks)
-    features, runtimes = [], []
-    for _ in range(40):
-        nearest = rng.integers(0, 5, size=rng.integers(1, 4))
-        rows = landmarks[nearest] + rng.normal(scale=0.1, size=(len(nearest), 2))
-        features.append(basis.transform(rows))
-        runtimes.append(costs[nearest].sum())
-    fitted = LinearCostModel(basis, np.zeros(5)).fit(features, runtimes)
-    np.testing.assert_allclose(fitted.coefficients, costs)
 
 
 class Unpenalized(RowMap):
@@ -385,26 +220,28 @@ class Unpenalized(RowMap):
 
 
 def test_fit_is_nonnegative_relative_least_squares_with_basis_ridge(rng):
-    # Six landmark costs from three runtimes is underdetermined, and the
-    # penalty is alpha times the ridge weights of each basis.
+    # Six coefficients from three runtimes is underdetermined, and the penalty
+    # is alpha times the ridge weights of each basis.
     raw = Unpenalized(TransposeBasis())
-    nearest = KNearest(TransposeBasis(), rng.random((6, 2)))
-    basis = Concat(raw, nearest)
-    np.testing.assert_array_equal(basis.ridge, [0, 0, 1, 1, 1, 1, 1, 1])
+    squares = Quadratic(TransposeBasis())
+    basis = Concat(raw, squares)
+    np.testing.assert_array_equal(basis.ridge, [0, 0, 1, 1, 1, 1])
+    np.testing.assert_array_equal(Affine(raw).ridge, [0, 0, 1])
+    np.testing.assert_array_equal(Stratify(raw, 0, [0.5]).ridge, np.zeros(4))
     features = []
     for _ in range(3):
         rows = rng.random((3, 2))
         features.append(
-            np.concatenate([raw.transform(rows), nearest.transform(rows)], axis=1)
+            np.concatenate([raw.transform(rows), squares.transform(rows)], axis=1)
         )
     runtimes = np.array([1.0, 2.0, 3.0])
     design = np.stack([rows.sum(axis=0) for rows in features])
     for alpha in (0.0, 0.5, 2.0):
-        fitted = LinearCostModel(basis, np.zeros(8)).fit(features, runtimes, alpha)
+        fitted = CostModel(basis, np.zeros(6)).fit(features, runtimes, alpha)
         augmented = np.concatenate(
             [design / runtimes[:, None], np.sqrt(alpha) * np.diag(basis.ridge)]
         )
-        expected = nnls(augmented, np.concatenate([np.ones(3), np.zeros(8)]))[0]
+        expected = nnls(augmented, np.concatenate([np.ones(3), np.zeros(6)]))[0]
         np.testing.assert_allclose(fitted.coefficients, expected, atol=1e-9)
         assert fitted.coefficients.min() >= 0
 
@@ -417,7 +254,7 @@ def test_fit_clamps_negative_coefficients(rng):
     runtimes = design @ [1.0, -0.5, 3.0, 0.7, 0.2, -0.3, 0.5] * noise
     relative = design / runtimes[:, None]
     ones = np.ones(len(runtimes))
-    fitted = LinearCostModel(basis, np.zeros(7)).fit(features, runtimes)
+    fitted = CostModel(basis, np.zeros(7)).fit(features, runtimes)
     np.testing.assert_allclose(fitted.coefficients, nnls(relative, ones)[0])
     assert fitted.coefficients[1] == 0 and fitted.coefficients[5] == 0
     assert np.any(np.linalg.lstsq(relative, ones)[0] < 0)
@@ -426,7 +263,7 @@ def test_fit_clamps_negative_coefficients(rng):
 def test_fit_requires_positive_runtimes(rng):
     features = random_programs(rng, 2, 3)
     with pytest.raises(ValueError, match="Expected positive runtimes"):
-        LinearCostModel(TransposeBasis(), np.zeros(2)).fit(features, [1.0, 0.0, 2.0])
+        CostModel(TransposeBasis(), np.zeros(2)).fit(features, [1.0, 0.0, 2.0])
 
 
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
@@ -457,11 +294,11 @@ def test_flops_cost_retains_query_components(factory):
         query_costs.append(cost.predict_component_cost(Statement(stmt), machine))
         machine(stmt)
     assert query_costs == [26.0, 22.0]
-    nonlinear = LinearCostModel(Quadratic(FlopsBasis()), [1.0, 0.0, 0.0, 10.0])
+    nonlinear = CostModel(Quadratic(FlopsBasis()), [1.0, 0.0, 0.0, 10.0])
     assert nonlinear.predict_cost(plan, {}, stats, sf) == 120.0
     assert set(stats) == {a}
     # Each query costs a constant.
-    affine = LinearCostModel(Affine(FlopsBasis()), [2.0, 3.0, 100.0])
+    affine = CostModel(Affine(FlopsBasis()), [2.0, 3.0, 100.0])
     np.testing.assert_array_equal(
         affine.get_features(plan, {}, stats, sf), [[6, 2, 1], [2, 2, 1]]
     )
@@ -477,12 +314,9 @@ def test_flops_cost_retains_query_components(factory):
         PIGEON,
         TRANSPOSE,
         LOOP_COST_MODEL,
-        LinearCostModel(
-            Quadratic(Concat(PigeonBasis(), TransposeBasis())), np.ones(49)
-        ),
-        LinearCostModel(Quadratic(PigeonBasis()), np.ones(25)),
-        LinearCostModel(KNearest(PigeonBasis(), np.ones((2, 5))), np.ones(2)),
-        LinearCostModel(Stratify(PigeonBasis(), 0, [4.0]), np.ones(10)),
+        CostModel(Affine(PigeonBasis()), np.ones(6)),
+        CostModel(Quadratic(Concat(PigeonBasis(), TransposeBasis())), np.ones(49)),
+        CostModel(Stratify(PigeonBasis(), 0, [4.0]), np.ones(10)),
     ],
 )
 @pytest.mark.parametrize("plan", [Plan(()), Plan((Produces(()),))])
@@ -499,7 +333,7 @@ def test_quadratic_of_concat_crosses_bases():
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
     plan = fuse_loop_order(Query(Table(out, (j, i)), Table(a, (i, j))), (j, i))
     basis = Concat(PigeonBasis(), TransposeBasis())
-    cost = LinearCostModel(Quadratic(basis), np.ones(49))
+    cost = CostModel(Quadratic(basis), np.ones(49))
     features = basis.get_features(plan, {}, stats, sf)
     assert features.shape == (3, 7)
     assert cost.get_features(plan, {}, stats, sf).shape == (3, 49)
@@ -511,26 +345,20 @@ def test_quadratic_of_concat_crosses_bases():
 @pytest.mark.parametrize(
     "cost",
     [
-        LinearCostModel(Quadratic(PigeonBasis()), np.ones(25)),
-        LinearCostModel(Quadratic(TransposeBasis()), np.ones(4)),
-        LinearCostModel(
+        PIGEON,
+        TRANSPOSE,
+        LOOP_COST_MODEL,
+        CostModel(Affine(PigeonBasis()), np.arange(6)),
+        CostModel(Quadratic(PigeonBasis()), np.ones(25)),
+        CostModel(
             Concat(Quadratic(PigeonBasis()), Quadratic(TransposeBasis())), np.ones(29)
         ),
-        LinearCostModel(
-            Quadratic(Concat(PigeonBasis(), TransposeBasis())), np.ones(49)
-        ),
-        LinearCostModel(Concat(PigeonBasis(), Quadratic(PigeonBasis())), np.ones(30)),
-        LinearCostModel(
-            Concat(
-                KNearest(PigeonBasis(), [[0] * 5, [6, 2, 2, 0, 0], [6, 6, 0, 0, 0]], 2),
-                Quadratic(TransposeBasis()),
-            ),
-            np.arange(7),
-        ),
-        LinearCostModel(Stratify(PigeonBasis(), 0, [2.0, 4.0]), np.arange(15)),
+        CostModel(Quadratic(Concat(PigeonBasis(), TransposeBasis())), np.ones(49)),
+        CostModel(Concat(PigeonBasis(), Quadratic(PigeonBasis())), np.ones(30)),
+        CostModel(Stratify(PigeonBasis(), 0, [2.0, 4.0]), np.arange(15)),
     ],
 )
-def test_nonlinear_loop_costs_are_additive_over_prefixes(cost):
+def test_loop_costs_are_additive_over_prefixes(cost):
     sf = DCStatsFactory()
     i, j = Field("i"), Field("j")
     a, out = HardAlias("a"), HardAlias("out")
@@ -696,7 +524,9 @@ def test_pigeon_prefix_costs_match_full_cost(factory, expected):
         prefixes = [order[:n] for n in range(len(order) + 1)]
         features = np.concatenate(
             [
-                model.get_component_features(Prefix(prefix, expr, out_idxs), machine)
+                model.basis.get_component_features(
+                    Prefix(prefix, expr, out_idxs), machine
+                )
                 for prefix in prefixes
             ]
         )
@@ -737,7 +567,7 @@ def test_pigeon_counts_iterations_of_a_merge(b, expected):
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), arg, (j, k))
     machine = StatsMachine(sf, stats)
     iterations = [
-        PIGEON.get_component_features(Prefix(prefix, expr, ()), machine)[0, 0]
+        PIGEON.basis.get_component_features(Prefix(prefix, expr, ()), machine)[0, 0]
         for prefix in [(j,), (j, k)]
     ]
     assert iterations == expected
@@ -813,11 +643,12 @@ def test_pigeon_empty_prefix_and_loop_without_inputs(factory):
     machine = StatsMachine(sf, dict(stats))
 
     np.testing.assert_array_equal(
-        model.get_component_features(Prefix((), scalar), machine), [[0, 0, 1, 0, 0]]
+        model.basis.get_component_features(Prefix((), scalar), machine),
+        [[0, 0, 1, 0, 0]],
     )
     assert model.predict_component_cost(Prefix((), scalar), machine) == 10
     np.testing.assert_array_equal(
-        model.get_component_features(Prefix((i,), broadcast), machine),
+        model.basis.get_component_features(Prefix((i,), broadcast), machine),
         [[1, 0, 1, 0, 1]],
     )
 
@@ -938,7 +769,7 @@ def test_linear_model_of_concat_sums_models(factory):
     copy = fuse_loop_order(Query(Table(out, (j, i)), Table(a, (i, j))), (j, i))
     plan = Plan((copy, Produces((out,))))
     models = (PIGEON, TRANSPOSE)
-    model = LinearCostModel(
+    model = CostModel(
         Concat(*(sub.basis for sub in models)),
         np.concatenate([sub.coefficients for sub in models]),
     )
@@ -964,7 +795,7 @@ def test_by_kind_dispatches_components_by_key():
     expr = Table(a, (i, j))
     query = fuse_loop_order(Query(Table(out, (j, i)), expr), (j, i))
     models = {0: PIGEON, 1: TRANSPOSE, 2: PIGEON}
-    cost = LinearCostModel(
+    cost = CostModel(
         ByKind(
             {n: model.basis for n, model in models.items()},
             key=lambda component: len(component.prefix),
@@ -978,7 +809,7 @@ def test_by_kind_dispatches_components_by_key():
         cost.get_features(query, {}, stats, sf),
         block_diag(
             *(
-                models[n].get_component_features(prefix, machine)
+                models[n].basis.get_component_features(prefix, machine)
                 for n, prefix in enumerate(prefixes)
             )
         ),

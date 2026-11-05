@@ -39,6 +39,8 @@ mkdir "$local/repo"
 git ls-files -z | tar --null -T - -cf - |
   tar -xf - -C "$local/repo"
 cd "$local/repo"
+# pixi's package cache goes there too, rather than filling the home quota.
+export PIXI_CACHE_DIR="$local/pixi-cache"
 pixi install --frozen -e fitting
 # Julia's depot, with its packages and their caches, compiled for this CPU,
 # goes there too. The trailing colon keeps the depots of Julia's own

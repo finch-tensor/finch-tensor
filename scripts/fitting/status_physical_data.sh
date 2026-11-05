@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Show the progress of fitting the cost model of a stage to DIR: how many
-# programs each step has finished, of each basis, the models fitted, the
+# programs are generated, timed, and coalesced, the models fitted, the
 # states of the Slurm jobs which scripts/fitting/launch_physical_data.sh
 # submitted, the latest progress of each task which hasn't finished, and the
 # logs which report errors.
@@ -18,10 +18,11 @@ count() {
   find "$directory/data" -maxdepth 1 -name "*.$1" 2>/dev/null | wc -l | tr -d ' '
 }
 echo "programs: $(count program.json) generated, $(count timing.json) timed"
-# The features of each basis are in files named EXAMPLE.NAME.features.json.
-find "$directory/data" -maxdepth 1 -name "*.features.json" 2>/dev/null |
-  sed 's/.*\.\([^.]*\)\.features\.json$/\1/' | sort | uniq -c |
-  awk '{print "  " $2 ": " $1 " featurized"}'
+# Each coalesced example is recorded under its name, and nothing else is.
+if [[ -f $directory/examples.json ]]; then
+  coalesced=$(grep -o '"name": "' "$directory/examples.json" | wc -l | tr -d ' ')
+  echo "  $coalesced coalesced into examples.json"
+fi
 models=$(find "$directory" -maxdepth 1 -name "*.model.json" 2>/dev/null | sort)
 if [[ -n $models ]]; then
   echo "models:"

@@ -1,6 +1,6 @@
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Generic, Self
+from typing import Any, Generic
 
 import numpy as np
 
@@ -24,26 +24,29 @@ from finch.finch_logic import (
     Protocol,
     Query,
     QueryInto,
+    StatsFactory,
     Table,
 )
 from finch.symbolic import PostOrderDFS, Term
 
-from .cost_models import NS, Basis, Concat, LinearCostModel
+from .cost_models import NS, Basis, Concat, CostModel
 
 
 @dataclass(frozen=True)
 class Prefix:
     """
     An outermost-first loop prefix of expr, the right-hand side of a query.
-    output_vars orders the output of the query, when there is one, and
-    formats, which bases that price formatted tensors need, lists the level
-    options each alias stores, outermost first, as FormatBasis takes them.
+    output_vars orders the output of the query, when there is one, and output
+    is the tensor it writes. formats, which bases that price formatted tensors
+    need, lists the level options each alias stores, outermost first, as
+    level_formats lists them.
     """
 
     prefix: tuple[Field, ...]
     expr: LogicExpression
     output_vars: tuple[Field, ...] | None = None
     formats: Mapping[Alias, Any] | None = field(default=None, compare=False, hash=False)
+    output: Alias | Literal | None = None
 
 
 def prefixes(
@@ -56,7 +59,7 @@ def prefixes(
     The loop prefixes of each query of term, including the empty prefix, in
     query order and from the shortest to the longest, advancing machine past
     each query after its prefixes. The loop order of a query is the fields of
-    its enclosing Fuse nodes. Each prefix carries formats.
+    its enclosing Fuse nodes.
     """
     match term:
         case Plan(bodies):
@@ -71,16 +74,24 @@ def prefixes(
             return
         case Produces():
             return
-        case Query(Table(_, lhs_idxs), expr):
+        case Query(Table(lhs, lhs_idxs), expr):
             pass
-        case QueryInto(Table(_, lhs_idxs), _, _):
+        case QueryInto(Table(lhs, lhs_idxs), _, _):
             expr = term.as_query().rhs
         case _:
             raise ValueError(f"Unsupported statement type: {term}")
 
     for n in range(len(loop_order) + 1):
-        yield Prefix(loop_order[:n], expr, lhs_idxs, formats)
+        yield Prefix(loop_order[:n], expr, lhs_idxs, formats, output=lhs)
     machine(term)
+
+
+def restrict(stats_factory: StatsFactory, stat: NS, fields) -> NS:
+    """The support of stat over fields, reducing the rest away."""
+    reduce_idxs = tuple(idx for idx in stat.index_order if idx not in fields)
+    return stats_factory.aggregate(
+        ffuncs.or_, False, reduce_idxs, stats_factory.support(stat)
+    )
 
 
 class LoopBasis(Basis[Prefix]):
@@ -102,10 +113,11 @@ class LoopBasis(Basis[Prefix]):
 
 class LoopSpaces(Generic[NS]):
     """
-    The spaces of the last loop of a nonempty loop prefix. Execution is where a
-    merge of the inputs, which can't look ahead, visits the enclosing loops. A
-    table walks the field of the loop unless it gallops or follows it, as its
-    protocol for that field says.
+    The spaces of the last loop of a nonempty loop prefix: where it is
+    entered, what it visits, and where its walks step, from the stats of the
+    tables it merges, restricted as their formats and protocols allow, as
+    unrestricted says. A table whose formats the prefix doesn't list is taken
+    to be sparse, and a table without protocols walks the field of the loop.
     """
 
     def __init__(self, component: Prefix, machine: StatsMachine[NS]):
@@ -118,50 +130,100 @@ class LoopSpaces(Generic[NS]):
                 self.arg = arg
             case expr:
                 self.arg = expr
+        # The extent of each field, from the tables which read it, and the
+        # field of each level of each and whether it doesn't filter, outermost
+        # first, where the formats list level options.
+        self.dims: dict[Field, float] = {}
+        self.levels: dict[Table, list[tuple[Field, bool]]] = {}
+        formats = component.formats or {}
+        for node in PostOrderDFS(self.arg):
+            match node:
+                case Table(Alias() as tns, idxs) if idxs:
+                    self.dims.update(self.machine(node).dim_sizes)
+                    match formats.get(tns.unfused):
+                        case [*options]:
+                            self.levels[node] = [
+                                (idxs[tns.nfused + depth], not option.filters)
+                                for depth, option in enumerate(options)
+                                if tns.nfused + depth < len(idxs)
+                            ]
+        # The loop is entered wherever the formats let the enclosing loops go,
+        # and its merge steps only where every fiber it merges has positions
+        # at idx.
         self.exec_space = self.stats_factory.support(self.merged(self.arg))
+        self.merge_space = self.project(self.merged(self.arg, (self.idx,)))
 
-    def project(self, stat: NS, fields=()) -> NS:
-        fields = {*self.parent, *fields}
-        reduce_idxs = tuple(idx for idx in stat.index_order if idx not in fields)
-        return self.stats_factory.aggregate(
-            ffuncs.or_, False, reduce_idxs, self.stats_factory.support(stat)
-        )
+    def project(self, stat: NS, fields=(), followed=()) -> NS:
+        """
+        The support of stat over parent and fields, less the fields of
+        followed, which it spans wholly.
+        """
+        return restrict(self.stats_factory, stat, {*self.parent, *fields} - {*followed})
 
     def protocol(self, node: Term) -> Protocol:
+        """The protocol node reads the field of the loop with."""
         match node:
             case Table(_, idxs, (_, *_) as protocols) if self.idx in idxs:
                 return protocols[idxs.index(self.idx)]
         return DefaultProtocol()
 
+    def unrestricted(self, table: Table, fields) -> set[Field]:
+        """
+        The fields of fields which table doesn't restrict: the field of the
+        loop where table follows it, since it is looked up wherever the others
+        go, and those of the dense levels down to the deepest level of the
+        rest, from the sparse level above them, which have a fiber at every
+        slot of it, so the positions of the level are the entries of the
+        sparse one, at every slot of the dense ones.
+        """
+        unrestricted = set()
+        if self.idx in fields and self.protocol(table) == Follow():
+            unrestricted.add(self.idx)
+        run: set[Field] = set()
+        trailing: set[Field] = set()
+        for idx, dense in self.levels.get(table, ()):
+            run = run | {idx} if dense else set()
+            if idx in fields and idx not in unrestricted:
+                trailing = run
+        return unrestricted | trailing
+
     def merged(self, node: LogicExpression, fields=()) -> NS:
+        """
+        Where a merge of the inputs of node visits parent and fields: where
+        every fiber it merges has positions, as the formats give them.
+        """
         # A merge coiterates the projections of the inputs, so it visits more
         # of parent than the projection of their result.
+        followed: set[Field] = set()
         match node:
             case MapJoin(Literal(op), args):
                 return self.stats_factory.mapjoin(
                     op, *(self.merged(arg, fields) for arg in args)
                 )
-            case _:
-                stat = self.machine(node)
-                # A followed table is looked up wherever the others go.
-                followed = any(
-                    self.protocol(table) == Follow() for table in PostOrderDFS(node)
-                )
-                projected = self.project(stat, () if followed else fields)
-                # The fill decides whether a mapjoin joins or unions it.
-                projected.fill_type = stat.fill_type
-                return projected
+            case Table():
+                followed = self.unrestricted(node, {*self.parent, *fields})
+        stat = self.machine(node)
+        projected = self.project(stat, fields, followed)
+        # The fill decides whether a mapjoin joins or unions it.
+        projected.fill_type = stat.fill_type
+        return projected
+
+    def extent(self, stat: NS, fields) -> float:
+        """The points of stat over fields, spanning all of those it lacks."""
+        count = stat.estimate_non_fill_values()
+        for idx in fields:
+            if idx not in stat.index_order:
+                count *= self.dims.get(idx, 1.0)
+        return count
 
     def count(self, stat: NS) -> float:
-        # A space without idx spans all of it.
-        if self.idx in stat.index_order:
-            return stat.estimate_non_fill_values()
-        for node in PostOrderDFS(self.arg):
-            match node:
-                case Table(_, idxs) if self.idx in idxs:
-                    dim = self.machine(node).dim_sizes[self.idx]
-                    return stat.estimate_non_fill_values() * dim
-        return stat.estimate_non_fill_values()
+        return self.extent(stat, (*self.parent, self.idx))
+
+    def executions(self) -> float:
+        return self.extent(self.exec_space, self.parent)
+
+    def iterations(self) -> float:
+        return self.count(self.visited())
 
     def visited(self) -> NS:
         """Where the loop visits idx, which its walks and gallops restrict."""
@@ -171,28 +233,42 @@ class LoopSpaces(Generic[NS]):
             self.stats_factory.support(self.merged(self.arg, (self.idx,))),
         )
 
-    def walk(self, table: Table) -> float:
-        """The steps of a walk of table through idx."""
-        return self.count(
-            self.stats_factory.mapjoin(
-                ffuncs.and_,
-                self.exec_space,
-                self.project(self.machine(table), (self.idx,)),
-            )
+    def located(self, stat: NS, fields) -> float:
+        """
+        The distinct points of stat at fields: the positions of a level of
+        those fields which the loop reaches in stat, however often it runs.
+        """
+        if any(idx not in fields for idx in stat.index_order):
+            stat = restrict(self.stats_factory, stat, fields)
+        return self.extent(stat, fields)
+
+    def stepped(self, table: Table) -> NS:
+        """
+        The entries of table at idx which a walk of it steps through: those
+        where the merge steps, since it steps through nothing where another
+        fiber it merges has no positions.
+        """
+        return self.stats_factory.mapjoin(
+            ffuncs.and_,
+            self.merge_space,
+            self.project(self.machine(table), (self.idx,)),
         )
+
+    def walk(self, table: Table) -> float:
+        return self.count(self.stepped(table))
 
 
 class PigeonBasis(LoopBasis, LoopOrderedForm):
     """
     PigeonBasis counts iteration, operation, output, lookup, and dense
-    iteration costs across loop prefixes. Each table reads the field of a loop
-    with its protocol for that field, and a table without protocols walks it.
-    The dense iterations of a loop are those it would make if its tables were
-    dense, so that none could restrict it: its whole extent, wherever its
-    enclosing loops run.
+    iteration costs across loop prefixes. The empty prefix charges the
+    non-fill values of the output once, and a nonempty prefix charges its last
+    loop: a walk steps through the stored indices of its table, a gallop or a
+    follow instead visits the indices where the expression runs, charging a
+    lookup at each, and the dense iterations of a loop are those it would make
+    if its tables were dense, so that none could restrict it: its whole
+    extent, wherever its enclosing loops run.
     """
-
-    class_key = "pigeon"
 
     @property
     def n_features(self) -> int:
@@ -207,19 +283,6 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
         component: Prefix,
         machine: StatsMachine[NS],
     ) -> np.ndarray:
-        """Return the incremental features for an outermost-first loop prefix.
-
-        A nonempty prefix charges its last index, projecting execution and
-        output onto prefix[:-1], as in the inside-out calculation. Execution is
-        where a merge of the inputs, which can't look ahead, visits prefix[:-1].
-        The empty prefix charges the output's non-fill values once. Summing all
-        prefixes, including the empty one, gives the query's features.
-
-        A walk steps through the stored indices of its table. A gallop or a
-        follow instead visits the indices where the expression runs, which a
-        follow doesn't restrict, and charges a lookup at each of them. A loop
-        whose tables all follow its field visits all of it.
-        """
         prefix, expr, output_vars = (
             component.prefix,
             component.expr,
@@ -228,13 +291,8 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
         stats_factory = machine.stats_factory
         out_space = machine(expr)
         if output_vars is not None:
-            reduce_idxs = tuple(
-                idx for idx in out_space.index_order if idx not in output_vars
-            )
-            if reduce_idxs:
-                out_space = stats_factory.aggregate(
-                    ffuncs.or_, False, reduce_idxs, stats_factory.support(out_space)
-                )
+            if any(idx not in output_vars for idx in out_space.index_order):
+                out_space = restrict(stats_factory, out_space, output_vars)
             out_space = stats_factory.reorder(out_space, output_vars)
         if not prefix:
             return np.array(
@@ -254,7 +312,7 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
                             lookups += 1
                         case _:
                             walks.append(spaces.project(stat, (idx,)))
-        iterations = exec_space.estimate_non_fill_values()
+        iterations = spaces.executions()
         lookup_cost = 0.0
         if lookups:
             visited = spaces.visited()
@@ -265,9 +323,11 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
             )
             lookup_cost = spaces.count(visited) * lookups
         elif inputs:
-            iterations = stats_factory.mapjoin(
-                ffuncs.and_, exec_space, stats_factory.mapjoin(ffuncs.or_, *walks)
-            ).estimate_non_fill_values()
+            iterations = spaces.count(
+                stats_factory.mapjoin(
+                    ffuncs.and_, exec_space, stats_factory.mapjoin(ffuncs.or_, *walks)
+                )
+            )
         out_cost = 0.0
         if idx in out_space.index_order:
             out_cost = spaces.project(out_space).estimate_non_fill_values()
@@ -275,7 +335,7 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
             [
                 [
                     iterations,
-                    exec_space.estimate_non_fill_values() * len(inputs),
+                    spaces.executions() * len(inputs),
                     out_cost,
                     lookup_cost,
                     spaces.count(exec_space),
@@ -286,10 +346,10 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
 
 class TransposeBasis(LoopBasis, LoopOrderedForm):
     """
-    Count dense and sparse transposed entries, charging each input once per query.
+    Count dense and sparse transposed entries, charging each input once per
+    query, at the first prefix whose last loop reads it out of its stored
+    order.
     """
-
-    class_key = "transpose"
 
     @property
     def n_features(self) -> int:
@@ -304,12 +364,6 @@ class TransposeBasis(LoopBasis, LoopOrderedForm):
         component: Prefix,
         machine: StatsMachine[NS],
     ) -> np.ndarray:
-        """Charge only the input transpositions newly forced by this prefix.
-
-        Deduplicate input tables within this prefix. Comparing with the parent
-        prefix avoids charging them again at deeper loop levels. Empty prefixes
-        have no transposition cost.
-        """
         prefix, expr = component.prefix, component.expr
         features = np.zeros((1, self.n_features))
         if not prefix:
@@ -352,8 +406,6 @@ class WriteBasis(LoopBasis, LoopOrderedForm):
     workspace so small can be reset and copied out cheaply.
     """
 
-    class_key = "write"
-
     def __init__(self, workspace_limit: float = 100_000):
         self.workspace_limit = workspace_limit
 
@@ -364,12 +416,6 @@ class WriteBasis(LoopBasis, LoopOrderedForm):
     @property
     def feature_names(self) -> tuple[str, ...]:
         return ("sequential_writes", "scatter_writes", "workspace_writes")
-
-    def to_json(self) -> dict[str, Any]:
-        return {**super().to_json(), "workspace_limit": self.workspace_limit}
-
-    def _from_json(self, data: Mapping[str, Any]) -> Self:
-        return type(self)(data["workspace_limit"])
 
     def get_component_features(
         self,
@@ -429,14 +475,14 @@ class WriteBasis(LoopBasis, LoopOrderedForm):
 # an iteration, dense iterations are free until the model is fitted, and a
 # write which scatters costs 10 iterations more than one in order, as it does
 # into a hash level, which most sparse outputs need for it.
-LOOP_COST_MODEL = LinearCostModel(
+LOOP_COST_MODEL = CostModel(
     Concat(PigeonBasis(), TransposeBasis(), WriteBasis()),
     [1.0, 1.0, 10.0, 1.0, 0.0, 0.5, 60.0, 0.0, 10.0, 10.0],
 )
 # A small workspace takes the writes of a query which scatter, as a dense level
 # or a byte map does, almost as cheaply as those in order. Without one, they
 # cost as much as they do without workspaces.
-WORKSPACE_LOOP_COST_MODEL = LinearCostModel(
+WORKSPACE_LOOP_COST_MODEL = CostModel(
     Concat(PigeonBasis(), TransposeBasis(), WriteBasis()),
     [1.0, 1.0, 10.0, 1.0, 0.0, 0.5, 60.0, 0.0, 10.0, 1.0],
 )

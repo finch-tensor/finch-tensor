@@ -11,7 +11,7 @@ from finch.autoschedule import DefaultLogicFactorizer
 from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
 from finch.autoschedule.cost_models import (
     LOOP_COST_MODEL,
-    LinearCostModel,
+    CostModel,
     PigeonBasis,
     Prefix,
     TransposeBasis,
@@ -188,7 +188,7 @@ def test_greedy_order_breaks_ties_by_field_order():
         b: sf(ones, (j, k)),
         c: sf(ones, (k, m)),
     }
-    pigeon = LinearCostModel(PigeonBasis(), [1.0, 1.0, 10.0, 1.0, 0.0])
+    pigeon = CostModel(PigeonBasis(), [1.0, 1.0, 10.0, 1.0, 0.0])
     machine = StatsMachine(sf, dict(forward_bindings))
 
     # The chain's endpoints tie, so only the tie-break separates them.
@@ -237,8 +237,8 @@ def test_greedy_avoids_transposing_a_sparse_input():
     }
     assert tuple(dict.fromkeys(expr.fields())) == (j, i)
 
-    pigeon = LinearCostModel(PigeonBasis(), [1.0, 1.0, 10.0, 1.0, 0.0])
-    transpose = LinearCostModel(TransposeBasis(), [0.5, 60.0])
+    pigeon = CostModel(PigeonBasis(), [1.0, 1.0, 10.0, 1.0, 0.0])
+    transpose = CostModel(TransposeBasis(), [0.5, 60.0])
     model = LOOP_COST_MODEL
     machine = StatsMachine(sf, dict(bindings))
     # Reads and writes alone cannot separate the two, so the field-order
