@@ -297,8 +297,7 @@ def test_gallops_jump_within_the_smallest_support():
     def jumps(px, py):
         machine = StatsMachine(sf, dict(stats))
         basis = ProtocolBasis()
-        # The levels of x and y, and the reads of them at the loop over i, are
-        # components, of which only the reads fill the gallop column.
+        # The reads of x and y at the loop over i are the components.
         rows = [
             basis.get_component_features(component, machine)[0]
             for component in basis.components(program(px, py), formats, machine)

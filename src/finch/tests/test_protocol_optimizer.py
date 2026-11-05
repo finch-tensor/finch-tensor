@@ -155,8 +155,8 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
     }
     basis = ProtocolBasis()
     names = basis.feature_names
-    assert names[:2] == ("dense.positions", "dense.slots")
-    block = [name.removeprefix("sparse_list.") for name in names[28:40]]
+    assert names[:2] == ("dense.executions", "dense.iterations")
+    block = [name.removeprefix("sparse_list.") for name in names[12:24]]
     assert block == [
         "executions",
         "iterations",
@@ -184,8 +184,8 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
         # the columns of its kind. c has no format, so it isn't written.
         assert len(accesses) == 2
         total = sum(accesses)
-        assert not total[:28].any() and not total[40:].any()
-        return total[30:37].tolist()
+        assert not total[:12].any() and not total[24:].any()
+        return total[14:21].tolist()
 
     # Each list seeks one fiber. Walks step through the 5 entries of each,
     # and either would visit the 5 of the other if it were dense. Each has 5
@@ -380,7 +380,7 @@ def test_optimize_protocols_prices_a_follow_by_its_lookups():
         return CostModel(
             PROTOCOL_BASIS,
             [
-                weights.get(name.partition(".")[2], 0.0)
+                weights.get(name.rpartition(".")[2], 0.0)
                 for name in PROTOCOL_BASIS.feature_names
             ],
         )
