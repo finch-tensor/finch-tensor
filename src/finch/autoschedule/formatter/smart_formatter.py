@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import logging
 from abc import abstractmethod
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
+from functools import cache
 from itertools import product
+from pathlib import Path
 from typing import TypeVar
 
 import numpy as np
@@ -165,6 +168,91 @@ def optimize_formats(
         if not changed:
             break
     return {alias: bindings[alias] for alias in stored}
+
+
+def stored_shape_types(
+    prgm: lgc.LogicStatement,
+    bindings: Mapping[lgc.Alias, TensorFType],
+    machine: StatsMachine,
+) -> dict[lgc.Alias, tuple[FType, ...]]:
+    """
+    The dimensions each alias of prgm which bindings doesn't format stores, at
+    its first definition, advancing machine past prgm. No definition may
+    change the rank an alias stores.
+    """
+    shape_types: dict[lgc.Alias, tuple[FType | None, ...]] = {
+        var: val.shape_type for var, val in bindings.items()
+    }
+    stored: dict[lgc.Alias, tuple[FType, ...]] = {}
+    ranks = {var: len(val.shape_type) for var, val in bindings.items()}
+
+    def visit(node: lgc.LogicStatement):
+        match node:
+            case lgc.Plan(bodies):
+                for body in bodies:
+                    visit(body)
+            case lgc.Fuse(_, body):
+                visit(body)
+            case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
+                lgc.Table(lgc.Alias() as lhs, _), _, _
+            ):
+                node.infer_shape_type(shape_types)
+                machine(node)
+                alias, nfused = lhs.unfused, lhs.nfused
+                shape_type = tuple(
+                    ftype(dim) if dim is not None else ftypes.intp
+                    for dim in shape_types[alias][nfused:]
+                )
+                if ranks.setdefault(alias, len(shape_type)) != len(shape_type):
+                    raise ValueError(
+                        f"Cannot change the rank of allocated tensor {alias}."
+                    )
+                if alias not in bindings and alias not in stored:
+                    stored[alias] = shape_type
+            case lgc.Produces():
+                return
+            case _:
+                raise ValueError(f"Unsupported logic statement for formatting: {node}")
+
+    visit(prgm)
+    return stored
+
+
+def program_cost(
+    prgm: lgc.LogicStatement,
+    bindings: Mapping[lgc.Alias, TensorFType],
+    stats: Mapping[lgc.Alias, TensorStats],
+    stats_factory: StatsFactory,
+    cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
+    options: Sequence[LevelOption] = LEVEL_OPTIONS,
+) -> float:
+    """
+    The cost of prgm under cost_model, once each alias it defines is formatted
+    as optimize_formats chooses and its tables read with the protocols
+    choose_protocols chooses: the storage of the formatted aliases and the
+    accesses of every query, as optimize_formats sums them.
+    """
+    stored = stored_shape_types(
+        prgm, bindings, StatsMachine(stats_factory, OrderedDict(stats))
+    )
+    fill_types = prgm.infer_fill_type(
+        {var: val.fill_type for var, val in bindings.items()}
+    )
+    formats = optimize_formats(
+        prgm, bindings, stats, stats_factory, stored, fill_types, cost_model, options
+    )
+    _, costs = choose_protocols(
+        prgm, {**bindings, **formats}, stats, stats_factory, cost_model
+    )
+    # The levels are priced from the stats before prgm, which listing them
+    # leaves in place.
+    machine = StatsMachine(stats_factory, OrderedDict(stats))
+    storage = sum(
+        cost_model.predict_component_cost(choice, machine)
+        for alias, levels in level_formats(formats).items()
+        for choice in storage_choices(alias, levels, prgm, machine)
+    )
+    return sum(costs) + storage
 
 
 TS = TypeVar("TS", bound=TensorStats)
@@ -341,51 +429,13 @@ class CostFormatter(LogicFormatter):
     ):
         bindings = bindings.copy()
         machine = StatsMachine(stats_factory, OrderedDict(stats))
-        shape_types: dict[lgc.Alias, tuple[FType | None, ...]] = {
-            var: val.shape_type for var, val in bindings.items()
-        }
+        stored = stored_shape_types(prgm, bindings, machine)
         fill_types = prgm.infer_fill_type(
             {var: val.fill_type for var, val in bindings.items()}
         )
-        # The dimensions each new alias stores, at its first definition, and
-        # the rank each alias stores, which no definition may change.
-        stored_shape_types: dict[lgc.Alias, tuple[FType, ...]] = {}
-        ranks = {var: len(val.shape_type) for var, val in bindings.items()}
-
-        def formatter(node: lgc.LogicStatement):
-            match node:
-                case lgc.Plan(bodies):
-                    for body in bodies:
-                        formatter(body)
-                case lgc.Fuse(_, body):
-                    formatter(body)
-                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
-                    lgc.Table(lgc.Alias() as lhs, _), _, _
-                ):
-                    node.infer_shape_type(shape_types)
-                    machine(node)
-                    alias, nfused = lhs.unfused, lhs.nfused
-                    shape_type = tuple(
-                        ftype(dim) if dim is not None else ftypes.intp
-                        for dim in shape_types[alias][nfused:]
-                    )
-                    if ranks.setdefault(alias, len(shape_type)) != len(shape_type):
-                        raise ValueError(
-                            f"Cannot change the rank of allocated tensor {alias}."
-                        )
-                    if alias not in bindings and alias not in stored_shape_types:
-                        stored_shape_types[alias] = shape_type
-                case lgc.Produces():
-                    return
-                case _:
-                    raise ValueError(
-                        f"Unsupported logic statement for formatting: {node}"
-                    )
-
-        formatter(prgm)
         bindings.update(
             self.choose_formats(
-                prgm, bindings, stats, stats_factory, stored_shape_types, fill_types
+                prgm, bindings, stats, stats_factory, stored, fill_types
             )
         )
 
@@ -438,11 +488,23 @@ WORKSPACE_COST_MODEL = CostModel(
 )
 
 
+# The models of PROTOCOL_BASIS fitted to the timings of the physical
+# optimizers, at the root of the repository.
+FITTED_MODELS = Path(__file__).resolve().parents[4] / "pace-models"
+
+
+@cache
+def fitted_cost_model(name: str = "format") -> CostModel[ProtocolComponent]:
+    """The model of PROTOCOL_BASIS fitted in FITTED_MODELS/{name}.model.json."""
+    with open(FITTED_MODELS / f"{name}.model.json") as f:
+        return PROTOCOL_COST_MODEL.from_json(json.load(f))
+
+
 class WorkspaceCostFormatter(CostFormatter):
     """
-    Choose each format, including the format of each workspace, pricing
-    scattered writes and the reset of each slice by level.
+    Choose each format, including the format of each workspace, under the
+    fitted format model, as fitted_cost_model loads it.
     """
 
     def __init__(self, loader: LogicLoader | None = None):
-        super().__init__(loader, WORKSPACE_COST_MODEL)
+        super().__init__(loader, fitted_cost_model())

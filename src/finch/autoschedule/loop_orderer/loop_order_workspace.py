@@ -1,12 +1,24 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from collections.abc import Sequence
 
 import numpy as np
 
 from finch.algebra.tensor import TensorFType
-from finch.autoschedule.cost_models import WORKSPACE_LOOP_COST_MODEL, CostModel, Prefix
+from finch.autoschedule.cost_models import (
+    WORKSPACE_LOOP_COST_MODEL,
+    CostModel,
+    LevelOption,
+    Prefix,
+    ProtocolComponent,
+)
 from finch.autoschedule.cost_models.loop_cost_models import WORKSPACE_LIMIT
+from finch.autoschedule.formatter.smart_formatter import (
+    LEVEL_OPTIONS,
+    fitted_cost_model,
+    program_cost,
+)
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.util import flatten_plans, fuse_loop_order
 from finch.finch_logic import (
@@ -148,18 +160,84 @@ class WorkspaceLoopOrderer(BFSLoopOrderer):
             match node:
                 case Query(Table(HardAlias() as lhs, idxs), _) if lhs not in bindings:
                     outputs[lhs] = idxs
-        # The stats of each output give the extent of each of its fields.
-        machine = StatsMachine(stats_factory, OrderedDict(stats))
-        machine(prgm)
         for alias, idxs in outputs.items():
             depth = workspace_depth(prgm, alias)
             if depth is None or depth == 0:
                 continue
-            output = machine.bindings[alias]
-            size = np.prod([output.get_dim_size(idx) for idx in idxs[depth:]])
-            if size <= self.workspace_limit:
-                ws = HardAlias(spc.freshen(alias.name, "ws"))
-                staged = add_workspace(prgm, alias, depth, ws)
-                assert isinstance(staged, Plan)
+            ws = HardAlias(spc.freshen(alias.name, "ws"))
+            staged = add_workspace(prgm, alias, depth, ws)
+            assert isinstance(staged, Plan)
+            if self.keep_workspace(
+                prgm, staged, alias, idxs[depth:], bindings, stats, stats_factory
+            ):
                 prgm = staged
         return prgm
+
+    def keep_workspace(
+        self,
+        prgm: Plan,
+        staged: Plan,
+        alias: HardAlias,
+        slice_idxs: tuple[Field, ...],
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> bool:
+        """
+        Whether staged, which redirects the query defining alias into a
+        workspace storing slice_idxs, replaces prgm: if a slice of the
+        workspace has at most workspace_limit entries.
+        """
+        # The stats of the output give the extent of each of its fields.
+        machine = StatsMachine(stats_factory, OrderedDict(stats))
+        machine(prgm)
+        output = machine.bindings[alias]
+        size = np.prod([output.get_dim_size(idx) for idx in slice_idxs])
+        return bool(size <= self.workspace_limit)
+
+
+class CostedWorkspaceLoopOrderer(WorkspaceLoopOrderer):
+    """
+    Order loops and propose workspaces like WorkspaceLoopOrderer, but keep a
+    workspace only if the program with it costs less than the program without
+    it under format_cost_model, by default the fitted format model, once the
+    formats of each are chosen and its protocols, as program_cost prices them.
+    The formatter downstream should price programs with the same model.
+    """
+
+    def __init__(
+        self,
+        ctx: LogicLoader | None = None,
+        *,
+        k: int | None = None,
+        cost_model: CostModel[Prefix] | None = None,
+        format_cost_model: CostModel[ProtocolComponent] | None = None,
+        options: Sequence[LevelOption] = LEVEL_OPTIONS,
+    ):
+        super().__init__(ctx, k=k, cost_model=cost_model)
+        if format_cost_model is None:
+            format_cost_model = fitted_cost_model()
+        self.format_cost_model = format_cost_model
+        self.options = options
+
+    def keep_workspace(
+        self,
+        prgm: Plan,
+        staged: Plan,
+        alias: HardAlias,
+        slice_idxs: tuple[Field, ...],
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> bool:
+        def cost(stmt: Plan) -> float:
+            return program_cost(
+                stmt,
+                bindings,
+                stats,
+                stats_factory,
+                self.format_cost_model,
+                self.options,
+            )
+
+        return cost(staged) < cost(prgm)

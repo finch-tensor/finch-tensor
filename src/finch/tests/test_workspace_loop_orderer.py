@@ -9,7 +9,11 @@ from finch.autoschedule import CompilerFormLowerer, NotationGenerator
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.cost_models import Prefix, WriteBasis
 from finch.autoschedule.formatter.smart_formatter import WorkspaceCostFormatter
-from finch.autoschedule.loop_orderer import BFSLoopOrderer, WorkspaceLoopOrderer
+from finch.autoschedule.loop_orderer import (
+    BFSLoopOrderer,
+    CostedWorkspaceLoopOrderer,
+    WorkspaceLoopOrderer,
+)
 from finch.autoschedule.loop_orderer.loop_order_workspace import (
     add_workspace,
     workspace_depth,
@@ -245,6 +249,22 @@ def test_workspace_loop_orderer_adds_small_workspaces_with_fewer_fields(
     prgm = orderer.add_workspaces(plan, {}, stats, sf)
     fused = []
     for node in PostOrderDFS(prgm):
+        match node:
+            case FusedAlias():
+                fused.append(node)
+    assert bool(fused) == staged
+
+
+@pytest.mark.parametrize(("per_row", "staged"), [(3, True), (16, False)])
+def test_costed_workspace_loop_orderer_keeps_workspaces_which_cost_less(
+    per_row, staged
+):
+    # A sparse product is accumulated row by row in a workspace, but one which
+    # fills most of its output costs less written into a dense output.
+    data_a, data_b = _sparse_matmul(256, per_row)
+    capture = _order(CostedWorkspaceLoopOrderer, _csr(data_a), _csr(data_b))
+    fused = []
+    for node in PostOrderDFS(capture.last_prgm):
         match node:
             case FusedAlias():
                 fused.append(node)
