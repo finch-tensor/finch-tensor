@@ -297,19 +297,6 @@ class AbstractLoopOrderer(LogicLoopOrderer):
     ) -> Plan:
         pass
 
-    def add_workspaces(
-        self,
-        prgm: Plan,
-        bindings: dict[Alias, TensorFType],
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ) -> Plan:
-        """
-        Redirect the queries which scatter into their outputs into workspaces.
-        Copies are propagated before this, so the copies out of workspaces stay.
-        """
-        return prgm
-
     def lower(
         self,
         prgm: Plan,
@@ -329,7 +316,6 @@ class AbstractLoopOrderer(LogicLoopOrderer):
             assert isinstance(prgm, Plan)
             prgm = concordize(prgm, bindings)
             prgm = propagate_copy_queries(prgm, bindings)
-            prgm = self.add_workspaces(prgm, bindings, stats, stats_factory)
             prgm = flatten_plans(prgm)
             return prgm, bindings
 

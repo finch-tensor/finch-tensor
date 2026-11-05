@@ -1,21 +1,17 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from finch.algebra.tensor import TensorFType
-from finch.autoschedule.cost_models import (
-    WORKSPACE_LOOP_COST_MODEL,
-    CostModel,
-    LevelOption,
-    Prefix,
-    ProtocolComponent,
-)
+from finch.autoschedule.cost_models import CostModel, LevelOption, ProtocolComponent
 from finch.autoschedule.formatter.smart_formatter import (
     LEVEL_OPTIONS,
     fitted_cost_model,
     program_cost,
 )
+from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.util import flatten_plans, fuse_loop_order
+from finch.finch_assembly import AssemblyLibrary
 from finch.finch_logic import (
     Alias,
     Field,
@@ -32,9 +28,6 @@ from finch.finch_logic import (
     TensorStats,
 )
 from finch.symbolic import Namespace, PostOrderDFS
-
-from .loop_order_bnb import BFSLoopOrderer
-from .loop_ordering import with_copy_loop_orders
 
 
 def workspace_depth(prgm: LogicStatement, alias: Alias) -> int | None:
@@ -114,74 +107,79 @@ def add_workspace(
     return prgm
 
 
-class WorkspaceLoopOrderer(BFSLoopOrderer):
+def add_workspaces(
+    prgm: LogicStatement,
+    bindings: Mapping[Alias, TensorFType],
+    stats: Mapping[Alias, TensorStats],
+    stats_factory: StatsFactory,
+    cost_model: CostModel[ProtocolComponent],
+    options: Sequence[LevelOption] = LEVEL_OPTIONS,
+) -> LogicStatement:
     """
-    Search for the loop order of each query like BFSLoopOrderer, pricing the
-    writes which scatter into an output by WORKSPACE_LOOP_COST_MODEL, as cheaply
-    as a workspace takes them. Then redirect each query whose loop order
-    scatters into its output into a workspace fused over the fields it writes
-    in order, which is copied into the output in order after each slice, if
-    the workspace stores fewer fields than the output, and the program costs
-    less with it than without it under format_cost_model, by default the
-    fitted format model, once the formats and protocols of each are chosen, as
-    program_cost prices them. The formatter downstream should price programs
-    with the same model.
+    Redirect each query of prgm which scatters into an output of prgm into a
+    workspace fused over the fields it writes in loop order, as add_workspace
+    does, if the workspace stores fewer fields than the output, and prgm costs
+    less with it than without it under cost_model, once the formats and
+    protocols of each are chosen, as program_cost prices them. The inputs of
+    bindings have no workspaces.
+    """
+
+    def cost(stmt: LogicStatement) -> float:
+        return program_cost(stmt, bindings, stats, stats_factory, cost_model, options)
+
+    prgm = flatten_plans(prgm)
+    spc = Namespace(prgm)
+    outputs: dict[HardAlias, None] = {}
+    for node in PostOrderDFS(prgm):
+        match node:
+            case Query(Table(HardAlias() as lhs, _), _) if lhs not in bindings:
+                outputs[lhs] = None
+    best = None
+    for alias in outputs:
+        depth = workspace_depth(prgm, alias)
+        if not depth:
+            continue
+        staged = add_workspace(
+            prgm, alias, depth, HardAlias(spc.freshen(alias.name, "ws"))
+        )
+        if best is None:
+            best = cost(prgm)
+        staged_cost = cost(staged)
+        if staged_cost < best:
+            prgm, best = staged, staged_cost
+    return prgm
+
+
+class LogicWorkspacer(LoopOrderedForm, LogicLoader):
+    """
+    Pass a program in LoopOrderedForm to ctx, after redirecting the queries
+    which scatter into their outputs into workspaces where they cost less
+    under cost_model, by default the fitted format model, as add_workspaces
+    does. A loop orderer wraps it, so that the copies out of workspaces aren't
+    propagated, and the formatter it wraps should price programs with the same
+    model.
     """
 
     def __init__(
         self,
-        ctx: LogicLoader | None = None,
-        *,
-        k: int | None = None,
-        cost_model: CostModel[Prefix] | None = None,
-        format_cost_model: CostModel[ProtocolComponent] | None = None,
+        ctx: LogicLoader,
+        cost_model: CostModel[ProtocolComponent] | None = None,
         options: Sequence[LevelOption] = LEVEL_OPTIONS,
     ):
+        self.ctx = ctx
         if cost_model is None:
-            cost_model = WORKSPACE_LOOP_COST_MODEL
-        super().__init__(ctx, k=k, cost_model=cost_model)
-        if format_cost_model is None:
-            format_cost_model = fitted_cost_model()
-        self.format_cost_model = format_cost_model
+            cost_model = fitted_cost_model()
+        self.cost_model = cost_model
         self.options = options
 
-    def add_workspaces(
+    def lower(
         self,
-        prgm: Plan,
+        prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
-    ) -> Plan:
-        def cost(stmt: Plan) -> float:
-            return program_cost(
-                stmt,
-                bindings,
-                stats,
-                stats_factory,
-                self.format_cost_model,
-                self.options,
-            )
-
-        # Copies are given their loop orders first, so that a copy in order
-        # isn't mistaken for one which scatters.
-        prgm = with_copy_loop_orders(flatten_plans(prgm))
-        spc = Namespace(prgm)
-        outputs: dict[HardAlias, None] = {}
-        for node in PostOrderDFS(prgm):
-            match node:
-                case Query(Table(HardAlias() as lhs, _), _) if lhs not in bindings:
-                    outputs[lhs] = None
-        best = None
-        for alias in outputs:
-            depth = workspace_depth(prgm, alias)
-            if not depth:
-                continue
-            ws = HardAlias(spc.freshen(alias.name, "ws"))
-            staged = add_workspace(prgm, alias, depth, ws)
-            assert isinstance(staged, Plan)
-            if best is None:
-                best = cost(prgm)
-            staged_cost = cost(staged)
-            if staged_cost < best:
-                prgm, best = staged, staged_cost
-        return prgm
+    ) -> tuple[AssemblyLibrary, dict[Alias, TensorFType]]:
+        prgm = add_workspaces(
+            prgm, bindings, stats, stats_factory, self.cost_model, self.options
+        )
+        return self.ctx(prgm, bindings, stats, stats_factory)

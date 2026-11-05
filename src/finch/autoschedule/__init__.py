@@ -49,6 +49,7 @@ from .protocolizer import (
     protocolize,
 )
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
+from .workspacer import LogicWorkspacer
 
 __all__ = [
     "COMPILE_JULIA",
@@ -80,6 +81,7 @@ __all__ = [
     "LogicNormalizer",
     "LogicNotationLowerer",
     "LogicProtocolizer",
+    "LogicWorkspacer",
     "MapJoin",
     "NotationGenerator",
     "Plan",

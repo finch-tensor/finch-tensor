@@ -30,7 +30,6 @@ from finch.autoschedule.formatter.smart_formatter import (
     CostFormatter,
     format_ftype,
 )
-from finch.autoschedule.loop_orderer.loop_order_workspace import add_workspace
 from finch.autoschedule.tensor_stats import (
     BaseTensorStats,
     DCStatsFactory,
@@ -39,6 +38,7 @@ from finch.autoschedule.tensor_stats import (
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.tensor_stats.uniform_stats import UniformStats
 from finch.autoschedule.util import fuse_loop_order
+from finch.autoschedule.workspacer import add_workspace
 from finch.finch_logic import (
     Aggregate,
     Alias,

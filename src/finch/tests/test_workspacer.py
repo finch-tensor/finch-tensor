@@ -9,12 +9,11 @@ from finch.algebra import StaticFillFType, TensorFType, ftype
 from finch.autoschedule import CompilerFormLowerer, NotationGenerator
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.cost_models import Prefix, WriteBasis
-from finch.autoschedule.formatter.smart_formatter import WorkspaceCostFormatter
-from finch.autoschedule.loop_orderer import BFSLoopOrderer, WorkspaceLoopOrderer
-from finch.autoschedule.loop_orderer.loop_order_workspace import (
-    add_workspace,
-    workspace_depth,
+from finch.autoschedule.formatter.smart_formatter import (
+    WorkspaceCostFormatter,
+    fitted_cost_model,
 )
+from finch.autoschedule.loop_orderer import BFSLoopOrderer
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.tensor_stats import (
     BaseTensorStats,
@@ -24,6 +23,12 @@ from finch.autoschedule.tensor_stats import (
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.tensor_stats.uniform_stats import UniformStats
 from finch.autoschedule.util import fuse_loop_order
+from finch.autoschedule.workspacer import (
+    LogicWorkspacer,
+    add_workspace,
+    add_workspaces,
+    workspace_depth,
+)
 from finch.codegen import NumbaCompiler, NumpyBuffer
 from finch.compile import NotationCompiler
 from finch.finch_assembly import AssemblySimplify, LowerPackedStructSlots
@@ -145,7 +150,7 @@ def _random_csr(n, per_row, seed):
     return tensor, sps.csr_array((vals, cols, ptr), shape=(n, n))
 
 
-def _order(orderer_cls, tensor_a, tensor_b):
+def _order(tensor_a, tensor_b, workspaces):
     i, j, k = Field("i"), Field("j"), Field("k")
     a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
     sf = DCStatsFactory()
@@ -155,13 +160,14 @@ def _order(orderer_cls, tensor_a, tensor_b):
     }
     capture = LogicCapture()
     plan, _ = _matmul(c, a, b)
-    orderer_cls(WorkspaceCostFormatter(CompilerFormLowerer(capture)))(
+    formatter = WorkspaceCostFormatter(CompilerFormLowerer(capture))
+    BFSLoopOrderer(LogicWorkspacer(formatter) if workspaces else formatter)(
         plan, {a: tensor_a.ftype, b: tensor_b.ftype}, stats, sf
     )
     return capture
 
 
-def test_workspace_loop_orderer_accumulates_rows_in_a_workspace():
+def test_workspacer_accumulates_rows_in_a_workspace():
     i, j, k = Field("i"), Field("j"), Field("k")
     c = HardAlias("c")
     # The output is sparse enough that a workspace for each row costs less
@@ -172,16 +178,17 @@ def test_workspace_loop_orderer_accumulates_rows_in_a_workspace():
     )
 
     # The search scatters into the columns of c, for each of its rows.
-    capture = _order(BFSLoopOrderer, tensor_a, tensor_b)
+    capture = _order(tensor_a, tensor_b, workspaces=False)
     match capture.last_prgm:
         case Plan((Fuse(i_, Fuse(j_, Fuse(k_, Query(Table(lhs, _), _)))), Produces())):
             assert (i_, j_, k_, lhs) == (i, j, k, c)
         case prgm:
             raise AssertionError(f"Expected the loop order (i, j, k): {prgm}")
 
-    # Copies are propagated before the workspace is added, so its copy stays,
-    # and the writes scatter into a workspace for each row instead.
-    capture = _order(WorkspaceLoopOrderer, tensor_a, tensor_b)
+    # The loop orderer propagates copies before the workspacer adds the
+    # workspace, so its copy stays, and the writes scatter into a workspace for
+    # each row instead.
+    capture = _order(tensor_a, tensor_b, workspaces=True)
     match capture.last_prgm:
         case Plan(
             (
@@ -218,7 +225,7 @@ def test_workspace_loop_orderer_accumulates_rows_in_a_workspace():
     assert abs(result.to_scipy() - csr_a @ csr_b).max() < 1e-12
 
 
-def test_workspace_loop_orderer_needs_a_field_written_in_order():
+def test_workspacer_needs_a_field_written_in_order():
     i, j, k = Field("i"), Field("j"), Field("k")
     a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
     sf = DCStatsFactory()
@@ -228,7 +235,7 @@ def test_workspace_loop_orderer_needs_a_field_written_in_order():
     }
     # The loops scatter into i, so a workspace would store all of c.
     plan, _ = _matmul(c, a, b, (k, i, j))
-    assert WorkspaceLoopOrderer().add_workspaces(plan, {}, stats, sf) == plan
+    assert add_workspaces(plan, {}, stats, sf, fitted_cost_model()) == plan
 
 
 @pytest.mark.parametrize(
@@ -239,12 +246,12 @@ def test_workspace_loop_orderer_needs_a_field_written_in_order():
         (256, 16, False),
     ],
 )
-def test_workspace_loop_orderer_keeps_workspaces_which_cost_less(n, per_row, staged):
+def test_workspacer_keeps_workspaces_which_cost_less(n, per_row, staged):
     (tensor_a, _), (tensor_b, _) = (
         _random_csr(n, per_row, 0),
         _random_csr(n, per_row, 1),
     )
-    capture = _order(WorkspaceLoopOrderer, tensor_a, tensor_b)
+    capture = _order(tensor_a, tensor_b, workspaces=True)
     fused = []
     for node in PostOrderDFS(capture.last_prgm):
         match node:
@@ -253,15 +260,15 @@ def test_workspace_loop_orderer_keeps_workspaces_which_cost_less(n, per_row, sta
     assert bool(fused) == staged
 
 
-def test_workspace_loop_orderer_writes_in_order_without_a_workspace():
+def test_workspacer_leaves_queries_which_write_in_order():
     # The product of dense matrices is cheapest as an inner product, which
     # writes c in order, so it needs no workspace.
     rng = np.random.default_rng(0)
     data_a, data_b = rng.random((8, 8)), rng.random((8, 8))
     tensor_a, tensor_b = fl.asarray(data_a), fl.asarray(data_b)
-    ordered = _order(BFSLoopOrderer, tensor_a, tensor_b).last_prgm
+    ordered = _order(tensor_a, tensor_b, workspaces=False).last_prgm
     assert workspace_depth(ordered, HardAlias("c")) is None
-    assert _order(WorkspaceLoopOrderer, tensor_a, tensor_b).last_prgm == ordered
+    assert _order(tensor_a, tensor_b, workspaces=True).last_prgm == ordered
 
 
 def test_only_small_workspaces_make_scattered_writes_cheap():
