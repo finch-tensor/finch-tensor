@@ -12,11 +12,12 @@ the optimizers, which see the supports of their inputs. The loop stage orders
 loops before its inputs are formatted, so it reads them without protocols.
 With --hours H, no program is featurized after H hours. Programs are
 featurized in the order they are timed, so those timed within the same hours
-are featurized first.
+are featurized first. With --timed, only the programs already timed are, as
+when featurizing a new basis after the timings.
 
     pixi run -e fitting python -m scripts.fitting.featurize_physical_data \\
         DIR [--model NAME=PATH]... [--basis NAME]... [--chunk K] [--resume] \\
-        [--hours H]
+        [--timed] [--hours H]
 """
 
 import argparse
@@ -102,11 +103,13 @@ def featurize_example(directory: Path, example, names, models) -> dict[str, list
     return rows
 
 
-def featurize(directory: Path, names, models, chunk, resume, hours) -> None:
+def featurize(directory: Path, names, models, chunk, resume, timed, hours) -> None:
     deadline = time.monotonic() + 3600 * hours
     # Each example is featurized with the bases it lacks, or all if not resuming.
     todo = []
-    for example in examples(directory, chunk):
+    for example in examples(
+        directory, chunk, "timing.json" if timed else "program.json"
+    ):
         record = json.loads(path(directory, example, "program.json").read_text())
         wanted = names or [record["stage"]]
         missing = [
@@ -151,6 +154,11 @@ def main() -> None:
         help="extract only the bases which each program lacks features of",
     )
     parser.add_argument(
+        "--timed",
+        action="store_true",
+        help="featurize only the programs which have been timed",
+    )
+    parser.add_argument(
         "--hours",
         type=float,
         default=math.inf,
@@ -164,6 +172,7 @@ def main() -> None:
         parse_models(args.model),
         args.chunk,
         args.resume,
+        args.timed,
         args.hours,
     )
 

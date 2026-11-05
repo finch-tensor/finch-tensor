@@ -51,7 +51,9 @@ from .protocol_cost_models import (
     READ_PROTOCOLS,
     ProtocolBasis,
     ProtocolChoice,
+    level_accesses,
     level_reads,
+    level_writes,
     read_options,
 )
 
@@ -94,10 +96,12 @@ __all__ = [
     "Stratify",
     "TransposeBasis",
     "allowed_options",
+    "level_accesses",
     "level_executions",
     "level_formats",
     "level_options",
     "level_reads",
+    "level_writes",
     "prefixes",
     "read_options",
     "write_protocol",

@@ -282,9 +282,13 @@ def test_gallops_jump_within_the_smallest_support():
     def jumps(px, py):
         machine = StatsMachine(sf, dict(stats))
         basis = ProtocolBasis()
-        _, prefix = basis.components(program(px, py), formats, machine)
-        row = basis.get_component_features(prefix, machine)[0]
-        return row[basis.feature_names.index("sparse_list.gallop_visits")]
+        # The loop over i reads x and y, each an access of the basis.
+        rows = [
+            basis.get_component_features(access, machine)[0]
+            for access in basis.components(program(px, py), formats, machine)
+        ]
+        assert len(rows) == 2
+        return sum(rows)[basis.feature_names.index("sparse_list.gallop_visits")]
 
     # Two gallops each jump at most as often as the smaller list has entries,
     # and a gallop driven by a walk jumps once for each step of the walk.

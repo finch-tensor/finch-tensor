@@ -150,43 +150,95 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
     }
     basis = ProtocolBasis()
     names = basis.feature_names
-    block = [name.removeprefix("sparse_list.") for name in names[5:10]]
+    block = [name.removeprefix("sparse_list.") for name in names[9:18]]
     assert block == [
         "seeks",
         "follow_visits",
         "walk_visits",
         "gallop_visits",
         "dense_visits",
+        "distinct_reads",
+        "extrude_visits",
+        "laminate_visits",
+        "distinct_writes",
     ]
 
     def lists(protocols):
         plan = product_plan(x, y, c, i, [(proto,) for proto in protocols])
         machine = StatsMachine(sf, dict(stats))
         rows = [
-            basis.get_component_features(prefix, machine)[0]
-            for prefix in basis.components(plan, formats, machine)
+            basis.get_component_features(access, machine)[0]
+            for access in basis.components(plan, formats, machine)
         ]
-        # The empty prefix reads nothing, and the loop over i reads both
-        # lists, which only fill the columns of their kind.
-        assert len(rows) == 2 and not rows[0].any()
-        assert not rows[1][:5].any() and not rows[1][10:].any()
-        return rows[1][5:10].tolist()
+        # The loop over i reads both lists, each an access, which only fills
+        # the columns of its kind. c has no format, so it isn't written.
+        assert len(rows) == 2
+        total = sum(rows)
+        assert not total[:9].any() and not total[18:].any()
+        return total[9:15].tolist()
 
     # Each list seeks one fiber. Walks step through the 5 entries of each,
-    # and either would visit the 5 of the other if it were dense.
-    assert lists((Walk(), Walk())) == [2, 0, 10, 0, 10]
+    # and either would visit the 5 of the other if it were dense. Each has 5
+    # distinct entries, whatever reads them.
+    assert lists((Walk(), Walk())) == [2, 0, 10, 0, 10, 10]
     # Gallops jump to the entries they share, within the 5 of the smaller.
-    assert lists((Gallop(), Gallop())) == [2, 0, 0, 10, 10]
+    assert lists((Gallop(), Gallop())) == [2, 0, 0, 10, 10, 10]
     # A followed y is looked up at each of the 5 entries of x, and a dense x
     # would visit all 10.
-    assert lists((Walk(), Follow())) == [2, 5, 5, 0, 15]
+    assert lists((Walk(), Follow())) == [2, 5, 5, 0, 15, 10]
     # A gallop of y alone jumps to each of the 5 entries x walks, and a dense
     # x would visit the 5 entries y gallops to.
-    assert lists((Walk(), Gallop())) == [2, 0, 5, 5, 10]
+    assert lists((Walk(), Gallop())) == [2, 0, 5, 5, 10, 10]
     plan = product_plan(x, y, c, i, ((Walk(),), (Follow(),)))
     rows = Affine(PROTOCOL_BASIS).get_features(plan, formats, stats, sf)
-    assert rows.shape == (2, 21)
+    assert rows.shape == (2, 37)
     assert PROTOCOL_COST_MODEL.predict(rows[:, :-1]) > 0
+
+
+def test_protocol_basis_counts_writes_apart_from_their_locations():
+    # c[i] = sum_j x[j, i], with 5 entries of x in the rows 0, 2, and 5 of c.
+    sf = ExactStatsFactory()
+    i, j = Field("i"), Field("j")
+    x, c = HardAlias("x"), HardAlias("c")
+    xd = np.zeros((8, 8))
+    xd[[0, 1, 1, 3, 3], [0, 0, 2, 2, 5]] = 1.0
+    stats: dict[Alias, TensorStats] = {x: sf(fl.asarray(xd), (j, i))}
+    formats: dict[Alias, list[LevelOption]] = {
+        x: [SparseListLevelOption(), SparseListLevelOption()],
+        c: [SparseHashLevelOption()],
+    }
+    query = Query(
+        Table(c, (i,)),
+        Aggregate(Literal(ffuncs.add), Literal(0.0), Table(x, (j, i)), (j,)),
+    )
+    basis = ProtocolBasis()
+    names = basis.feature_names
+
+    def writes(loop_order):
+        plan = Plan((fuse_loop_order(query, loop_order), Produces((c,))))
+        machine = StatsMachine(sf, dict(stats))
+        rows = [
+            basis.get_component_features(access, machine)[0]
+            for access in basis.components(plan, formats, machine)
+            if access.write
+        ]
+        # c has one level, written at one loop.
+        assert len(rows) == 1
+        return [
+            rows[0][names.index(f"sparse_hash.{name}")]
+            for name in (
+                "seeks",
+                "extrude_visits",
+                "laminate_visits",
+                "distinct_writes",
+            )
+        ]
+
+    # Looping over j outside, c is reached at the loop over i, which runs in
+    # the 3 rows of x, and laminated at each of the 5 entries of x, to 3
+    # distinct entries. Looping over i outside, it is extruded once per row.
+    assert writes((j, i)) == [3, 0, 5, 3]
+    assert writes((i, j)) == [1, 3, 0, 3]
 
 
 def test_optimize_protocols_chooses_the_cheaper_read():

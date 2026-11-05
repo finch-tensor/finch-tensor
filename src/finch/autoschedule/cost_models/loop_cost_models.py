@@ -40,7 +40,8 @@ class Prefix:
     options each alias stores, outermost first, as FormatBasis takes them.
     executions, when given, estimates how many times the enclosing loops run,
     as the protocol optimizer computes it from its choices at them, and the
-    counts of the last loop are scaled to it.
+    counts of the last loop are scaled to it. output, when given, is the tensor
+    the query writes, with the fields of output_vars.
     """
 
     prefix: tuple[Field, ...]
@@ -48,6 +49,7 @@ class Prefix:
     output_vars: tuple[Field, ...] | None = None
     formats: Mapping[Alias, Any] | None = field(default=None, compare=False, hash=False)
     executions: float | None = None
+    output: Alias | Literal | None = None
 
 
 def prefixes(
@@ -60,7 +62,8 @@ def prefixes(
     The loop prefixes of each query of term, including the empty prefix, in
     query order and from the shortest to the longest, advancing machine past
     each query after its prefixes. The loop order of a query is the fields of
-    its enclosing Fuse nodes. Each prefix carries formats.
+    its enclosing Fuse nodes. Each prefix carries formats, and the alias its
+    query writes.
     """
     match term:
         case Plan(bodies):
@@ -75,15 +78,15 @@ def prefixes(
             return
         case Produces():
             return
-        case Query(Table(_, lhs_idxs), expr):
+        case Query(Table(lhs, lhs_idxs), expr):
             pass
-        case QueryInto(Table(_, lhs_idxs), _, _):
+        case QueryInto(Table(lhs, lhs_idxs), _, _):
             expr = term.as_query().rhs
         case _:
             raise ValueError(f"Unsupported statement type: {term}")
 
     for n in range(len(loop_order) + 1):
-        yield Prefix(loop_order[:n], expr, lhs_idxs, formats)
+        yield Prefix(loop_order[:n], expr, lhs_idxs, formats, output=lhs)
     machine(term)
 
 
@@ -231,15 +234,30 @@ class LoopSpaces(Generic[NS]):
             self.stats_factory.support(self.merged(self.arg, (self.idx,))),
         )
 
+    def located(self, stat: NS, fields) -> float:
+        """
+        The distinct points of stat at fields, over the loops of the prefix:
+        the positions of a level of those fields which the loop reaches in
+        stat.
+        """
+        reduce_idxs = tuple(idx for idx in stat.index_order if idx not in fields)
+        if reduce_idxs:
+            stat = self.stats_factory.aggregate(
+                ffuncs.or_, False, reduce_idxs, self.stats_factory.support(stat)
+            )
+        return self.extent(stat, fields) * self.scale
+
+    def stepped(self, table: Table) -> NS:
+        """The entries of table at idx which the enclosing loops reach."""
+        return self.stats_factory.mapjoin(
+            ffuncs.and_,
+            self.exec_space,
+            self.project(self.machine(table), (self.idx,)),
+        )
+
     def walk(self, table: Table) -> float:
         """The steps of a walk of table through idx."""
-        return self.count(
-            self.stats_factory.mapjoin(
-                ffuncs.and_,
-                self.exec_space,
-                self.project(self.machine(table), (self.idx,)),
-            )
-        )
+        return self.count(self.stepped(table))
 
 
 class PigeonBasis(LoopBasis, LoopOrderedForm):

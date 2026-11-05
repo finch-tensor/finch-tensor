@@ -15,6 +15,8 @@ from .cost_models import (
     CostModel,
     LoopSpaces,
     Prefix,
+    ProtocolChoice,
+    level_accesses,
     level_formats,
     level_reads,
     read_options,
@@ -116,7 +118,7 @@ def optimize_protocols(
     bindings: Mapping[lgc.Alias, TensorFType],
     stats: Mapping[lgc.Alias, TensorStats],
     stats_factory: StatsFactory,
-    cost_model: CostModel[Prefix] = PROTOCOL_COST_MODEL,
+    cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
 ) -> lgc.LogicStatement:
     """
     Read each level of each formatted tensor of bindings with the protocol
@@ -124,8 +126,9 @@ def optimize_protocols(
     loop order of its query, as read_options lists them. The reads at a loop
     share its iteration space, and the protocols they read it with decide how
     often the loops within it run, so the reads of a query are chosen from the
-    outermost loop in, by dynamic programming: the choice at a loop costs its
-    prefix plus the least cost of the loops within it, which are priced as
+    outermost loop in, by dynamic programming: the choice at a loop costs the
+    accesses at it, the writes of the output among them, plus the least cost
+    of the loops within it, which are priced as
     running as often as the loop iterates under the choice, as Prefix takes
     it. A read which gives its protocol keeps it, and every other read keeps
     the default of its level, as protocolize states it.
@@ -191,8 +194,13 @@ def optimize_protocols(
                 rhs_2 = rhs
                 for tns, idxs, depth, proto in choice:
                     rhs_2 = with_protocol(rhs_2, tns, idxs, depth, proto)
-                prefix = Prefix(loops, expr(rhs_2), lhs_idxs, formats, executions)
-                total = cost_model.predict_component_cost(prefix, machine)
+                prefix = Prefix(
+                    loops, expr(rhs_2), lhs_idxs, formats, executions, lhs.tns
+                )
+                total = sum(
+                    cost_model.predict_component_cost(access, machine)
+                    for access in level_accesses(prefix, formats)
+                )
                 iterations = LoopSpaces(prefix, machine).iterations()
                 total_2, rest = rec(n + 1, rhs_2, iterations)
                 if total + total_2 < best[0]:
@@ -235,7 +243,7 @@ class CostProtocolizer(FormattedForm, LogicLoader):
     def __init__(
         self,
         ctx: LogicLoader,
-        cost_model: CostModel[Prefix] = PROTOCOL_COST_MODEL,
+        cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
     ):
         self.ctx = ctx
         self.cost_model = cost_model
