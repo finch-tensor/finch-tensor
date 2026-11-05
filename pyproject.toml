@@ -62,6 +62,7 @@ platforms = [
     { name = "linux-ppc64", platform = "linux-ppc64le", glibc = "2.34" },
     { name = "macos-arm64", platform = "osx-arm64", macos = "15.0" },
     { name = "win-amd64", platform = "win-64" },
+    "linux-64",
 ]
 preview = ["pixi-build"]
 requires-pixi = ">=0.71.0"
@@ -133,6 +134,12 @@ args = [
     { arg = "njobs", default = "0" },
 ]
 depends-on = [{task = "compile", environment = "test-c"}]
+default-environment = "test-c"
+
+[tool.pixi.feature.test.tasks.test-parallel-c]
+cmd = "pytest -m parallel_c -n 0"
+env = { FINCH_TEST_CFLAGS = "-fopenmp", OMP_NUM_THREADS = "4" }
+depends-on = [{ task = "compile", environment = "test-c" }]
 default-environment = "test-c"
 
 [tool.pixi.feature.test.tasks.test-mlir]
@@ -292,6 +299,7 @@ markers = [
     "c_backend: tests that exercise the C backend (require a native C compiler)",
     "mlir_backend: tests that exercise the MLIR backend (require MLIR Python bindings)",
     "slow: tests that are slow (not recommended for CI)",
+    "parallel_c: tests that exercise C backend with OpenMP for parallel C code generation",
 ]
 testpaths = ["src"]
 junit_family = "xunit2"
