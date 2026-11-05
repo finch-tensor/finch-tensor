@@ -18,6 +18,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar, overload
 
+import numpy as np
+
 from .ftypes import FType, FTyped, ftype
 
 if TYPE_CHECKING:
@@ -52,6 +54,21 @@ class AbstractFillFType(FType, ABC):
     def astype(self, element_type: FType) -> AbstractFillFType:
         """This fill, with its value converted to `element_type`."""
         ...
+
+
+def _zero_signs(value: Any) -> tuple:
+    """The signs of value's floating-point zeros. `same` (like `==`) equates
+    0.0 and -0.0, but a static fill is a type parameter of Julia's levels,
+    where Element{0.0} and Element{-0.0} are different types, so ftypes filled
+    with them must differ too, or one's kernel is cached for the other's.
+    """
+    if isinstance(value, tuple):
+        return tuple(_zero_signs(elt) for elt in value)
+    if isinstance(value, complex | np.complexfloating):
+        return (_zero_signs(value.real), _zero_signs(value.imag))
+    if isinstance(value, float | np.floating) and value == 0:
+        return bool(np.signbit(value))
+    return None
 
 
 class StaticFillFType(AbstractFillFType):
@@ -92,6 +109,7 @@ class StaticFillFType(AbstractFillFType):
             isinstance(other, StaticFillFType)
             and self.element_type == other.element_type
             and bool(same(self._value, other._value))
+            and _zero_signs(self._value) == _zero_signs(other._value)
         )
 
     def __hash__(self):

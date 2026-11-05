@@ -797,8 +797,9 @@ class _LogicalAndFType(BinaryFinchOperatorFType):
 
 
 class _LogicalAnd(FinchOperator):
-    def __call__(self, a, b):
-        return np.logical_and(a, b)
+    def __call__(self, *args):
+        # Associative, so calls may carry more than two operands, like add's.
+        return reduce(np.logical_and, args)
 
     def __repr__(self) -> str:
         return "logical_and"
@@ -836,8 +837,9 @@ class _LogicalOrFType(BinaryFinchOperatorFType):
 
 
 class _LogicalOr(FinchOperator):
-    def __call__(self, a, b):
-        return np.logical_or(a, b)
+    def __call__(self, *args):
+        # Associative, so calls may carry more than two operands, like add's.
+        return reduce(np.logical_or, args)
 
     def __repr__(self) -> str:
         return "logical_or"

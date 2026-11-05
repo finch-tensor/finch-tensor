@@ -100,7 +100,11 @@ class FlopsCostModel(FactorizeCostModel, AliasedForm):
                     out_stats = stats_factory.mapjoin(op, init_stats, out_stats)
                     return out_stats, iter_stats
                 case MapJoin(Literal(op), (arg,)):
-                    return visit_expr(arg)
+                    # A unary map iterates as its argument does, but its output
+                    # has the mapped fill (e.g. a norm's (value, scale) tuples),
+                    # which an aggregate over it reads.
+                    arg_stats, iter_stats = visit_expr(arg)
+                    return stats_factory.mapjoin(op, arg_stats), iter_stats
                 case MapJoin(Literal(op), args):
                     out_stats = stats_factory.mapjoin(
                         op, *(visit_expr(arg)[0] for arg in args)

@@ -13,6 +13,7 @@ from finch.algebra.fill import (
     StaticFillFType,
     is_dynamic,
 )
+from finch.algebra.ftypes import FDTypeBoolean
 from finch.compile import NotationCompiler, dimension
 from finch.compile.lower import make_extent
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
@@ -65,7 +66,8 @@ _JULIA_OPS = {
     ffuncs.rshift.ftype: ">>",
     ffuncs.logical_and.ftype: "Finch.and",
     ffuncs.logical_or.ftype: "Finch.or",
-    ffuncs.logical_not.ftype: "!",
+    # NumPy's logical_not is true exactly for zeros; Julia's ! takes only Bools.
+    ffuncs.logical_not.ftype: "iszero",
     ffuncs.logical_xor.ftype: "xor",
     # math / elementwise
     ffuncs.max.ftype: "max",
@@ -81,6 +83,26 @@ _JULIA_OPS = {
     ffuncs.truth.ftype: "Bool",
     ffuncs.first_arg.ftype: "first_arg",
 }
+
+# Logical operators read their operands' truth, as NumPy's do, but their Julia
+# counterparts (&&, ||, &, |, xor) take Bools, or act bitwise on integers, so
+# operands of other types are converted with !iszero first.
+_LOGICAL_OPS = {
+    ffuncs.logical_and.ftype,
+    ffuncs.logical_or.ftype,
+    ffuncs.logical_xor.ftype,
+}
+
+
+def _julia_truth(node, code: str) -> str:
+    """code, read as a Bool. !iszero is right for Bools too, so it is only
+    skipped when node is known to be one."""
+    try:
+        is_bool = isinstance(node.result_type, FDTypeBoolean)
+    except (AttributeError, AssertionError):
+        is_bool = False
+    return code if is_bool else f"!iszero({code})"
+
 
 _JULIA_REDUCTION_OPS = {
     ffuncs.add.ftype: "+",
@@ -384,6 +406,11 @@ class FinchJLGenerator:
 
             case ntn.Call(op, args):
                 arg_strs = [self.generate_julia(arg, nestingLvl) for arg in args]
+                if op.result_type in _LOGICAL_OPS:
+                    arg_strs = [
+                        _julia_truth(arg, arg_str)
+                        for arg, arg_str in zip(args, arg_strs, strict=True)
+                    ]
                 if op.result_type == make_tuple.ftype:
                     return f"({', '.join(arg_strs)}{',' if len(arg_strs) == 1 else ''})"
                 julia_op = _JULIA_OPS.get(op.result_type) or self.generate_julia(
@@ -421,6 +448,8 @@ class FinchJLGenerator:
                         stmt = f"{lhs_str} := {rhs_str}"
                     case _:
                         op = _JULIA_REDUCTION_OPS[lhs.mode.op.result_type]
+                        if lhs.mode.op.result_type in _LOGICAL_OPS:
+                            rhs_str = _julia_truth(rhs, rhs_str)
                         stmt = f"{lhs_str} {op}= {rhs_str}"
                 return f"{tab_str}{stmt}"
 
