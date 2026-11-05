@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 
 import finch as fl
@@ -214,18 +216,23 @@ def test_protocol_basis_counts_writes_apart_from_their_locations():
     basis = ProtocolBasis()
     names = basis.feature_names
 
-    def writes(loop_order):
+    def writes(loop_order, executions=None, parents=None):
         plan = Plan((fuse_loop_order(query, loop_order), Produces((c,))))
         machine = StatsMachine(sf, dict(stats))
-        rows = [
-            basis.get_component_features(access, machine)[0]
+        accesses = [
+            access
             for access in basis.components(plan, formats, machine)
             if access.write
         ]
         # c has one level, written at one loop.
-        assert len(rows) == 1
+        (access,) = accesses
+        if executions is not None:
+            access = replace(
+                access, prefix=replace(access.prefix, executions=executions)
+            )
+        row = basis.get_component_features(replace(access, parents=parents), machine)[0]
         return [
-            rows[0][names.index(f"sparse_hash.{name}")]
+            row[names.index(f"sparse_hash.{name}")]
             for name in (
                 "seeks",
                 "extrude_visits",
@@ -239,6 +246,11 @@ def test_protocol_basis_counts_writes_apart_from_their_locations():
     # distinct entries. Looping over i outside, it is extruded once per row.
     assert writes((j, i)) == [3, 0, 5, 3]
     assert writes((i, j)) == [1, 3, 0, 3]
+    # If the choices above make the loop over i run in 6 rows, c is laminated
+    # twice as often, at the same 3 entries. If instead the level is entered
+    # as 2 fibers, it has twice the entries, written as often.
+    assert writes((j, i), executions=6.0) == [6, 0, 10, 3]
+    assert writes((j, i), parents=2.0) == [3, 0, 5, 6]
 
 
 def test_optimize_protocols_chooses_the_cheaper_read():

@@ -236,16 +236,17 @@ class LoopSpaces(Generic[NS]):
 
     def located(self, stat: NS, fields) -> float:
         """
-        The distinct points of stat at fields, over the loops of the prefix:
-        the positions of a level of those fields which the loop reaches in
-        stat.
+        The distinct points of stat at fields: the positions of a level of
+        those fields which the loop reaches in stat. They aren't scaled to the
+        executions of the prefix, since a loop which runs more often reaches
+        the same positions.
         """
         reduce_idxs = tuple(idx for idx in stat.index_order if idx not in fields)
         if reduce_idxs:
             stat = self.stats_factory.aggregate(
                 ffuncs.or_, False, reduce_idxs, self.stats_factory.support(stat)
             )
-        return self.extent(stat, fields) * self.scale
+        return self.extent(stat, fields)
 
     def stepped(self, table: Table) -> NS:
         """The entries of table at idx which the enclosing loops reach."""
