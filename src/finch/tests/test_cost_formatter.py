@@ -256,7 +256,7 @@ def test_bytemap_allocates_its_children_densely():
     assert option.next_num_pos(stats, factory, 0, 1, ()) == 4
     np.testing.assert_allclose(
         option.get_storage_features(stats, factory, 0, 1, 8, pos_size, 8, ()),
-        [1, 4, 3.5, (2 + 3.5) * pos_size, 3.5, 3.5 * np.log2(3.5)],
+        [1, 4, 3.5, (2 + 3.5) * pos_size],
     )
 
 
@@ -463,39 +463,6 @@ def test_sparse_list_levels_reject_scatter_writes():
     assert allowed_options(c, 0, plan, options) == options
 
 
-@pytest.mark.parametrize(
-    "option, expected",
-    [
-        (DenseLevelOption(), [1, 4, 16]),
-        # A slice of one entry still takes a comparison to sort.
-        (
-            SparseByteMapLevelOption(),
-            [1, 4, 1, 3 * np.dtype(np.intp).itemsize, 4, 4],
-        ),
-    ],
-)
-def test_workspace_levels_reset_each_slice(option, expected):
-    t, i = Field("t"), Field("i")
-    a, scratch = HardAlias("a"), HardAlias("scratch")
-    fused = FusedAlias(scratch, 1)
-    sf = DCStatsFactory()
-    stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.eye(4)), (t, i))}
-    copy = fuse_loop_order(Query(Table(fused, (t, i)), Table(a, (t, i))), (t, i))
-    plan = Plan((copy, Produces((fused,))))
-    formats: dict[Alias, list[LevelOption]] = {scratch: [option, ElementLevelOption()]}
-    basis = ProtocolBasis()
-    machine = StatsMachine(sf, dict(stats))
-    level, _ = storage_components(basis, plan, formats, machine)
-
-    # Each of the 4 slices of the diagonal is reset before it is written.
-    columns = [
-        basis.feature_names.index(f"{option.kind}.{name}")
-        for name in option.feature_names
-    ]
-    features = basis.get_component_features(level, machine)
-    np.testing.assert_allclose(features[0, columns], expected)
-
-
 def test_dense_workspaces_are_followed_through_every_slot():
     i, j, k = Field("i"), Field("j"), Field("k")
     a, b, c, w = (HardAlias(name) for name in "abcw")
@@ -518,3 +485,27 @@ def test_dense_workspaces_are_followed_through_every_slot():
     names = ("follow_visits", "dense_visits", "distinct_reads", "laminate_visits")
     columns = [basis.feature_names.index(f"dense.{name}") for name in names]
     np.testing.assert_array_equal(features[columns], [64, 64, 16, 32])
+
+
+def test_bytemap_workspaces_write_each_entry_once_per_slice():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, c, w = (HardAlias(name) for name in "abcw")
+    sf = DCStatsFactory()
+    data_a, data_b = _block_matmul(8, 2)
+    stats: dict[Alias, TensorStats] = {
+        a: sf(fl.asarray(data_a), (i, j)),
+        b: sf(fl.asarray(data_b), (j, k)),
+    }
+    plan, _ = _matmul(c, a, b, (i, j, k))
+    staged = add_workspace(plan, c, 1, w)
+    formats: dict[Alias, list[LevelOption]] = {
+        w: [SparseByteMapLevelOption(), ElementLevelOption()]
+    }
+    basis = ProtocolBasis()
+    features = basis.get_features(staged, formats, stats, sf).sum(axis=0)
+
+    # The query scatters 32 products into the workspace, but only onto 2
+    # entries of each of the 8 rows, which are all that is cleared and sorted.
+    names = ("laminate_visits", "distinct_writes")
+    columns = [basis.feature_names.index(f"sparse_bytemap.{name}") for name in names]
+    np.testing.assert_array_equal(features[columns], [32, 16])

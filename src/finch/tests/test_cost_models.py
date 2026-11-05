@@ -139,7 +139,7 @@ def test_stratify_fits_separate_coefficients_per_regime(rng):
         LOOP_COST_MODEL,
         CostModel(Affine(PigeonBasis()), np.arange(6)),
         PROTOCOL_COST_MODEL,
-        CostModel(Affine(STORAGE_BASIS), np.arange(20)),
+        CostModel(Affine(STORAGE_BASIS), np.arange(17)),
         CostModel(
             Concat(Stratify(Quadratic(PigeonBasis()), 0, [2.0, 4.0]), TransposeBasis()),
             np.arange(77),
@@ -188,14 +188,14 @@ def test_feature_names_compose():
         "a.sparse_transposes",
         "b.iterations",
     )
-    assert STORAGE_BASIS.feature_names == PROTOCOL_COST_MODEL.basis.feature_names[:19]
+    assert STORAGE_BASIS.feature_names == PROTOCOL_COST_MODEL.basis.feature_names[:16]
     assert STORAGE_BASIS.feature_names[:6] == (
         "dense.positions",
         "dense.slots",
-        "dense.reset_slots",
         "sparse_list.positions",
         "sparse_list.entries",
         "sparse_list.position_bytes",
+        "sparse_list.index_bytes",
     )
 
 

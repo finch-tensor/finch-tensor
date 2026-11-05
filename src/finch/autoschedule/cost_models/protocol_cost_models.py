@@ -66,11 +66,6 @@ def nnz_after(stats: NS, stats_factory: StatsFactory[NS], depth: int, over: tupl
     return stats.estimate_non_fill_values(over=over)
 
 
-def num_slices(stats: NS, over: tuple = ()) -> float:
-    """Return the number of slices of stats which fix the fields of over."""
-    return float(np.prod([stats.get_dim_size(idx) for idx in over]))
-
-
 def alias_blocks(
     alias: Alias, term: LogicStatement, machine: StatsMachine[NS]
 ) -> list[tuple[NS, tuple[Field, ...]]]:
@@ -133,9 +128,8 @@ class LevelOption(ABC):
     the positions it passes to its child, from the stats of the tensor, the
     zero-based depth of the level, and the num_pos positions entering it. A
     tensor which stores one slice that fixes the fields of over is described by
-    its largest slice, and is reset once for each slice. A level which filters
-    has a fiber only where it has an entry, so a lookup which finds none runs
-    nothing within it.
+    its largest slice. A level which filters has a fiber only where it has an
+    entry, so a lookup which finds none runs nothing within it.
     """
 
     kind: ClassVar[str]
@@ -164,13 +158,10 @@ class LevelOption(ABC):
 
 
 class DenseLevelOption(LevelOption):
-    """
-    Storage features are positions, slots, and the slots zeroed by resetting
-    every slice.
-    """
+    """Storage features are positions and slots."""
 
     kind = "dense"
-    feature_names = ("positions", "slots", "reset_slots")
+    feature_names = ("positions", "slots")
     # A dense level is only looked up, so that it never decides where a loop
     # goes.
     protocols = (Follow(), Extrude(), Laminate())
@@ -183,8 +174,9 @@ class DenseLevelOption(LevelOption):
     def get_storage_features(
         self, stats, stats_factory, depth, num_pos, idx_size, pos_size, val_size, over
     ):
-        slots = self.next_num_pos(stats, stats_factory, depth, num_pos, over)
-        return np.array([num_pos, slots, slots * num_slices(stats, over)])
+        return np.array(
+            [num_pos, self.next_num_pos(stats, stats_factory, depth, num_pos, over)]
+        )
 
 
 class SparseHashLevelOption(LevelOption):
@@ -230,20 +222,11 @@ class SparseByteMapLevelOption(LevelOption):
     """
     A bytemap flags each of its slots with a byte, and lists the slots which
     are occupied, so its children are allocated densely. Storage features are
-    positions, slots, entries, the bytes of its pointers and list, the entries
-    cleared by resetting every slice, and the comparisons which sort the
-    entries of every slice when it is frozen.
+    positions, slots, entries, and the bytes of its pointers and list.
     """
 
     kind = "sparse_bytemap"
-    feature_names = (
-        "positions",
-        "slots",
-        "entries",
-        "position_bytes",
-        "reset_entries",
-        "sort_compares",
-    )
+    feature_names = ("positions", "slots", "entries", "position_bytes")
     protocols = (
         DefaultProtocol(),
         Walk(),
@@ -263,16 +246,7 @@ class SparseByteMapLevelOption(LevelOption):
     ):
         slots = self.next_num_pos(stats, stats_factory, depth, num_pos, over)
         nnz_l = nnz_after(stats, stats_factory, depth, over)
-        return np.array(
-            [
-                num_pos,
-                slots,
-                nnz_l,
-                (num_pos + 1 + nnz_l) * pos_size,
-                nnz_l * num_slices(stats, over),
-                nnz_l * np.log2(max(nnz_l, 2)) * num_slices(stats, over),
-            ]
-        )
+        return np.array([num_pos, slots, nnz_l, (num_pos + 1 + nnz_l) * pos_size])
 
 
 class ElementLevelOption(LevelOption):
@@ -835,8 +809,7 @@ class ProtocolBasis(Basis[ProtocolComponent], LoopOrderedForm):
 PROTOCOL_BASIS = Affine(ProtocolBasis())
 
 # Until the model is fitted, each byte a level stores costs 1, a byte of flags
-# among them, and its positions and entries nothing more, nor resetting and
-# sorting its slices. Seeking a fiber
+# among them, and its positions and entries nothing more. Seeking a fiber
 # costs 1, and entering a loop or iterating it nothing more. A walk costs 1
 # for each entry it steps through, a gallop costs 4 for each jump, and a
 # follow costs a lookup for each visit: 1 in a dense level or a bytemap, 3 in
@@ -847,10 +820,10 @@ PROTOCOL_BASIS = Affine(ProtocolBasis())
 # written costs 1 more to insert, except in a dense level, which has a slot
 # for each.
 _STORAGE_COSTS: dict[str, tuple[float, ...]] = {
-    "dense": (0, 0, 0),
+    "dense": (0, 0),
     "sparse_list": (0, 0, 1, 1),
     "sparse_hash": (0, 0, 1, 1),
-    "sparse_bytemap": (0, 1, 0, 1, 0, 0),
+    "sparse_bytemap": (0, 1, 0, 1),
     "element": (0, 1),
 }
 _PROTOCOL_COSTS: dict[str, tuple[float, ...]] = {

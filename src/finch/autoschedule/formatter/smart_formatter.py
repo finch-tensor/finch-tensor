@@ -395,31 +395,35 @@ class CostFormatter(LogicFormatter):
 
 
 # Costs are in resets of a dense slot, as fit to Gustavson SpGEMM on Finch.jl.
-# Dense levels pay to reset every slot of each slice, but take writes in any
-# order almost for free. A byte map allocates a flag and a child for each of its
-# slots, like a dense level, but clears and sorts only the entries of each
-# slice. A hash pays for a probe at every write and lookup, and a sorted list
-# appends cheaply but binary searches to look up out of order. A walk costs 1
-# for each entry it steps through, and a gallop 4 for each jump.
+# A dense level zeroes each of its slots, and a workspace zeroes them again for
+# each slice, which the copy out of it counts by following every slot of every
+# slice; it takes writes in any order almost for free. A byte map allocates a
+# flag and a child for each of its slots, like a dense level, but only clears
+# and sorts the distinct entries written to each slice, as if each slice held
+# 16 entries to sort. A hash pays for a probe at every write and lookup, and a
+# sorted list appends cheaply but binary searches to look up out of order. A
+# walk costs 1 for each entry it steps through, and a gallop 4 for each jump.
 _WORKSPACE_STORAGE_COSTS: dict[str, tuple[float, ...]] = {
-    "dense": (0, 0, 1),
+    "dense": (0, 1),
     "sparse_list": (0, 0, 0, 0),
     "sparse_hash": (0, 0, 0, 0),
-    "sparse_bytemap": (0, 1, 0, 0, 1, 1.6),
+    "sparse_bytemap": (0, 1, 0, 0),
     "element": (0, 0),
 }
-# The follow, walk, gallop, extrude, and laminate visits of each kind of level.
+_BYTEMAP_CLEAR = 1 + 1.6 * np.log2(16)
+# The follow, walk, gallop, extrude, and laminate visits and the distinct writes
+# of each kind of level.
 _WORKSPACE_ACCESS_COSTS: dict[str, tuple[float, ...]] = {
-    "dense": (1, 1, 0, 0.1, 0.1),
-    "sparse_list": (8, 1, 4, 1.3, 1.3),
-    "sparse_hash": (15, 1, 0, 15, 15),
-    "sparse_bytemap": (1, 1, 4, 1, 1),
+    "dense": (1 + 1, 1, 0, 0.1, 0.1, 0),
+    "sparse_list": (8, 1, 4, 1.3, 1.3, 0),
+    "sparse_hash": (15, 1, 0, 15, 15, 0),
+    "sparse_bytemap": (1, 1, 4, 1, 1, _BYTEMAP_CLEAR),
 }
 
 
 def _workspace_access_costs(kind: str) -> tuple[float, ...]:
-    follow, walk, gallop, extrude, laminate = _WORKSPACE_ACCESS_COSTS[kind]
-    return (0, 0, 0, 0, follow, walk, gallop, 0, 0, extrude, laminate, 0)
+    follow, walk, gallop, extrude, laminate, writes = _WORKSPACE_ACCESS_COSTS[kind]
+    return (0, 0, 0, 0, follow, walk, gallop, 0, 0, extrude, laminate, writes)
 
 
 WORKSPACE_COST_MODEL = CostModel(

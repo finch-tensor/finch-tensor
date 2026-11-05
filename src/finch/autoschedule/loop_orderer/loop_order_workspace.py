@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+from collections import OrderedDict
+
+import numpy as np
+
 from finch.algebra.tensor import TensorFType
 from finch.autoschedule.cost_models import WORKSPACE_LOOP_COST_MODEL, CostModel, Prefix
+from finch.autoschedule.cost_models.loop_cost_models import WORKSPACE_LIMIT
+from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.util import flatten_plans, fuse_loop_order
 from finch.finch_logic import (
     Alias,
@@ -107,8 +113,10 @@ class WorkspaceLoopOrderer(BFSLoopOrderer):
     writes which scatter into an output by WORKSPACE_LOOP_COST_MODEL, as cheaply
     as a workspace takes them. Then redirect each query whose loop order
     scatters into its output into a workspace fused over the fields it writes
-    in order, which is copied into the output in order after each slice. The
-    formatter chooses the format of each workspace.
+    in order, which is copied into the output in order after each slice, if
+    the workspace stores fewer fields than the output, and a slice of it has
+    at most workspace_limit entries, as the WriteBasis of the cost model
+    assumes. The formatter chooses the format of each workspace.
     """
 
     def __init__(
@@ -117,10 +125,12 @@ class WorkspaceLoopOrderer(BFSLoopOrderer):
         *,
         k: int | None = None,
         cost_model: CostModel[Prefix] | None = None,
+        workspace_limit: float = WORKSPACE_LIMIT,
     ):
         if cost_model is None:
             cost_model = WORKSPACE_LOOP_COST_MODEL
         super().__init__(ctx, k=k, cost_model=cost_model)
+        self.workspace_limit = workspace_limit
 
     def add_workspaces(
         self,
@@ -133,14 +143,21 @@ class WorkspaceLoopOrderer(BFSLoopOrderer):
         # isn't mistaken for one which scatters.
         prgm = with_copy_loop_orders(flatten_plans(prgm))
         spc = Namespace(prgm)
-        outputs: dict[HardAlias, None] = {}
+        outputs: dict[HardAlias, tuple[Field, ...]] = {}
         for node in PostOrderDFS(prgm):
             match node:
-                case Query(Table(HardAlias() as lhs, _), _) if lhs not in bindings:
-                    outputs[lhs] = None
-        for alias in outputs:
+                case Query(Table(HardAlias() as lhs, idxs), _) if lhs not in bindings:
+                    outputs[lhs] = idxs
+        # The stats of each output give the extent of each of its fields.
+        machine = StatsMachine(stats_factory, OrderedDict(stats))
+        machine(prgm)
+        for alias, idxs in outputs.items():
             depth = workspace_depth(prgm, alias)
-            if depth is not None:
+            if depth is None or depth == 0:
+                continue
+            output = machine.bindings[alias]
+            size = np.prod([output.get_dim_size(idx) for idx in idxs[depth:]])
+            if size <= self.workspace_limit:
                 ws = HardAlias(spc.freshen(alias.name, "ws"))
                 staged = add_workspace(prgm, alias, depth, ws)
                 assert isinstance(staged, Plan)

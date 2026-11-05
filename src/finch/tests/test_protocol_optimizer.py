@@ -156,8 +156,7 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
     basis = ProtocolBasis()
     names = basis.feature_names
     assert names[:2] == ("dense.positions", "dense.slots")
-    start = names.index("sparse_list.executions")
-    block = [name.removeprefix("sparse_list.") for name in names[start : start + 12]]
+    block = [name.removeprefix("sparse_list.") for name in names[28:40]]
     assert block == [
         "executions",
         "iterations",
@@ -185,8 +184,8 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
         # the columns of its kind. c has no format, so it isn't written.
         assert len(accesses) == 2
         total = sum(accesses)
-        assert not total[:start].any() and not total[start + 12 :].any()
-        return total[start + 2 : start + 9].tolist()
+        assert not total[:28].any() and not total[40:].any()
+        return total[30:37].tolist()
 
     # Each list seeks one fiber. Walks step through the 5 entries of each,
     # and either would visit the 5 of the other if it were dense. Each has 5
@@ -204,7 +203,7 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
     # The reads of the lists, with the constant; the lists are already stored,
     # so their levels cost nothing.
     rows = PROTOCOL_BASIS.get_features(plan, formats, stats, sf)
-    assert rows.shape == (2, PROTOCOL_BASIS.n_features)
+    assert rows.shape == (2, 65)
     assert PROTOCOL_COST_MODEL.predict(rows) > 0
 
 

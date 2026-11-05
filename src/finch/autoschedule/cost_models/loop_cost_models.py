@@ -390,6 +390,11 @@ class TransposeBasis(LoopBasis, LoopOrderedForm):
         return features
 
 
+# The most entries a slice of a workspace may have, so that it can be reset and
+# copied out cheaply.
+WORKSPACE_LIMIT = 100_000
+
+
 class WriteBasis(LoopBasis, LoopOrderedForm):
     """
     Count the writes to each level of the output of a query, at the loop which
@@ -406,7 +411,7 @@ class WriteBasis(LoopBasis, LoopOrderedForm):
     workspace so small can be reset and copied out cheaply.
     """
 
-    def __init__(self, workspace_limit: float = 100_000):
+    def __init__(self, workspace_limit: float = WORKSPACE_LIMIT):
         self.workspace_limit = workspace_limit
 
     @property
