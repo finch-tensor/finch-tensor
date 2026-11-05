@@ -14,21 +14,19 @@ from finch.autoschedule.cost_models import (
     FLOPS_COST_MODEL,
     LOOP_COST_MODEL,
     PROTOCOL_COST_MODEL,
+    STORAGE_BASIS,
     Affine,
     Basis,
     ByKind,
     Concat,
-    DenseLevelOption,
     FlopsBasis,
     KNearest,
-    LevelBasis,
     LinearCostModel,
     LoopSpaces,
     PigeonBasis,
     Prefix,
     Quadratic,
     RowMap,
-    SparseHashLevelOption,
     Statement,
     Stratify,
     TransposeBasis,
@@ -150,25 +148,13 @@ def test_stratify_fits_separate_coefficients_per_regime(rng):
         LOOP_COST_MODEL,
         LinearCostModel(Affine(PigeonBasis()), np.arange(6)),
         PROTOCOL_COST_MODEL,
-        LinearCostModel(
-            Affine(ByKind({"dense": Affine(LevelBasis(DenseLevelOption))})),
-            np.arange(10),
-        ),
+        LinearCostModel(Affine(STORAGE_BASIS), np.arange(17)),
         LinearCostModel(
             Concat(
                 Stratify(Quadratic(PigeonBasis()), 0, [2.0, 4.0], increasing=True),
                 KNearest(TransposeBasis(), [[0.0, 0.0], [1.0, 2.0]], 2),
             ),
             np.arange(77),
-        ),
-        LinearCostModel(
-            ByKind(
-                {
-                    "dense": LevelBasis(DenseLevelOption),
-                    "sparse_hash": LevelBasis(SparseHashLevelOption),
-                }
-            ),
-            np.arange(18),
         ),
     ],
 )
@@ -215,15 +201,13 @@ def test_feature_names_compose():
         "regime1.dense_transposes",
         "regime1.sparse_transposes",
     )
-    assert ByKind({"dense": LevelBasis(DenseLevelOption)}).feature_names == (
+    assert STORAGE_BASIS.feature_names[:6] == (
         "dense.positions",
         "dense.slots",
-        "dense.visits",
-        "dense.dense_visits",
-        "dense.entries",
-        "dense.lookups",
-        "dense.sequential_writes",
-        "dense.scatter_writes",
+        "sparse_list.positions",
+        "sparse_list.entries",
+        "sparse_list.position_bytes",
+        "sparse_list.index_bytes",
     )
 
 
@@ -241,10 +225,6 @@ def test_from_json_rejects_other_classes():
     with pytest.raises(ValueError, match="Expected 2 bases, got 1"):
         Concat(PigeonBasis(), TransposeBasis()).from_json(
             Concat(PigeonBasis()).to_json()
-        )
-    with pytest.raises(ValueError, match="levels of dense, got 'sparse_hash'"):
-        LevelBasis(DenseLevelOption).from_json(
-            LevelBasis(SparseHashLevelOption).to_json()
         )
     # The kinds and key of a ByKind are those of the basis which reads it.
     bases: dict[int, Basis] = {0: PigeonBasis(), 1: TransposeBasis()}

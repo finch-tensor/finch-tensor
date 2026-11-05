@@ -28,7 +28,7 @@ from finch.algebra import Tensor
 from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
 from finch.autoschedule.cost_models import CostModel, LevelOption
 from finch.autoschedule.executor import LogicExecutor
-from finch.autoschedule.formatter.smart_formatter import CostFormatter
+from finch.autoschedule.formatter.smart_formatter import CostFormatter, format_ftype
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.autoschedule.util import fuse_loop_order
 from finch.compile_jl.compiler import FinchJLCompiler
@@ -40,12 +40,7 @@ from scripts.fitting.generate_physical_data import (
     path,
     write_json,
 )
-from scripts.fitting.physical_bases import (
-    format_ftype,
-    input_perms,
-    parse_models,
-    resolve,
-)
+from scripts.fitting.physical_bases import input_perms, parse_models, resolve
 
 
 class FixedFormatter(CostFormatter):
@@ -55,8 +50,11 @@ class FixedFormatter(CostFormatter):
         super().__init__(loader)
         self.formats = formats
 
-    def get_tensor_ftype(self, alias, term, machine, fill_type, shape_type):
-        return format_ftype(self.formats[alias], fill_type, shape_type)
+    def choose_formats(self, prgm, bindings, stats, stats_factory, stored, fill_types):
+        return {
+            alias: format_ftype(self.formats[alias], fill_types[alias], shape_type)
+            for alias, shape_type in stored.items()
+        }
 
 
 def julia_loader():

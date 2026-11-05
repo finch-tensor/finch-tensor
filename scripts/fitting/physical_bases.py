@@ -24,7 +24,6 @@ examples coalesce_physical_data collects, so a new basis needs no new timings.
 """
 
 import json
-from collections import OrderedDict
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -48,13 +47,10 @@ from finch.autoschedule.cost_models import (
     level_options,
 )
 from finch.autoschedule.formatter.smart_formatter import (
-    LEVEL_BASIS,
-    LEVEL_BUILDERS,
     LEVEL_OPTIONS,
-    STORAGE_COST_MODEL,
-    optimize_format,
+    format_ftype,
+    optimize_formats,
 )
-from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
     Alias,
@@ -70,7 +66,6 @@ from finch.finch_logic import (
 )
 from finch.finch_logic.parser import PROTOCOLS
 from finch.symbolic import PostOrderDFS, PostWalk, Rewrite
-from finch.tensor import element, fiber_tensor
 from scripts.fitting.kronecker_stats import KroneckerStatsFactory, KroneckerTensor
 
 STAGES = ("protocol", "level", "transpose", "loop")
@@ -78,9 +73,11 @@ OPTIONS = {option.kind: option for option in LEVEL_OPTIONS}
 A, B, C = HardAlias("A"), HardAlias("B"), HardAlias("C")
 INPUTS = (A, B)
 
+# The formatter and the protocol optimizer price the same basis, so the level
+# stage fits it again, to examples whose formats vary.
 BASES: dict[str, Basis] = {
     "protocol": Affine(PROTOCOL_BASIS),
-    "level": Affine(LEVEL_BASIS),
+    "level": Affine(PROTOCOL_BASIS),
     "transpose": Affine(TransposeBasis()),
     "loop": Affine(PigeonBasis()),
 }
@@ -88,7 +85,7 @@ BASES: dict[str, Basis] = {
 # The models the optimizers of each stage use until they are fitted.
 DEFAULT_MODELS: dict[str, CostModel] = {
     "protocol": PROTOCOL_COST_MODEL,
-    "level": STORAGE_COST_MODEL,
+    "level": PROTOCOL_COST_MODEL,
 }
 
 
@@ -202,14 +199,6 @@ def input_fields(plan: LogicStatement) -> dict[Alias, tuple]:
     return fields
 
 
-def format_ftype(options: list[LevelOption], fill_type, shape_type):
-    """The ftype of a tensor of the level options, fill_type, and shape_type."""
-    lvl = element(fill_type, fill_type.element_type, ftypes.intp)
-    for option, dim in reversed(list(zip(options, shape_type, strict=True))):
-        lvl = LEVEL_BUILDERS[option.kind](lvl, dim)
-    return fiber_tensor(lvl)
-
-
 def input_ftype(options: list[LevelOption], tensor: KroneckerTensor):
     """The ftype of tensor stored with the level options."""
     shape_type = (ftype(tensor.idx_type),) * tensor.ndim
@@ -246,24 +235,17 @@ def choose_formats(
     be unformatted.
     """
     fields = input_fields(plan)
-    stats = OrderedDict(
-        (tns, stats_factory(tensor, fields[tns])) for tns, tensor in inputs.items()
-    )
+    stats = {tns: stats_factory(tensor, fields[tns]) for tns, tensor in inputs.items()}
     fill_types = plan.infer_fill_type(
         {tns: StaticFillFType(tensor.dtype(0)) for tns, tensor in inputs.items()}
     )
+    stored = {tns: (ftypes.intp,) * len(idxs) for tns, idxs in fields.items()}
+    ftypes_2 = optimize_formats(
+        plan, {}, stats, stats_factory, stored, fill_types, cost_model, LEVEL_OPTIONS
+    )
     formats = {}
-    for tns, idxs in fields.items():
-        lvl = optimize_format(
-            tns,
-            (ftypes.intp,) * len(idxs),
-            StatsMachine(stats_factory, OrderedDict(stats)),
-            fill_types[tns],
-            cost_model,
-            plan,
-            LEVEL_OPTIONS,
-        )
-        options = level_options(fiber_tensor(lvl))
+    for tns, fmt in ftypes_2.items():
+        options = level_options(fmt)
         assert options is not None
         formats[tns] = options
     return formats

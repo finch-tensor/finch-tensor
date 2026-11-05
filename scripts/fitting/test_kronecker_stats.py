@@ -7,6 +7,7 @@ import numpy as np
 import finch as fl
 from finch import ffuncs
 from finch.autoschedule.cost_models import (
+    STORAGE_BASIS,
     DenseLevelOption,
     ElementLevelOption,
     LevelOption,
@@ -15,7 +16,6 @@ from finch.autoschedule.cost_models import (
     SparseHashLevelOption,
     SparseListLevelOption,
 )
-from finch.autoschedule.formatter.smart_formatter import LEVEL_BASIS
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
@@ -185,7 +185,7 @@ def test_features_match_exact_stats_of_the_tensors(rng, program, fields, protoco
         c: [DenseLevelOption(), hsh, ElementLevelOption()],
     }
     plan = program(protocols)
-    for basis in (PigeonBasis(), ProtocolBasis(), LEVEL_BASIS):
+    for basis in (PigeonBasis(), ProtocolBasis(), STORAGE_BASIS):
         np.testing.assert_array_equal(
             basis.get_features(plan, formats, stats["kronecker"], kronecker),
             basis.get_features(plan, formats, stats["exact"], exact),

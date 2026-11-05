@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from functools import partial
 from itertools import product
 
@@ -112,23 +112,39 @@ def with_protocol(
     return Rewrite(PostWalk(read))(expr)
 
 
-def optimize_protocols(
+def touches(stmt: lgc.LogicStatement, aliases: set[lgc.Alias]) -> bool:
+    """Whether stmt reads or writes a tensor of aliases."""
+    for node in PostOrderDFS(stmt):
+        match node:
+            case lgc.Table(lgc.Alias() as tns) if tns.unfused in aliases:
+                return True
+    return False
+
+
+def choose_protocols(
     prgm: lgc.LogicStatement,
     bindings: Mapping[lgc.Alias, TensorFType],
     stats: Mapping[lgc.Alias, TensorStats],
     stats_factory: StatsFactory,
     cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
-) -> lgc.LogicStatement:
+    only: set[lgc.Alias] | None = None,
+    costs: Sequence[float] | None = None,
+) -> tuple[lgc.LogicStatement, list[float]]:
     """
     Read each level of each formatted tensor of bindings with the protocol
     which costs least under cost_model, of those the level supports under the
-    loop order of its query, as read_options lists them. The reads at a loop
-    share its iteration space, which the protocols they read it with decide,
-    so they are chosen together, by the cost of the loop and of the accesses
-    at it, the writes of the output among them. The loops within a loop are
-    entered where the formats say, whatever the protocols at it, so each loop
-    is chosen on its own. A read which gives its protocol keeps it, and every
-    other read keeps the default of its level, as protocolize states it.
+    loop order of its query, as read_options lists them, and return the
+    program with the cost of each of its queries, in program order. The reads
+    at a loop share its iteration space, which the protocols they read it
+    with decide, so they are chosen together, by the cost of the loop and of
+    the accesses at it, the writes of the output among them. The loops within
+    a loop are entered where the formats say, whatever the protocols at it,
+    so each loop is chosen on its own. A read which gives its protocol keeps
+    it, and every other read keeps the default of its level, as protocolize
+    states it. With only, the queries which read or write none of its aliases
+    aren't chosen: they keep their protocols and take the costs given, which
+    are those of every query in order, since the cost of a query depends only
+    on the formats of its own tensors.
     """
     formats = level_formats(bindings)
     given = set()
@@ -142,9 +158,11 @@ def optimize_protocols(
                 )
     prgm = protocolize(prgm, bindings)
     machine = StatsMachine(stats_factory, OrderedDict(stats))
+    found: list[float] = []
 
     def choose(stmt: lgc.Query | lgc.QueryInto, loop_order: tuple[lgc.Field, ...]):
-        """stmt, reading each level with the protocol which costs least."""
+        """stmt, reading each level with the protocol which costs least, and
+        its cost."""
         match stmt:
             case lgc.Query(lgc.Table(_, lhs_idxs) as lhs, rhs):
                 rebuild = partial(lgc.Query, lhs)
@@ -158,6 +176,7 @@ def optimize_protocols(
                     return update.as_query().rhs
             return rhs
 
+        cost = 0.0
         for n in range(len(loop_order)):
             loops = loop_order[: n + 1]
             options = [
@@ -175,8 +194,6 @@ def optimize_protocols(
                 if (read.alias, read.table.idxs, read.alias.nfused + read.depth)
                 not in given
             ]
-            if not options:
-                continue
             best: tuple[float, lgc.LogicExpression] = (float("inf"), rhs)
             for choice in product(*options):
                 rhs_2 = rhs
@@ -189,8 +206,9 @@ def optimize_protocols(
                 )
                 if total < best[0]:
                     best = (total, rhs_2)
-            _, rhs = best
-        return rebuild(rhs)
+            total, rhs = best
+            cost += total
+        return rebuild(rhs), cost
 
     def visit(stmt: lgc.LogicStatement, loop_order: tuple[lgc.Field, ...]):
         match stmt:
@@ -203,13 +221,31 @@ def optimize_protocols(
             case lgc.QueryInto(lgc.Table(), _, lgc.Literal()):
                 pass
             case lgc.Query() | lgc.QueryInto():
-                stmt = choose(stmt, loop_order)
+                if only is None or touches(stmt, only):
+                    stmt, cost = choose(stmt, loop_order)
+                elif costs is not None:
+                    cost = costs[len(found)]
+                else:
+                    raise ValueError("Expected the costs of the queries not chosen")
+                found.append(cost)
             case _:
                 raise ValueError(f"Unsupported statement type: {stmt}")
         machine(stmt)
         return stmt
 
-    return visit(prgm, ())
+    return visit(prgm, ()), found
+
+
+def optimize_protocols(
+    prgm: lgc.LogicStatement,
+    bindings: Mapping[lgc.Alias, TensorFType],
+    stats: Mapping[lgc.Alias, TensorStats],
+    stats_factory: StatsFactory,
+    cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
+) -> lgc.LogicStatement:
+    """prgm, reading each level with the protocol which costs least under
+    cost_model, as choose_protocols chooses them."""
+    return choose_protocols(prgm, bindings, stats, stats_factory, cost_model)[0]
 
 
 class CostProtocolizer(FormattedForm, LogicLoader):

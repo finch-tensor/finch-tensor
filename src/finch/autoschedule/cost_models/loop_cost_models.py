@@ -37,7 +37,7 @@ class Prefix:
     An outermost-first loop prefix of expr, the right-hand side of a query.
     output_vars orders the output of the query, when there is one, and
     formats, which bases that price formatted tensors need, lists the level
-    options each alias stores, outermost first, as FormatBasis takes them.
+    options each alias stores, outermost first, as level_formats lists them.
     executions, when given, estimates how many times the enclosing loops run,
     as the protocol optimizer computes it from its choices at them, and the
     counts of the last loop are scaled to it. output, when given, is the tensor
@@ -137,7 +137,8 @@ class LoopSpaces(Generic[NS]):
             case expr:
                 self.arg = expr
         # The extent of each field, from the tables which read it, and the
-        # fields of the dense levels of each, where the formats list levels.
+        # fields of the levels of each which don't filter, where the formats
+        # list level options.
         self.dims: dict[Field, float] = {}
         self.dense: dict[Table, set[Field]] = {}
         formats = component.formats or {}
@@ -151,7 +152,7 @@ class LoopSpaces(Generic[NS]):
                                 idxs[tns.nfused + depth]
                                 for depth, option in enumerate(options)
                                 if tns.nfused + depth < len(idxs)
-                                and getattr(option, "kind", None) == "dense"
+                                and not getattr(option, "filters", True)
                             }
         # The loop is entered wherever the formats let the enclosing loops go,
         # and its merge steps only where every fiber it merges has entries.

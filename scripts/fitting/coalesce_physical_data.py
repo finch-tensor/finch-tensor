@@ -19,6 +19,9 @@ from scripts.fitting.generate_physical_data import examples, path
 
 
 def coalesce(directory: Path, chunk, output: Path | None) -> None:
+    # Globbing a missing directory finds nothing, which would coalesce nothing.
+    if not (directory / "data").is_dir():
+        raise SystemExit(f"{directory}/data is not a directory; check DIR")
     programs = examples(directory, chunk)
     # Few examples are timed, so only theirs are looked up, which is much
     # faster on a parallel filesystem than looking up each example's files.
