@@ -322,8 +322,8 @@ def test_format_selection_uses_custom_model():
 
     # Charging only the seeks of lists makes a dense T free, and charging only
     # the seeks of dense levels makes lists free.
-    assert choose({"access.sparse_list.seeks": 1.0}) == ["dense", "dense"]
-    assert choose({"access.dense.seeks": 1.0}) == ["sparse_list", "sparse_list"]
+    assert choose({"sparse_list.seeks": 1.0}) == ["dense", "dense"]
+    assert choose({"dense.seeks": 1.0}) == ["sparse_list", "sparse_list"]
 
 
 def test_fused_alias_levels_describe_the_largest_slice():
@@ -344,9 +344,9 @@ def test_fused_alias_levels_describe_the_largest_slice():
     sparse, element = basis.components(plan, formats, machine)
 
     # Each slice of the diagonal stores the one entry of its row.
-    assert (sparse.alias, sparse.depth, sparse.num_pos) == (scratch, 0, (1.0,))
+    assert (sparse.alias, sparse.depth, sparse.num_pos) == (scratch, 0, 1.0)
     assert element.depth == 1
-    assert element.num_pos == pytest.approx((1.0,))
+    assert element.num_pos == pytest.approx(1.0)
     size = np.dtype(np.intp).itemsize
     names = basis.feature_names
     columns = [

@@ -50,7 +50,7 @@ from finch.tensor import (
     SparseListLevelFType,
 )
 
-from .cost_models import NS, Affine, Basis, ByKind, CostModel
+from .cost_models import NS, Affine, Basis, ByKind, Concat, CostModel
 from .loop_cost_models import LoopSpaces, Prefix, prefixes
 
 
@@ -425,16 +425,16 @@ def followed(expr: LogicExpression, table: Table) -> LogicExpression:
 @dataclass(frozen=True)
 class StorageChoice:
     """
-    The level option at a zero-based depth of the levels alias stores, priced
-    over the blocks of alias in the program, as alias_blocks lists them, with
-    the positions entering the level in each.
+    The level option at a zero-based depth of the levels alias stores, in one
+    block of alias in the program, as alias_blocks lists them, with the
+    positions entering the level there.
     """
 
     alias: Alias
     depth: int
     option: LevelOption
-    num_pos: tuple[float, ...]
-    blocks: list[tuple[Any, tuple[Field, ...]]] = field(compare=False, hash=False)
+    num_pos: float
+    block: tuple[Any, tuple[Field, ...]] = field(compare=False, hash=False)
 
 
 # bindings name no position type, so positions are intp.
@@ -460,25 +460,21 @@ def storage_choices(
     machine: StatsMachine[NS],
 ) -> Iterator[StorageChoice]:
     """
-    The levels alias stores in term, of options outermost first, each with
-    the positions entering it in each block of alias, from the stats of
-    machine, which is left where it is.
+    The levels alias stores in term, of options outermost first, in each
+    block of alias, each with the positions entering it there, from the stats
+    of machine, which is left where it is.
     """
     blocks = alias_blocks(alias, term, machine)
-    if not blocks:
-        return
-    num_pos = (1.0,) * len(blocks)
+    num_pos = [1.0] * len(blocks)
     for depth, option in enumerate(options):
-        yield StorageChoice(alias, depth, option, num_pos, blocks)
-        num_pos = tuple(
-            option.next_num_pos(
-                stats, machine.stats_factory, len(over) + depth, n, over
+        for n, (stats, over) in enumerate(blocks):
+            yield StorageChoice(alias, depth, option, num_pos[n], (stats, over))
+            num_pos[n] = option.next_num_pos(
+                stats, machine.stats_factory, len(over) + depth, num_pos[n], over
             )
-            for (stats, over), n in zip(blocks, num_pos, strict=True)
-        )
 
 
-class LevelBasis(Basis[StorageChoice], LoopOrderedForm):
+class LevelBasis(Basis[Any], LoopOrderedForm):
     """
     A tensor-local basis where each level of each formatted alias is a
     component, whose rows are the storage features of option, one for each
@@ -516,31 +512,32 @@ class LevelBasis(Basis[StorageChoice], LoopOrderedForm):
         component: StorageChoice,
         machine: StatsMachine[NS],
     ) -> np.ndarray:
-        features = np.zeros((len(component.blocks), self.n_features))
-        for row, ((stats, over), num_pos) in enumerate(
-            zip(component.blocks, component.num_pos, strict=True)
-        ):
-            depth = len(over) + component.depth
-            shape_type = stats.shape_type
-            # The element level has no dimension, and a broadcast dimension
-            # is intp.
-            idx_size = 0
-            if depth < len(shape_type):
-                idx_size = np_dtype(shape_type[depth] or ftypes.intp).itemsize
-            features[row] = self.option.get_storage_features(
-                stats,
-                machine.stats_factory,
-                depth,
-                num_pos,
-                idx_size,
-                POS_SIZE,
-                np_dtype(stats.element_type).itemsize,
-                over,
-            )
-        return features
+        match component:
+            case StorageChoice(block=(stats, over)):
+                pass
+            case _:
+                return np.zeros((1, self.n_features))
+        depth = len(over) + component.depth
+        shape_type = stats.shape_type
+        # The element level has no dimension, and a broadcast dimension is
+        # intp.
+        idx_size = 0
+        if depth < len(shape_type):
+            idx_size = np_dtype(shape_type[depth] or ftypes.intp).itemsize
+        features = self.option.get_storage_features(
+            stats,
+            machine.stats_factory,
+            depth,
+            component.num_pos,
+            idx_size,
+            POS_SIZE,
+            np_dtype(stats.element_type).itemsize,
+            over,
+        )
+        return np.asarray(features, dtype=float).reshape(1, self.n_features)
 
 
-class StorageBasis(ByKind[StorageChoice, str]):
+class StorageBasis(ByKind[Any, str]):
     """The levels of each formatted alias, each under the basis of its kind."""
 
     def __init__(self):
@@ -701,7 +698,7 @@ FEATURES = (
 )
 
 
-class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
+class AccessBasis(Basis[Any], LoopOrderedForm):
     """
     A basis whose components are the accesses of the levels of the formatted
     tensors at the last loop of each loop prefix, each a row of FEATURES. The
@@ -733,7 +730,11 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
         component: ProtocolChoice,
         machine: StatsMachine[NS],
     ) -> np.ndarray:
-        prefix, table = component.prefix, component.table
+        match component:
+            case ProtocolChoice(prefix=prefix, table=table):
+                pass
+            case _:
+                return np.zeros((1, self.n_features))
         spaces = LoopSpaces(prefix, machine)
         features = dict.fromkeys(FEATURES, 0.0)
         features["executions"] = spaces.executions()
@@ -779,7 +780,7 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
         return np.array([list(features.values())])
 
 
-class ProtocolBasis(ByKind[ProtocolChoice, str]):
+class ProtocolBasis(ByKind[Any, str]):
     """The accesses of the levels of each formatted tensor, each under the
     basis of the kind of its level."""
 
@@ -787,28 +788,16 @@ class ProtocolBasis(ByKind[ProtocolChoice, str]):
         super().__init__({option.kind: AccessBasis() for option in KINDS}, option_kind)
 
 
-def component_group(component: ProtocolComponent) -> str:
-    match component:
-        case StorageChoice():
-            return "storage"
-        case ProtocolChoice():
-            return "access"
-
-
-class PhysicalBasis(ByKind[ProtocolComponent, str]):
+class PhysicalBasis(Concat[ProtocolComponent]):
     """
-    The basis of the physical optimizers: the levels of each formatted alias
-    which term writes, since the tensors it reads are already stored, under
-    StorageBasis, and the accesses of the levels at each loop, under
-    ProtocolBasis.
+    The basis of the physical optimizers: StorageBasis beside ProtocolBasis,
+    over the levels of each formatted alias which term writes, since the
+    tensors it reads are already stored, and the accesses of the levels at
+    each loop. Each basis prices the components of the other at zero.
     """
 
     def __init__(self):
-        bases: dict[str, Basis[Any]] = {
-            "storage": StorageBasis(),
-            "access": ProtocolBasis(),
-        }
-        super().__init__(bases, component_group)
+        super().__init__(StorageBasis(), ProtocolBasis())
 
     def components(
         self,

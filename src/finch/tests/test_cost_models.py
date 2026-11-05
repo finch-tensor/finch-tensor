@@ -188,9 +188,7 @@ def test_feature_names_compose():
         "a.sparse_transposes",
         "b.iterations",
     )
-    assert PROTOCOL_COST_MODEL.basis.feature_names[:16] == tuple(
-        f"storage.{name}" for name in STORAGE_BASIS.feature_names
-    )
+    assert PROTOCOL_COST_MODEL.basis.feature_names[:16] == STORAGE_BASIS.feature_names
     assert STORAGE_BASIS.feature_names[:6] == (
         "dense.positions",
         "dense.slots",
