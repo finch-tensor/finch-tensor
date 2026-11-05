@@ -412,6 +412,18 @@ def write_protocols(alias: Alias, depth: int, term: LogicStatement) -> set[Proto
     return protocols
 
 
+def written_aliases(term: LogicStatement) -> set[Alias]:
+    """The unfused aliases of the tables which the queries of term write."""
+    written = set()
+    for node in PostOrderDFS(term):
+        match node:
+            case Query(Table(Alias() as lhs, _), _) | QueryInto(
+                Table(Alias() as lhs, _), _, _
+            ):
+                written.add(lhs.unfused)
+    return written
+
+
 def allowed_options(
     alias: Alias, depth: int, term: LogicStatement, options: Sequence[LevelOption]
 ) -> list[LevelOption]:
@@ -772,10 +784,11 @@ FEATURES = (
 
 class ProtocolBasis(Basis[ProtocolComponent], LoopOrderedForm):
     """
-    A basis where each level of each formatted alias is a component, as
-    storage_choices lists them, and so is each access of a level at a loop,
-    as level_accesses lists them for each loop prefix. The rows of a level
-    are its storage features, one for each block of its alias, in the first
+    A basis where each level of each formatted alias which term writes is a
+    component, as storage_choices lists them, since the tensors it reads are
+    already stored, and so is each access of a level at a loop, as
+    level_accesses lists them for each loop prefix. The rows of a level are
+    its storage features, one for each block of its alias, in the first
     columns, as StorageBasis gives them. The row of an access describes it in
     the block of columns of the kind of the level, starting with the
     executions of its loop, how often it is entered, and its iterations.
@@ -809,8 +822,10 @@ class ProtocolBasis(Basis[ProtocolComponent], LoopOrderedForm):
         formats = level_formats(bindings)
         # The levels are priced from the stats before term, which listing
         # them leaves in place, and then the accesses advance past each query.
+        written = written_aliases(term)
         for alias, options in formats.items():
-            yield from storage_choices(alias, options, term, machine)
+            if alias.unfused in written:
+                yield from storage_choices(alias, options, term, machine)
         for prefix in prefixes(term, machine, formats=formats):
             yield from level_accesses(prefix, formats)
 

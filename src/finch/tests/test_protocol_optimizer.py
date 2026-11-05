@@ -197,9 +197,10 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
     # x would visit the 5 entries y gallops to.
     assert lists((Walk(), Gallop())) == [2, 2, 0, 5, 5, 10, 10]
     plan = product_plan(x, y, c, i, ((Walk(),), (Follow(),)))
-    # The level of each list, and the reads of them, with the constant.
+    # The reads of the lists, with the constant; the lists are already stored,
+    # so their levels cost nothing.
     rows = PROTOCOL_BASIS.get_features(plan, formats, stats, sf)
-    assert rows.shape == (4, 65)
+    assert rows.shape == (2, 65)
     assert PROTOCOL_COST_MODEL.predict(rows) > 0
 
 
