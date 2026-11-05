@@ -3,15 +3,15 @@ Grow a local collection of examples for fitting the cost model of a stage of
 physical_bases in DIR, one at a time, and watch the fit improve. Programs are
 drawn as generate_physical_data draws them, and the variants of each example
 are timed as time_physical_data times them and featurized with the basis of
-the stage as featurize_physical_data does, so DIR has the layout of the
-cluster's steps, and condense_physical_data and fit_physical_data can read it
-too. A fraction of the examples, which a hash of their names picks so that it
-survives restarts, is held out. After each example, a LinearCostModel is fitted
-to the others, and its predictions of the held-out runtimes and its held-out
-R^2 as the collection grows are drawn in a window, which only responds between
-examples, and to DIR/NAME.live.png. The examples already in DIR start the
-collection, and those not yet timed or featurized are finished first. Stop
-with Ctrl-C, or by closing the window.
+the stage as fit_physical_data does, so DIR has the layout of the cluster's
+steps, and coalesce_physical_data can collect it too. A fraction of the
+examples, which a hash of their names picks so that it survives restarts, is
+held out. After each example, a LinearCostModel is fitted to the others, and
+its predictions of the held-out runtimes and its held-out R^2 as the
+collection grows are drawn in a window, which only responds between examples,
+and to DIR/NAME.live.png. The examples already in DIR start the collection,
+and those not yet timed are finished first. Stop with Ctrl-C, or by closing
+the window.
 
     pixi run -e fitting python -m scripts.fitting.live_fit_physical_data \\
         DIR [--stage S] [--model NAME=PATH]... [--holdout F] [--programs N] \\
@@ -21,9 +21,7 @@ with Ctrl-C, or by closing the window.
 """
 
 import argparse
-import contextlib
 import itertools
-import json
 import zlib
 from pathlib import Path
 
@@ -32,15 +30,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from finch.autoschedule.cost_models import LinearCostModel
-from scripts.fitting.featurize_physical_data import featurize_example
 from scripts.fitting.fit_physical_data import draw_learning_curve, r_squared
 from scripts.fitting.generate_physical_data import (
     examples,
+    load,
     path,
     program_inputs,
     write_example,
 )
-from scripts.fitting.physical_bases import BASES, STAGES, features_kind, parse_models
+from scripts.fitting.physical_bases import (
+    BASES,
+    STAGES,
+    featurize_record,
+    parse_models,
+)
 from scripts.fitting.time_physical_data import Timer
 
 
@@ -48,11 +51,8 @@ def held_out(example, fraction) -> bool:
     return zlib.crc32(example.encode()) < fraction * 2**32
 
 
-def is_collected(directory: Path, name, example) -> bool:
-    return all(
-        path(directory, example, kind).exists()
-        for kind in ("timing.json", features_kind(name))
-    )
+def is_collected(directory: Path, example) -> bool:
+    return path(directory, example, "timing.json").exists()
 
 
 def collect(
@@ -60,19 +60,11 @@ def collect(
 ) -> list[tuple[np.ndarray, float]]:
     """
     The features of the basis name and the runtime of each variant of example,
-    which are timed and featurized if they haven't been, or if the features
-    are of an earlier definition of the basis.
+    which are timed if they haven't been.
     """
-    basis = BASES[name]
     runtimes = timer.time_example(directory, example, resume=True)
-    features_path = path(directory, example, features_kind(name))
-    rows = None
-    # Features of an earlier definition of the basis are an error to read.
-    if features_path.exists():
-        with contextlib.suppress(ValueError):
-            rows = basis.features_from_json(json.loads(features_path.read_text()))
-    if rows is None:
-        rows = featurize_example(directory, example, [name], models)[name]
+    record, inputs = load(directory, example)
+    rows = featurize_record(record, inputs, [name], models)[name]
     return [(rows[i], runtimes[str(i)]) for i in range(len(rows)) if str(i) in runtimes]
 
 
@@ -190,7 +182,7 @@ def live_fit(
     timer = Timer(models, repeat)
     pending = []
     for example in examples(directory):
-        if is_collected(directory, stage, example):
+        if is_collected(directory, example):
             live.add(example, collect(directory, stage, example, timer, models))
         else:
             pending.append(example)

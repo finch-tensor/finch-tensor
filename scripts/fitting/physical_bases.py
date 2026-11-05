@@ -4,9 +4,8 @@ innermost decision out. Each stage enumerates every option of its own decision
 for random programs, and the stages below it, which are already fitted, make
 theirs, so the runtime of each option is what the optimizer would get by
 choosing it, and the best option of each example is known. Each stage names
-the basis its model is fitted to, which featurize_physical_data extracts and
-condense_physical_data collects under the name of the stage, so several stages
-can share DIR, and a new basis needs no new timings.
+the basis its model is fitted to, which fit_physical_data extracts from the
+examples coalesce_physical_data collects, so a new basis needs no new timings.
 
 - protocol: for a random program with random formats, every assignment of
   the protocols its inputs are read with.
@@ -33,7 +32,7 @@ from typing import Any
 import numpy as np
 
 from finch.algebra import StaticFillFType, ftype, ftypes
-from finch.autoschedule import optimize_protocols
+from finch.autoschedule import optimize_protocols, protocolize
 from finch.autoschedule.cost_models import (
     PROTOCOL_BASIS,
     PROTOCOL_COST_MODEL,
@@ -41,6 +40,7 @@ from finch.autoschedule.cost_models import (
     Basis,
     Concat,
     CostModel,
+    ElementLevelOption,
     LevelOption,
     LinearCostModel,
     PigeonBasis,
@@ -90,10 +90,6 @@ DEFAULT_MODELS: dict[str, CostModel] = {
     "protocol": PROTOCOL_COST_MODEL,
     "level": STORAGE_COST_MODEL,
 }
-
-
-def features_kind(name: str) -> str:
-    return f"{name}.features.json"
 
 
 def load_model(name: str, path: Path) -> LinearCostModel:
@@ -304,3 +300,64 @@ def resolve(
             models["protocol"],
         )
     return plan, formats
+
+
+def features(
+    bases: Mapping[str, Basis], plan, formats, inputs, stats_factory, protocols=True
+) -> dict[str, np.ndarray]:
+    """
+    The features of each of bases of plan, with the level options of formats,
+    from the stats of inputs, which store their fields in the order plan reads
+    them. Unless protocols is false, each read without a protocol takes the
+    default of its level, as Finch.jl reads it.
+    """
+    fields = input_fields(plan)
+    stats = {tns: stats_factory(tensor, fields[tns]) for tns, tensor in inputs.items()}
+    if protocols:
+        ftypes = {
+            tns: input_ftype(formats[tns], tensor) for tns, tensor in inputs.items()
+        }
+        plan = protocolize(plan, ftypes)
+    formats = {
+        alias: [*options, ElementLevelOption()] for alias, options in formats.items()
+    }
+    return {
+        name: basis.get_features(plan, formats, stats, stats_factory)
+        for name, basis in bases.items()
+    }
+
+
+def featurize_record(
+    record: Mapping[str, Any],
+    inputs: Mapping[Alias, KroneckerTensor],
+    names,
+    models: Mapping[str, CostModel],
+) -> dict[str, list[np.ndarray]]:
+    """
+    The features of each basis of names of each variant of the example of
+    record, whose inputs are inputs, as it was timed: the stages below make
+    their choices with models, as time_physical_data makes them, so nothing is
+    compiled or run. The loop stage orders loops before its inputs are
+    formatted, so it reads them without protocols.
+    """
+    stage = record["stage"]
+    bases = {name: BASES[name] for name in names}
+    stats_factory = KroneckerStatsFactory(record["block_bits"])
+    rows: dict[str, list[np.ndarray]] = {name: [] for name in names}
+    for variant in record["variants"]:
+        plan, formats = resolve(record, variant, inputs, models)
+        if stage == "loop":
+            # The loop orderer prices the concordant program before the
+            # formatter and the protocol optimizer run, without protocols.
+            plan = variant_plan(record, variant)
+        found = features(
+            bases,
+            plan,
+            formats,
+            read_inputs(record, plan, inputs),
+            stats_factory,
+            protocols=stage != "loop",
+        )
+        for name in names:
+            rows[name].append(found[name])
+    return rows

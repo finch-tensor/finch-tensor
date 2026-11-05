@@ -1,16 +1,24 @@
 """
-Fit a LinearCostModel to the features and timings which condense_physical_data
-collected into DATA, of the basis of physical_bases named there, and write it
-to model.json if given. A model of the same basis reads model.json back with
-from_json. The variants of each example are every option of one decision, so
-the model is also scored by its regret: the runtime of the variant it predicts
-to be fastest over that of the fastest, for each example. To show how the fit
-improves with data, a held-out tenth of the examples scores models fitted to
-growing subsets of the rest, and the relative R^2 and the median regret of each
-are printed and plotted next to DATA, to DATA.learning_curve.png.
+Fit a LinearCostModel to the examples which coalesce_physical_data collected
+into EXAMPLES, with the basis of physical_bases named by --basis, or that of
+the stage of the examples, and write it to model.json if given. A model of
+the same basis reads model.json back with from_json. Each example is
+featurized as it was timed: the stages below make their choices with the
+models of --model, as time_physical_data made them, so no example is compiled
+or run, and the stats are counted exactly from the Kronecker blocks of its
+inputs, so none is materialized. The formats of a variant enter only through
+the bases, as in the optimizers, which see the supports of their inputs. The
+loop stage orders loops before its inputs are formatted, so it reads them
+without protocols. The variants of each example are every option of one
+decision, so the model is also scored by its regret: the runtime of the
+variant it predicts to be fastest over that of the fastest, for each example.
+To show how the fit improves with data, a held-out tenth of the examples
+scores models fitted to growing subsets of the rest, and the relative R^2 and
+the median regret of each are printed and plotted next to EXAMPLES, to
+NAME.learning_curve.png.
 
     pixi run -e fitting python -m scripts.fitting.fit_physical_data \\
-        DATA [--seed S] [model.json]
+        EXAMPLES [--basis NAME] [--model NAME=PATH]... [--seed S] [model.json]
 """
 
 import argparse
@@ -22,7 +30,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from finch.autoschedule.cost_models import LinearCostModel
-from scripts.fitting.physical_bases import BASES
+from scripts.fitting.generate_physical_data import record_inputs
+from scripts.fitting.physical_bases import BASES, featurize_record, parse_models
 
 
 def r_squared(predicted, actual) -> float:
@@ -124,18 +133,43 @@ def plot_learning_curve(sizes, scores, medians, n_test, n_features, path) -> Non
     plt.close(fig)
 
 
-def fit(data: Path, output: Path | None, seed) -> None:
-    record = json.loads(data.read_text())
-    basis = BASES[record["name"]]
-    features = basis.features_from_json(record)
-    runtimes = record["runtimes"]
-    examples = record["examples"]
+def featurize(records, name, models):
+    """
+    The features of the basis name, the runtime, and the name and index of
+    each timed variant of the examples of records, in order.
+    """
+    features, runtimes, examples = [], [], []
+    for i, record in enumerate(records, 1):
+        rows = featurize_record(record, record_inputs(record), [name], models)[name]
+        timed = record["runtimes"]
+        for index, variant_rows in enumerate(rows):
+            if str(index) in timed:
+                features.append(variant_rows)
+                runtimes.append(timed[str(index)])
+                examples.append((record["name"], index))
+        print(f"[{i}/{len(records)}] {record['name']}: {len(rows)} rows", flush=True)
+    return features, runtimes, examples
+
+
+def fit(data: Path, name, models, output: Path | None, seed) -> None:
+    records = json.loads(data.read_text())["examples"]
+    if name is None:
+        stages = {record["stage"] for record in records}
+        if len(stages) != 1:
+            raise ValueError(
+                f"Expected examples of one stage, got {sorted(stages)}; pass --basis"
+            )
+        (name,) = stages
+    basis = BASES[name]
+    features, runtimes, examples = featurize(records, name, models)
     groups = by_example(examples)
     print(f"fitting to {len(features)} variants of {len(groups)} examples", flush=True)
     model = LinearCostModel(basis, np.zeros(basis.n_features)).fit(features, runtimes)
     width = max(map(len, basis.feature_names))
-    for name, coefficient in zip(basis.feature_names, model.coefficients, strict=True):
-        print(f"{name:{width}} {coefficient:.3e}")
+    for feature, coefficient in zip(
+        basis.feature_names, model.coefficients, strict=True
+    ):
+        print(f"{feature:{width}} {coefficient:.3e}")
     if features:
         predicted = np.array([model.predict(rows) for rows in features])
         error = np.abs(predicted - runtimes) / np.asarray(runtimes)
@@ -157,7 +191,7 @@ def fit(data: Path, output: Path | None, seed) -> None:
         print(f"relative R^2 and median regret on {n_test} held-out examples:")
         for size, score, median in zip(sizes, scores, medians, strict=True):
             print(f"{size:8d} {score:8.3f} {median:8.2f}")
-        plot = data.with_suffix(".learning_curve.png")
+        plot = data.parent / f"{name}.learning_curve.png"
         plot_learning_curve(sizes, scores, medians, n_test, basis.n_features, plot)
     if output is not None:
         output.write_text(json.dumps(model.to_json(), indent=2))
@@ -167,13 +201,22 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("data", type=Path)
+    parser.add_argument("data", type=Path, metavar="EXAMPLES")
+    parser.add_argument(
+        "--basis", choices=BASES, help="the basis to fit; the stage's by default"
+    )
+    parser.add_argument(
+        "--model",
+        action="append",
+        metavar="NAME=PATH",
+        help="a fitted model of a stage below, which may be repeated",
+    )
     parser.add_argument(
         "--seed", type=int, default=0, help="the seed which holds examples out"
     )
-    parser.add_argument("model", type=Path, nargs="?")
+    parser.add_argument("output", type=Path, nargs="?", metavar="model.json")
     args = parser.parse_args()
-    fit(args.data, args.model, args.seed)
+    fit(args.data, args.basis, parse_models(args.model), args.output, args.seed)
 
 
 if __name__ == "__main__":

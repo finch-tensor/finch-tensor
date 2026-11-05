@@ -529,7 +529,12 @@ def load(
 ) -> tuple[dict[str, Any], dict[Alias, KroneckerTensor]]:
     """The record of an example which generate wrote, and its inputs."""
     record = json.loads(path(directory, example, "program.json").read_text())
-    return record, {tns: kronecker_input(record, tns) for tns in INPUTS}
+    return record, record_inputs(record)
+
+
+def record_inputs(record: dict[str, Any]) -> dict[Alias, KroneckerTensor]:
+    """The inputs of the example of record, drawn from their seeds."""
+    return {tns: kronecker_input(record, tns) for tns in INPUTS}
 
 
 def write_example(directory: Path, name, record) -> None:

@@ -3,25 +3,25 @@
 # scripts/fitting/physical_bases.py, by default protocol, to DIR, with the
 # models of the stages below it given as --model NAME=PATH, or the built-in
 # ones. Each step installs its environment on its node's own disk, see
-# scripts/fitting/step.slurm. Each chunk is timed and featurized with the
-# basis of the stage, and with every basis of --basis, as soon as it is
-# generated, and once they are done the features of each basis and the
-# timings are condensed into DIR/NAME.json, and a model is fitted to them and
-# written to DIR/NAME.model.json, which the next stage takes as its --model.
-# The programs and their timings and features go to DIR/data, logs to
-# DIR/logs, and the IDs of the jobs to DIR/jobs.txt, which
-# scripts/fitting/status_physical_data.sh reads to show their progress. The
-# condensing waits for the timing and featurizing to end however they end,
-# since the chunks which ran out of time still count, and otherwise a failed
-# step cancels the steps which depend on it, and a failed submission cancels
-# the jobs submitted before it. Every job is charged to the Slurm account A if given, or to the
+# scripts/fitting/step.slurm. Each chunk is timed as soon as it is generated,
+# and once every chunk is done the timed programs and their timings are
+# coalesced into DIR/examples.json, and a model of the basis of the stage, and
+# of every basis of --basis, is fitted to them, featurizing them as they were
+# timed, and written to DIR/NAME.model.json, which the next stage takes as its
+# --model. The examples file is small, so scripts/fitting/fit_physical_data.py
+# can fit it again anywhere, without DIR/data. The programs and their timings
+# go to DIR/data, logs to DIR/logs, and the IDs of the jobs to DIR/jobs.txt,
+# which scripts/fitting/status_physical_data.sh reads to show their progress.
+# The coalescing waits for the timing to end however it ends, since the chunks
+# which ran out of time still count, and otherwise a failed step cancels the
+# steps which depend on it, and a failed submission cancels the jobs submitted
+# before it. Every job is charged to the Slurm account A if given, or to the
 # default account otherwise. With --resume, DIR's programs are kept rather
-# than generated, only the variants not yet timed are timed, each example is
-# featurized only with the bases it lacks, and the jobs are added to
-# DIR/jobs.txt. Each chunk is timed and featurized for --hours H, by default 6,
-# and stops then, since its programs cost too differently to choose how many
-# fill the time, so more are generated than any chunk could time. Options of
-# this script come before DIR, and those after it are generate_physical_data's.
+# than generated, only the variants not yet timed are timed, and the jobs are
+# added to DIR/jobs.txt. Each chunk is timed for --hours H, by default 6, and
+# stops then, since its programs cost too differently to choose how many fill
+# the time, so more are generated than any chunk could time. Options of this
+# script come before DIR, and those after it are generate_physical_data's.
 #
 #     scripts/fitting/launch_physical_data.sh [--account A] [--stage STAGE] \
 #         [--model NAME=PATH]... [--basis NAME]... [--chunks N] [--repeat N] \
@@ -68,11 +68,9 @@ if [[ $# -lt 1 ]]; then
 fi
 # The basis of the stage is always fitted, and each basis is fitted once.
 unique=()
-basis_options=()
 for basis in "$stage" "${bases[@]}"; do
   if [[ " ${unique[*]} " != *" $basis "* ]]; then
     unique+=("$basis")
-    basis_options+=(--basis "$basis")
   fi
 done
 bases=("${unique[@]}")
@@ -141,22 +139,18 @@ time=$(submit "$array" ${generate:+"--dependency=aftercorr:$generate"} \
   "$step" time_physical_data "$directory" "${models[@]}" --repeat "$repeat" \
   --hours "$hours" $resume)
 record time "$time"
-featurize=$(submit "$array" ${generate:+"--dependency=aftercorr:$generate"} \
-  --job-name=featurize --cpus-per-task=2 --mem=16G --time="$limit" \
-  --output="$logs/featurize-%A_%a.log" \
-  "$step" featurize_physical_data "$directory" "${models[@]}" \
-  "${basis_options[@]}" --hours "$hours" $resume)
-record featurize "$featurize"
+coalesce=$(submit --dependency="afterany:$time" --job-name=coalesce \
+  --cpus-per-task=1 --mem=16G --time=01:00:00 \
+  --output="$logs/coalesce-%j.log" \
+  "$step" coalesce_physical_data "$directory")
+record coalesce "$coalesce"
+# Fitting featurizes the examples as they were timed, with the same models.
 for basis in "${bases[@]}"; do
-  condense=$(submit --dependency="afterany:$time:$featurize" \
-    --job-name="condense-$basis" --cpus-per-task=1 --mem=16G --time=01:00:00 \
-    --output="$logs/condense-$basis-%j.log" \
-    "$step" condense_physical_data "$directory" --basis "$basis")
-  record "condense-$basis" "$condense"
-  fit=$(submit --dependency="afterok:$condense" --job-name="fit-$basis" \
-    --cpus-per-task=1 --mem=16G --time=01:00:00 --mail-type=END,FAIL \
+  fit=$(submit --dependency="afterok:$coalesce" --job-name="fit-$basis" \
+    --cpus-per-task=1 --mem=16G --time=02:00:00 --mail-type=END,FAIL \
     --output="$logs/fit-$basis-%j.log" \
-    "$step" fit_physical_data "$directory/$basis.json" "$directory/$basis.model.json")
+    "$step" fit_physical_data "$directory/examples.json" --basis "$basis" \
+    "${models[@]}" "$directory/$basis.model.json")
   record "fit-$basis" "$fit"
 done
 
