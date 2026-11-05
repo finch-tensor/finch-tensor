@@ -153,7 +153,12 @@ class LoopSpaces(Generic[NS]):
                                 if tns.nfused + depth < len(idxs)
                                 and getattr(option, "kind", None) == "dense"
                             }
-        self.exec_space = self.stats_factory.support(self.merged(self.arg))
+        # The loop is entered wherever the formats let the enclosing loops go,
+        # and its merge steps only where every fiber it merges has entries.
+        self.exec_space = self.stats_factory.support(
+            self.merged(self.arg, entered=True)
+        )
+        self.merge_space = self.stats_factory.support(self.merged(self.arg))
         self.scale = 1.0
         if component.executions is not None:
             estimated = self.extent(self.exec_space, self.parent)
@@ -181,29 +186,37 @@ class LoopSpaces(Generic[NS]):
                 return protocols[idxs.index(idx)]
         return DefaultProtocol()
 
-    def unrestricted(self, table: Table, fields) -> set[Field]:
+    def unrestricted(self, table: Table, fields, entered=False) -> set[Field]:
         """
-        The fields of fields which table doesn't restrict: those of its dense
-        levels, which have a fiber at every slot, and the field of the loop
-        where table follows it, since it is looked up wherever the others go.
+        The fields of fields which table doesn't restrict: the field of the
+        loop where table follows it, since it is looked up wherever the others
+        go, and, where the loops are entered rather than where they visit,
+        those of its dense levels, which have a fiber at every slot.
         """
-        unrestricted = set(self.dense.get(table, ()))
+        unrestricted = set(self.dense.get(table, ())) if entered else set()
         if self.idx in fields and self.protocol(table) == Follow():
             unrestricted.add(self.idx)
         return unrestricted
 
-    def merged(self, node: LogicExpression, fields=()) -> NS:
+    def merged(self, node: LogicExpression, fields=(), entered=False) -> NS:
+        """
+        Where a merge of the inputs of node visits parent and fields, or, if
+        entered, where the loops are entered, which a dense level doesn't
+        restrict, though an empty fiber of it visits nothing.
+        """
         # A merge coiterates the projections of the inputs, so it visits more
         # of parent than the projection of their result.
         match node:
             case MapJoin(Literal(op), args):
                 return self.stats_factory.mapjoin(
-                    op, *(self.merged(arg, fields) for arg in args)
+                    op, *(self.merged(arg, fields, entered) for arg in args)
                 )
             case Table():
                 stat = self.machine(node)
                 projected = self.project(
-                    stat, fields, self.unrestricted(node, {*self.parent, *fields})
+                    stat,
+                    fields,
+                    self.unrestricted(node, {*self.parent, *fields}, entered),
                 )
                 # The fill decides whether a mapjoin joins or unions it.
                 projected.fill_type = stat.fill_type
@@ -259,10 +272,14 @@ class LoopSpaces(Generic[NS]):
         return self.extent(stat, fields)
 
     def stepped(self, table: Table) -> NS:
-        """The entries of table at idx which the enclosing loops reach."""
+        """
+        The entries of table at idx which a walk of it steps through: those
+        where the merge steps, since it steps through nothing where another
+        fiber it merges is empty.
+        """
         return self.stats_factory.mapjoin(
             ffuncs.and_,
-            self.exec_space,
+            self.merge_space,
             self.project(self.machine(table), (self.idx,)),
         )
 

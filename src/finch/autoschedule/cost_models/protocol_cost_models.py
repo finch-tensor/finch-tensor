@@ -316,7 +316,11 @@ class ProtocolBasis(Basis[ProtocolComponent], LoopOrderedForm):
         features = dict.fromkeys(FEATURES, 0.0)
         features["seeks"] = spaces.executions()
         visited = spaces.visited()
-        features["parents"] = spaces.located(visited, component.fields[:-1])
+        # The fibers entered are at the positions the enclosing loops reach,
+        # or, where a level above is reached at this loop, those it visits.
+        above = component.fields[:-1]
+        entered = visited if spaces.idx in above else spaces.exec_space
+        features["parents"] = spaces.located(entered, above)
         if component.parents is not None:
             features["parents"] = component.parents
         if component.write:
@@ -375,7 +379,5 @@ _PROTOCOL_COSTS: dict[str, tuple[float, ...]] = {
 }
 PROTOCOL_COST_MODEL = LinearCostModel(
     PROTOCOL_BASIS,
-    np.concatenate(
-        [_LOOP_COSTS, *(_PROTOCOL_COSTS[option.kind] for option in KINDS)]
-    ),
+    np.concatenate([_LOOP_COSTS, *(_PROTOCOL_COSTS[option.kind] for option in KINDS)]),
 )

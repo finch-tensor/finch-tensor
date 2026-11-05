@@ -117,20 +117,18 @@ def optimize_protocols(
     bindings: Mapping[lgc.Alias, TensorFType],
     stats: Mapping[lgc.Alias, TensorStats],
     stats_factory: StatsFactory,
-    cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
+    cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
 ) -> lgc.LogicStatement:
     """
     Read each level of each formatted tensor of bindings with the protocol
     which costs least under cost_model, of those the level supports under the
     loop order of its query, as read_options lists them. The reads at a loop
-    share its iteration space, and the protocols they read it with decide how
-    often the loops within it run, so the reads of a query are chosen from the
-    outermost loop in, by dynamic programming: the choice at a loop costs the
-    accesses at it, the writes of the output among them, plus the least cost
-    of the loops within it, which are priced as
-    running as often as the loop iterates under the choice, as Prefix takes
-    it. A read which gives its protocol keeps it, and every other read keeps
-    the default of its level, as protocolize states it.
+    share its iteration space, which the protocols they read it with decide,
+    so they are chosen together, by the cost of the loop and of the accesses
+    at it, the writes of the output among them. The loops within a loop are
+    entered where the formats say, whatever the protocols at it, so each loop
+    is chosen on its own. A read which gives its protocol keeps it, and every
+    other read keeps the default of its level, as protocolize states it.
     """
     formats = level_formats(bindings)
     given = set()
@@ -224,7 +222,7 @@ class CostProtocolizer(FormattedForm, LogicLoader):
     def __init__(
         self,
         ctx: LogicLoader,
-        cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
+        cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
     ):
         self.ctx = ctx
         self.cost_model = cost_model
