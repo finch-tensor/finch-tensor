@@ -18,18 +18,15 @@ from finch.algebra import (
 from finch.autoschedule.cost_models import (
     PROTOCOL_COST_MODEL,
     CostModel,
-    DenseLevelOption,
     LevelOption,
     ProtocolComponent,
-    SparseByteMapLevelOption,
-    SparseHashLevelOption,
-    SparseListLevelOption,
     allowed_options,
     level_formats,
     read_protocols,
     storage_choices,
     write_protocols,
 )
+from finch.autoschedule.cost_models.protocol_cost_models import KINDS
 from finch.autoschedule.protocolize import choose_protocols
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
@@ -54,12 +51,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 # The level options CostFormatter chooses from by default, and their builders.
 # Of options which cost the same, the earliest is chosen, so a list is chosen
 # over a hash wherever it can be written.
-LEVEL_OPTIONS = (
-    DenseLevelOption(),
-    SparseListLevelOption(),
-    SparseHashLevelOption(),
-    SparseByteMapLevelOption(),
-)
+LEVEL_OPTIONS = KINDS
 LEVEL_BUILDERS = {
     "dense": dense,
     "sparse_list": sparse_list,
@@ -87,24 +79,15 @@ def optimize_formats(
     fill_types: Mapping[lgc.Alias, AbstractFillFType],
     cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
     options: Sequence[LevelOption] = LEVEL_OPTIONS,
-    sweeps: int = 2,
 ) -> dict[lgc.Alias, TensorFType]:
     """
     The format of each alias of stored, whose levels have the shape types it
     gives and the fill of fill_types, under which prgm costs least by
-    cost_model, with its other tensors formatted as bindings says. Each level
-    takes an option which supports the protocols prgm reads and writes it
-    with, as allowed_options lists them. The cost of a format is that of the
-    levels it stores, as storage_choices lists them, and of the queries which
-    read or write the tensor, which depends on the formats of the other
-    tensors through the loops they share, so the aliases are searched one at
-    a time, by brute force: each in turn takes every format of its levels,
-    and keeps the one under which the program costs least with the protocols
-    chosen for the queries which read or write it, as choose_protocols
-    chooses them, taking the costs of the other queries as they are. The
-    aliases are swept until none changes, or sweeps times.
-    Each starts with the first option of each level which filters, so that
-    its loops run only where it has entries.
+    cost_model, with its other tensors formatted as bindings says, by
+    coordinate descent: each alias in turn tries every product of the options
+    its levels allow, re-choosing protocols only for the queries which touch
+    it, for two sweeps or until none changes. Each starts from the first
+    allowed option of each level which filters.
     """
     allowed = {
         alias: [
@@ -147,10 +130,10 @@ def optimize_formats(
     bindings = {**bindings, **formats}
     storage = {alias: storage_cost(alias, fmt) for alias, fmt in formats.items()}
     _, costs = choose_protocols(prgm, bindings, stats, stats_factory, cost_model)
-    for _ in range(sweeps):
+    # A second sweep lets each alias answer the formats chosen after it.
+    for _ in range(2):
         changed = False
         for alias, levels in allowed.items():
-            others = sum(storage.values()) - storage[alias]
             best = (sum(costs) + storage[alias], bindings[alias], costs, storage[alias])
             for kinds in product(*levels):
                 fmt = ftype_of(alias, kinds)
@@ -168,10 +151,14 @@ def optimize_formats(
                 storage_2 = storage_cost(alias, fmt)
                 if sum(costs_2) + storage_2 < best[0]:
                     best = (sum(costs_2) + storage_2, fmt, costs_2, storage_2)
-            if best[1] != bindings[alias]:
-                _, bindings[alias], costs, storage[alias] = best
+            _, best_fmt, best_costs, best_storage = best
+            if best_fmt != bindings[alias]:
+                bindings[alias], costs, storage[alias] = (
+                    best_fmt,
+                    best_costs,
+                    best_storage,
+                )
                 changed = True
-            del others
         if not changed:
             break
     return {alias: bindings[alias] for alias in stored}
@@ -312,7 +299,6 @@ class CostFormatter(LogicFormatter):
         loader: LogicLoader | None = None,
         cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
         options: Sequence[LevelOption] = LEVEL_OPTIONS,
-        sweeps: int = 2,
     ):
         super().__init__()
         if loader is None:
@@ -320,7 +306,6 @@ class CostFormatter(LogicFormatter):
         self.ctx = loader
         self.cost_model = cost_model
         self.options = options
-        self.sweeps = sweeps
 
     def choose_formats(
         self,
@@ -342,7 +327,6 @@ class CostFormatter(LogicFormatter):
             fill_types,
             self.cost_model,
             self.options,
-            self.sweeps,
         )
 
     def lower(

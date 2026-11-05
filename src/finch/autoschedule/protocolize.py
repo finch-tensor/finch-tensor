@@ -132,19 +132,14 @@ def choose_protocols(
 ) -> tuple[lgc.LogicStatement, list[float]]:
     """
     Read each level of each formatted tensor of bindings with the protocol
-    which costs least under cost_model, of those the level supports under the
-    loop order of its query, as read_options lists them, and return the
-    program with the cost of each of its queries, in program order. The reads
-    at a loop share its iteration space, which the protocols they read it
-    with decide, so they are chosen together, by the cost of the loop and of
-    the accesses at it, the writes of the output among them. The loops within
-    a loop are entered where the formats say, whatever the protocols at it,
-    so each loop is chosen on its own. A read which gives its protocol keeps
-    it, and every other read keeps the default of its level, as protocolize
-    states it. With only, the queries which read or write none of its aliases
-    aren't chosen: they keep their protocols and take the costs given, which
-    are those of every query in order, since the cost of a query depends only
-    on the formats of its own tensors.
+    which costs least under cost_model, and return the program with the cost
+    of each of its queries, in program order. The reads at a loop are chosen
+    together, over the product of the protocols each supports, by the cost of
+    the accesses at that loop alone, since the protocols at a loop don't
+    change where the loops within it are entered. A read which gives its
+    protocol keeps it. With only, the queries which touch none of its aliases
+    keep their protocols and take their costs from costs, those of every
+    query in order.
     """
     formats = level_formats(bindings)
     given = set()

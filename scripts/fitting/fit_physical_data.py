@@ -1,5 +1,5 @@
 """
-Fit a LinearCostModel to the examples which coalesce_physical_data collected
+Fit a CostModel to the examples which coalesce_physical_data collected
 into EXAMPLES, with the basis of physical_bases named by --basis, or that of
 the stage of the examples, and write it to model.json if given. A model of
 the same basis reads model.json back with from_json. Each example is
@@ -29,7 +29,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
-from finch.autoschedule.cost_models import LinearCostModel
+from finch.autoschedule.cost_models import CostModel
 from scripts.fitting.generate_physical_data import record_inputs
 from scripts.fitting.physical_bases import BASES, featurize_record, parse_models
 
@@ -48,7 +48,6 @@ def r_squared(predicted, actual) -> float:
 
 
 def by_example(examples) -> dict[str, list[int]]:
-    """The indices of the variants of each example, by its name."""
     groups: dict[str, list[int]] = {}
     for i, (example, _) in enumerate(examples):
         groups.setdefault(example, []).append(i)
@@ -81,7 +80,7 @@ def learning_curve(basis, features, runtimes, examples, rng, n_points=12):
     n_test = max(2, len(names) // 10)
     test = [i for name in names[:n_test] for i in groups[name]]
     train_names = names[n_test:]
-    untrained = LinearCostModel(basis, np.zeros(basis.n_features))
+    untrained = CostModel(basis, np.zeros(basis.n_features))
     sizes = np.unique(np.geomspace(1, len(train_names), n_points).round().astype(int))
     scores, medians = [], []
     for size in sizes:
@@ -96,7 +95,8 @@ def learning_curve(basis, features, runtimes, examples, rng, n_points=12):
     return list(sizes), scores, medians, n_test
 
 
-def draw_learning_curve(ax, sizes, scores, n_features, ylabel, medians=None) -> None:
+def plot_learning_curve(sizes, scores, medians, n_test, n_features, path) -> None:
+    fig, ax = plt.subplots()
     # A model fitted to a few programs can score far below zero, so scores
     # below -1 are drawn at -1 and marked.
     sizes, scores = np.asarray(sizes), np.asarray(scores)
@@ -109,38 +109,21 @@ def draw_learning_curve(ax, sizes, scores, n_features, ylabel, medians=None) -> 
     ax.set_xscale("log")
     ax.set_ylim(-1.05, 1.05)
     ax.set_xlabel("# examples trained on")
-    ax.set_ylabel(ylabel)
-    if medians is not None:
-        regret_ax = ax.twinx()
-        regret_ax.plot(sizes, medians, marker="s", color="C2", label="median regret")
-        regret_ax.set_yscale("log")
-        regret_ax.set_ylabel("median regret of the held-out examples")
-        regret_ax.legend(loc="lower right")
+    ax.set_ylabel(f"relative R^2 on {n_test} held-out examples")
+    regret_ax = ax.twinx()
+    regret_ax.plot(sizes, medians, marker="s", color="C2", label="median regret")
+    regret_ax.set_yscale("log")
+    regret_ax.set_ylabel("median regret of the held-out examples")
+    regret_ax.legend(loc="lower right")
     ax.legend(loc="lower left")
-
-
-def plot_learning_curve(sizes, scores, medians, n_test, n_features, path) -> None:
-    fig, ax = plt.subplots()
-    draw_learning_curve(
-        ax,
-        sizes,
-        scores,
-        n_features,
-        f"relative R^2 on {n_test} held-out examples",
-        medians,
-    )
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
 
 def featurize(records, name, models):
-    """
-    The features of the basis name, the runtime, and the name and index of
-    each timed variant of the examples of records, in order.
-    """
     features, runtimes, examples = [], [], []
     for i, record in enumerate(records, 1):
-        rows = featurize_record(record, record_inputs(record), [name], models)[name]
+        rows = featurize_record(record, record_inputs(record), name, models)
         timed = record["runtimes"]
         for index, variant_rows in enumerate(rows):
             if str(index) in timed:
@@ -164,7 +147,7 @@ def fit(data: Path, name, models, output: Path | None, seed) -> None:
     features, runtimes, examples = featurize(records, name, models)
     groups = by_example(examples)
     print(f"fitting to {len(features)} variants of {len(groups)} examples", flush=True)
-    model = LinearCostModel(basis, np.zeros(basis.n_features)).fit(features, runtimes)
+    model = CostModel(basis, np.zeros(basis.n_features)).fit(features, runtimes)
     width = max(map(len, basis.feature_names))
     for feature, coefficient in zip(
         basis.feature_names, model.coefficients, strict=True

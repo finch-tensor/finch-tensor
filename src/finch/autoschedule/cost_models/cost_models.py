@@ -1,12 +1,11 @@
 from abc import abstractmethod
 from collections.abc import Callable, Hashable, Iterator, Mapping, Sequence
 from operator import attrgetter
-from typing import Any, ClassVar, Generic, Self, TypeVar
+from typing import Any, Generic, TypeVar
 
 import numpy as np
 from numpy.typing import ArrayLike
-from scipy.linalg import block_diag
-from scipy.optimize import LinearConstraint, minimize, nnls
+from scipy.optimize import nnls
 
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
@@ -19,53 +18,17 @@ C = TypeVar("C")
 K = TypeVar("K", bound=Hashable)
 
 
-class Serializable:
-    """
-    An object which to_json describes as a JSON-compatible dict under the
-    class_key its class declares, and which from_json reads back as an object
-    of its own class, so that a model built in code loads data saved from one
-    of the same structure, and rejects data of any other class. Subclasses
-    with state extend to_json and override _from_json, which by default
-    constructs the class with no arguments.
-    """
-
-    class_key: ClassVar[str]
-
-    def to_json(self) -> dict[str, Any]:
-        return {"class_key": self.class_key}
-
-    def from_json(self, data: Mapping[str, Any]) -> Self:
-        if data.get("class_key") != self.class_key:
-            raise ValueError(
-                f"Expected {self.class_key} data, got {data.get('class_key')!r}"
-            )
-        return self._from_json(data)
-
-    def _from_json(self, data: Mapping[str, Any]) -> Self:
-        return type(self)()
-
-
-class Basis(Serializable, Form, Generic[C]):
+class Basis(Form, Generic[C]):
     """
     A basis describes a logic statement by the features of its components,
-    such as queries, loop prefixes, or tensor levels. Each stage decomposes
-    programs into its own kind of component, and its searches price one
-    component at a time. components yields the components of a program,
-    advancing the StatsMachine past each statement after yielding its
-    components. get_component_features returns X_c with shape
-    (n_rows, n_features), with one row for each independently modeled part of
-    the component. Like a Stage, a Basis inherits the form of statements it
-    accepts.
-
-    A basis also describes the coefficients of a linear model of it: ridge
-    weights the penalty on the square of each coefficient, and constraints is
-    a matrix whose product with the coefficients must be nonnegative.
-    feature_names names each feature, by default by its index.
-
-    features_to_json describes the features of several programs, as
-    get_features returns them, with the basis and the names of its features,
-    and features_from_json reads them back, if they are of the same basis, so
-    features can be saved and fitted to later.
+    such as queries, loop prefixes, or tensor levels. components yields the
+    components of a program, advancing the StatsMachine past each statement
+    after yielding its components, and get_component_features gives a
+    component one row of n_features for each independently priced part of
+    it. Like a Stage, a Basis inherits the form of statements it accepts.
+    ridge weights the penalty on the square of each coefficient of a linear
+    model of the basis, and feature_names names each feature, by default by
+    its index.
     """
 
     @property
@@ -79,10 +42,6 @@ class Basis(Serializable, Form, Generic[C]):
     @property
     def ridge(self) -> np.ndarray:
         return np.ones(self.n_features)
-
-    @property
-    def constraints(self) -> np.ndarray:
-        return np.empty((0, self.n_features))
 
     @abstractmethod
     def components(
@@ -113,32 +72,9 @@ class Basis(Serializable, Form, Generic[C]):
         ]
         return np.concatenate([np.empty((0, self.n_features)), *features])
 
-    def features_to_json(self, features: Sequence[np.ndarray]) -> dict[str, Any]:
-        return {
-            "basis": self.to_json(),
-            "feature_names": list(self.feature_names),
-            "features": [rows.tolist() for rows in features],
-        }
-
-    def features_from_json(self, data: Mapping[str, Any]) -> list[np.ndarray]:
-        if data["basis"] != self.to_json():
-            raise ValueError(
-                f"Expected features of {self.to_json()}, got {data['basis']}"
-            )
-        return [
-            np.array(rows, dtype=float).reshape(-1, self.n_features)
-            for rows in data["features"]
-        ]
-
 
 class Concat(Basis[C]):
-    """
-    The features of several bases side by side. The bases must describe the
-    same kind of component. A linear model of the concatenation is the sum of
-    linear models of each basis.
-    """
-
-    class_key = "concat"
+    """The features of several bases of the same kind of component, side by side."""
 
     def __init__(self, *bases: Basis[C]):
         if not bases:
@@ -157,29 +93,9 @@ class Concat(Basis[C]):
     def ridge(self) -> np.ndarray:
         return np.concatenate([basis.ridge for basis in self.bases])
 
-    @property
-    def constraints(self) -> np.ndarray:
-        return block_diag(*[basis.constraints for basis in self.bases])
-
     def validate_inputs(self, *inputs):
         for basis in self.bases:
             basis.validate_inputs(*inputs)
-
-    def to_json(self) -> dict[str, Any]:
-        return {**super().to_json(), "bases": [b.to_json() for b in self.bases]}
-
-    def _bases_from_json(self, data: Mapping[str, Any]) -> list[Basis[C]]:
-        if len(data["bases"]) != len(self.bases):
-            raise ValueError(
-                f"Expected {len(self.bases)} bases, got {len(data['bases'])}"
-            )
-        return [
-            basis.from_json(b)
-            for basis, b in zip(self.bases, data["bases"], strict=True)
-        ]
-
-    def _from_json(self, data: Mapping[str, Any]) -> Self:
-        return type(self)(*self._bases_from_json(data))
 
     def components(
         self,
@@ -205,11 +121,8 @@ class ByKind(Concat[C], Generic[C, K]):
     The features of each component under the basis of its kind, which key
     returns, by default the kind attribute of the component. The features of a
     component fill the columns of its basis, and the other columns are zero,
-    so a linear model has separate coefficients for each kind. The kinds and
-    key are part of the structure of the basis, so from_json keeps them.
+    so a linear model has separate coefficients for each kind.
     """
-
-    class_key = "by_kind"
 
     def __init__(
         self,
@@ -227,10 +140,6 @@ class ByKind(Concat[C], Generic[C, K]):
             for kind, basis in self.by_kind.items()
             for name in basis.feature_names
         )
-
-    def _from_json(self, data: Mapping[str, Any]) -> Self:
-        bases = zip(self.by_kind, self._bases_from_json(data), strict=True)
-        return type(self)(dict(bases), self.key)
 
     def get_component_features(
         self,
@@ -272,12 +181,6 @@ class RowMap(Basis[C]):
     @abstractmethod
     def transform(self, rows: np.ndarray) -> np.ndarray: ...
 
-    def to_json(self) -> dict[str, Any]:
-        return {**super().to_json(), "basis": self.basis.to_json()}
-
-    def _from_json(self, data: Mapping[str, Any]) -> Self:
-        return type(self)(self.basis.from_json(data["basis"]))
-
     def get_component_features(
         self,
         component: C,
@@ -291,8 +194,6 @@ class Quadratic(RowMap[C]):
     The products of each pair of features of each row of a basis, flattened
     row-major, so a linear model of them sums a quadratic form of each row.
     """
-
-    class_key = "quadratic"
 
     @property
     def n_features(self) -> int:
@@ -310,12 +211,8 @@ class Quadratic(RowMap[C]):
 class Affine(RowMap[C]):
     """
     The features of each row of a basis followed by a 1, so a linear model of
-    them adds a constant to the cost of each row. Around a ByKind, the
-    constant is shared by every kind, and around the basis of one kind, it is
-    that kind's own.
+    them adds a constant to the cost of each row.
     """
-
-    class_key = "affine"
 
     @property
     def n_features(self) -> int:
@@ -329,69 +226,8 @@ class Affine(RowMap[C]):
     def ridge(self) -> np.ndarray:
         return np.append(self.basis.ridge, 1.0)
 
-    @property
-    def constraints(self) -> np.ndarray:
-        constraints = self.basis.constraints
-        return np.hstack([constraints, np.zeros((len(constraints), 1))])
-
     def transform(self, rows: np.ndarray) -> np.ndarray:
         return np.hstack([rows, np.ones((len(rows), 1))])
-
-
-class KNearest(RowMap[C]):
-    """
-    The weights of the k landmark rows nearest each row of a basis by
-    Euclidean distance, in the columns of those landmarks, and zero
-    elsewhere. The weights are inversely proportional to distance and sum to
-    one, so a row on a landmark takes all of its weight. A linear model of
-    this basis is a k nearest neighbors model whose coefficients are the
-    costs of the landmarks, so fitting it by least squares apportions the
-    runtime of each program among the landmarks its rows are near. The
-    landmarks are usually rows of the basis from the programs the model is
-    fitted to.
-    """
-
-    class_key = "k_nearest"
-
-    def __init__(self, basis: Basis[C], landmarks: ArrayLike, k: int = 1):
-        super().__init__(basis)
-        self.landmarks = np.asarray(landmarks, dtype=float).reshape(
-            -1, basis.n_features
-        )
-        if not 1 <= k <= len(self.landmarks):
-            raise ValueError(f"Expected 1 <= k <= {len(self.landmarks)}, got {k}")
-        self.k = k
-
-    @property
-    def n_features(self) -> int:
-        return len(self.landmarks)
-
-    @property
-    def feature_names(self) -> tuple[str, ...]:
-        return tuple(f"landmark{i}" for i in range(self.n_features))
-
-    def to_json(self) -> dict[str, Any]:
-        return {**super().to_json(), "landmarks": self.landmarks.tolist(), "k": self.k}
-
-    def _from_json(self, data: Mapping[str, Any]) -> Self:
-        basis = self.basis.from_json(data["basis"])
-        return type(self)(basis, data["landmarks"], data["k"])
-
-    def transform(self, rows: np.ndarray) -> np.ndarray:
-        distances = np.linalg.norm(rows[:, None] - self.landmarks[None], axis=2)
-        nearest = np.argsort(distances, axis=1, kind="stable")[:, : self.k]
-        distances = np.take_along_axis(distances, nearest, axis=1)
-        # Rows on a landmark weight the landmarks at distance zero equally.
-        on_landmark = distances == 0
-        weights = np.where(
-            on_landmark.any(axis=1, keepdims=True),
-            on_landmark,
-            1 / np.where(on_landmark, 1, distances),
-        )
-        weights = weights / weights.sum(axis=1, keepdims=True)
-        features = np.zeros((len(rows), len(self.landmarks)))
-        np.put_along_axis(features, nearest, weights, axis=1)
-        return features
 
 
 class Stratify(RowMap[C]):
@@ -401,19 +237,10 @@ class Stratify(RowMap[C]):
     regime of a row is the number of thresholds its feature at index feature
     meets or exceeds. A linear model of this basis has separate coefficients
     for each regime, so a feature can cost differently once, say, the working
-    set exceeds a cache. increasing constrains each coefficient to be
-    nondecreasing from each regime to the next.
+    set exceeds a cache.
     """
 
-    class_key = "stratify"
-
-    def __init__(
-        self,
-        basis: Basis[C],
-        feature: int,
-        thresholds: ArrayLike,
-        increasing: bool = False,
-    ):
+    def __init__(self, basis: Basis[C], feature: int, thresholds: ArrayLike):
         super().__init__(basis)
         if not 0 <= feature < basis.n_features:
             raise ValueError(
@@ -423,27 +250,10 @@ class Stratify(RowMap[C]):
         self.thresholds = np.asarray(thresholds, dtype=float)
         if self.thresholds.ndim != 1 or not np.all(np.diff(self.thresholds) > 0):
             raise ValueError(f"Expected increasing thresholds, got {thresholds}")
-        self.increasing = increasing
 
     @property
     def n_regimes(self) -> int:
         return len(self.thresholds) + 1
-
-    def to_json(self) -> dict[str, Any]:
-        return {
-            **super().to_json(),
-            "feature": self.feature,
-            "thresholds": self.thresholds.tolist(),
-            "increasing": self.increasing,
-        }
-
-    def _from_json(self, data: Mapping[str, Any]) -> Self:
-        return type(self)(
-            self.basis.from_json(data["basis"]),
-            data["feature"],
-            data["thresholds"],
-            data["increasing"],
-        )
 
     @property
     def n_features(self) -> int:
@@ -461,16 +271,6 @@ class Stratify(RowMap[C]):
     def ridge(self) -> np.ndarray:
         return np.tile(self.basis.ridge, self.n_regimes)
 
-    @property
-    def constraints(self) -> np.ndarray:
-        constraints = block_diag(*[self.basis.constraints] * self.n_regimes)
-        if not self.increasing:
-            return constraints
-        steps = np.diff(np.eye(self.n_regimes), axis=0)
-        return np.concatenate(
-            [constraints, np.kron(steps, np.eye(self.basis.n_features))]
-        )
-
     def transform(self, rows: np.ndarray) -> np.ndarray:
         n = self.basis.n_features
         regime = np.searchsorted(self.thresholds, rows[:, self.feature], side="right")
@@ -480,56 +280,44 @@ class Stratify(RowMap[C]):
         return features
 
 
-class CostModel(Serializable, Form, Generic[C]):
+class CostModel(Form, Generic[C]):
     """
-    A cost model predicts the cost of a logic statement from the features its
-    basis gives the components of the statement. predict takes the features
-    of a component, or of a whole program, and returns a sum over their rows,
-    including zero for an empty matrix, so the cost of a program is the sum of
-    the costs of its components:
-
-        sum_c predict_component_cost(c)
-
-    Runtimes are measured for whole programs rather than components, so fit
-    takes the features of each program, as get_features returns them, with
-    its runtime, and returns a model fitted to all of them at once, with
-    alpha scaling the ridge penalty of the basis. Fitted models predict
-    nonnegative row costs, as branch-and-bound searches require.
+    A linear cost model weights the features its basis gives the components
+    of a logic statement by its coefficients, and sums over their rows, so
+    the cost of a program is the sum of the costs of its components, which
+    predict_component_cost prices one at a time. Runtimes are measured for
+    whole programs, so fit takes the features of each program, as
+    get_features returns them, with its runtime, and finds the nonnegative
+    coefficients which minimize the sum of the squared relative errors of the
+    predicted runtimes, so that fast programs count as much as slow ones, and
+    the cost of a row of nonnegative features is nonnegative, penalized by
+    alpha times the ridge weights of the basis. The runtimes must be
+    positive, and a fit to no programs is zero. to_json writes the
+    coefficients with the names of their features, which from_json checks
+    against the basis of the model it reads them into.
     """
 
-    def __init__(self, basis: Basis[C]):
+    def __init__(self, basis: Basis[C], coefficients: ArrayLike):
         self.basis = basis
-
-    def to_json(self) -> dict[str, Any]:
-        return {**super().to_json(), "basis": self.basis.to_json()}
-
-    @abstractmethod
-    def predict(self, features: np.ndarray) -> float: ...
-
-    @abstractmethod
-    def fit(
-        self,
-        features: Sequence[np.ndarray],
-        runtimes: ArrayLike,
-        alpha: float = 0.0,
-    ) -> Self: ...
+        self.coefficients = np.asarray(coefficients, dtype=float)
+        if self.coefficients.shape != (basis.n_features,):
+            raise ValueError(
+                f"Expected {basis.n_features} coefficients, "
+                f"got shape {self.coefficients.shape}"
+            )
 
     def validate_inputs(self, *inputs):
         self.basis.validate_inputs(*inputs)
 
-    def get_component_features(
-        self,
-        component: C,
-        machine: StatsMachine[NS],
-    ) -> np.ndarray:
-        return self.basis.get_component_features(component, machine)
+    def predict(self, features: np.ndarray) -> float:
+        return float(features.sum(axis=0) @ self.coefficients)
 
     def predict_component_cost(
         self,
         component: C,
         machine: StatsMachine[NS],
     ) -> float:
-        return self.predict(self.get_component_features(component, machine))
+        return self.predict(self.basis.get_component_features(component, machine))
 
     def get_features(
         self,
@@ -549,44 +337,26 @@ class CostModel(Serializable, Form, Generic[C]):
     ) -> float:
         return self.predict(self.get_features(term, bindings, stats, stats_factory))
 
-
-class LinearCostModel(CostModel[C]):
-    """
-    Weight the features of each row by coefficients, and sum over the rows.
-    fit finds nonnegative coefficients which minimize the sum of the squared
-    relative errors of the predicted runtimes, so that fast programs count as
-    much as slow ones, penalized by alpha times the ridge weights of the basis
-    and subject to its constraints. The runtimes must be positive. The
-    coefficients are nonnegative so that the costs of rows of nonnegative
-    features are. A fit to no programs is zero.
-    """
-
-    class_key = "linear"
-
-    def __init__(self, basis: Basis[C], coefficients: ArrayLike):
-        super().__init__(basis)
-        self.coefficients = np.asarray(coefficients, dtype=float)
-        if self.coefficients.shape != (basis.n_features,):
-            raise ValueError(
-                f"Expected {basis.n_features} coefficients, "
-                f"got shape {self.coefficients.shape}"
-            )
-
-    def predict(self, features: np.ndarray) -> float:
-        return float(features.sum(axis=0) @ self.coefficients)
-
     def to_json(self) -> dict[str, Any]:
-        return {**super().to_json(), "coefficients": self.coefficients.tolist()}
+        return {
+            "feature_names": list(self.basis.feature_names),
+            "coefficients": self.coefficients.tolist(),
+        }
 
-    def _from_json(self, data: Mapping[str, Any]) -> Self:
-        return type(self)(self.basis.from_json(data["basis"]), data["coefficients"])
+    def from_json(self, data: Mapping[str, Any]) -> "CostModel[C]":
+        names = list(self.basis.feature_names)
+        if data["feature_names"] != names:
+            raise ValueError(
+                f"Expected the coefficients of {names}, got {data['feature_names']}"
+            )
+        return type(self)(self.basis, data["coefficients"])
 
     def fit(
         self,
         features: Sequence[np.ndarray],
         runtimes: ArrayLike,
         alpha: float = 0.0,
-    ) -> Self:
+    ) -> "CostModel[C]":
         n = self.basis.n_features
         runtimes = np.asarray(runtimes, dtype=float)
         if np.any(runtimes <= 0):
@@ -599,20 +369,5 @@ class LinearCostModel(CostModel[C]):
             [sums / runtimes[:, None], np.diag(np.sqrt(alpha * self.basis.ridge))]
         )
         target = np.concatenate([np.ones(len(runtimes)), np.zeros(n)])
-        constraints = self.basis.constraints
-        if not len(constraints):
-            coefficients, _ = nnls(design, target)
-            return type(self)(self.basis, coefficients)
-        result = minimize(
-            lambda c: 0.5 * np.sum((design @ c - target) ** 2),
-            np.zeros(n),
-            jac=lambda c: design.T @ (design @ c - target),
-            method="SLSQP",
-            constraints=[
-                LinearConstraint(np.concatenate([constraints, np.eye(n)]), 0, np.inf)
-            ],
-            options={"ftol": 1e-15, "maxiter": 1000},
-        )
-        if not result.success:
-            raise ValueError(f"Constrained fit failed: {result.message}")
-        return type(self)(self.basis, np.maximum(result.x, 0))
+        coefficients, _ = nnls(design, target)
+        return type(self)(self.basis, coefficients)

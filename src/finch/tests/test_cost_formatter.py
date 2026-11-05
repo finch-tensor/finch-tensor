@@ -8,14 +8,15 @@ from finch.algebra import DynamicFillFType, StaticFillFType
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.cost_models import (
     PROTOCOL_BASIS,
-    STORAGE_BASIS,
+    CostModel,
     DenseLevelOption,
     ElementLevelOption,
     LevelOption,
-    LinearCostModel,
+    ProtocolBasis,
     SparseByteMapLevelOption,
     SparseHashLevelOption,
     SparseListLevelOption,
+    StorageChoice,
     alias_blocks,
     allowed_options,
     level_options,
@@ -308,7 +309,7 @@ def test_format_selection_uses_custom_model():
     prgm = Plan((copy, sums, Produces((y,))))
 
     def model(weights):
-        return LinearCostModel(
+        return CostModel(
             PROTOCOL_BASIS,
             [weights.get(name, 0.0) for name in PROTOCOL_BASIS.feature_names],
         )
@@ -326,6 +327,17 @@ def test_format_selection_uses_custom_model():
     assert choose({"dense.seeks": 1.0}) == ["sparse_list", "sparse_list"]
 
 
+def storage_components(basis, plan, formats, machine) -> list[StorageChoice]:
+    """The levels among the components of basis, which price from the blocks
+    they list, however far the machine has advanced."""
+    levels = []
+    for component in basis.components(plan, formats, machine):
+        match component:
+            case StorageChoice():
+                levels.append(component)
+    return levels
+
+
 def test_fused_alias_levels_describe_the_largest_slice():
     t, i = Field("t"), Field("i")
     a, scratch = HardAlias("a"), HardAlias("scratch")
@@ -337,20 +349,21 @@ def test_fused_alias_levels_describe_the_largest_slice():
     formats: dict[Alias, list[LevelOption]] = {
         scratch: [SparseHashLevelOption(), ElementLevelOption()]
     }
+    basis = ProtocolBasis()
     machine = StatsMachine(sf, dict(stats))
-    sparse, element = STORAGE_BASIS.components(plan, formats, machine)
+    sparse, element = storage_components(basis, plan, formats, machine)
 
     # Each slice of the diagonal stores the one entry of its row.
     assert (sparse.alias, sparse.depth, sparse.num_pos) == (scratch, 0, (1.0,))
     assert element.depth == 1
     assert element.num_pos == pytest.approx((1.0,))
     size = np.dtype(np.intp).itemsize
-    names = STORAGE_BASIS.feature_names
+    names = basis.feature_names
     columns = [
         names.index(f"sparse_hash.{name}")
         for name in ("positions", "entries", "position_bytes", "index_bytes")
     ]
-    features = STORAGE_BASIS.get_component_features(sparse, machine)
+    features = basis.get_component_features(sparse, machine)
     np.testing.assert_allclose(features[0, columns], [1, 1, 2 * size, size])
 
 
@@ -388,10 +401,17 @@ def test_storage_basis_prices_the_levels_of_each_block():
     formats: dict[Alias, list[LevelOption]] = {
         out: [SparseHashLevelOption(), ElementLevelOption()]
     }
-    rows = STORAGE_BASIS.get_features(plan, formats, stats, sf)
+    basis = ProtocolBasis()
+    machine = StatsMachine(sf, dict(stats))
+    rows = np.concatenate(
+        [
+            basis.get_component_features(level, machine)
+            for level in storage_components(basis, plan, formats, machine)
+        ]
+    )
     # A row for each block of the hash level, then of the element level.
-    assert rows.shape == (4, STORAGE_BASIS.n_features)
-    names = STORAGE_BASIS.feature_names
+    assert rows.shape == (4, basis.n_features)
+    names = basis.feature_names
     size = np.dtype(np.intp).itemsize
     columns = [
         names.index(f"sparse_hash.{name}")

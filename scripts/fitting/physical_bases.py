@@ -22,8 +22,7 @@ examples coalesce_physical_data collects, so a new basis needs no new timings.
   that order, so that the program is concordant, the formats the formatter
   chooses, from the supports of its inputs, and the protocols the protocol
   optimizer chooses. Its features are those of the supports, before the
-  formatter and the protocol optimizer run. loop_orderer_model puts the loop
-  and transpose models together for the loop orderer.
+  formatter and the protocol optimizer run.
 """
 
 import json
@@ -40,11 +39,9 @@ from finch.autoschedule.cost_models import (
     PROTOCOL_COST_MODEL,
     Affine,
     Basis,
-    Concat,
     CostModel,
     ElementLevelOption,
     LevelOption,
-    LinearCostModel,
     PigeonBasis,
     TransposeBasis,
     level_options,
@@ -85,45 +82,23 @@ BASES: dict[str, Basis] = {
     "loop": Affine(PigeonBasis()),
 }
 
-# The models the optimizers of each stage use until they are fitted.
-DEFAULT_MODELS: dict[str, CostModel] = {
-    "protocol": PROTOCOL_COST_MODEL,
-    "format": PROTOCOL_COST_MODEL,
-}
-
-
-def load_model(name: str, path: Path) -> LinearCostModel:
-    """The model of the basis name which fit_physical_data wrote to path."""
-    basis = BASES[name]
-    untrained = LinearCostModel(basis, np.zeros(basis.n_features))
-    return untrained.from_json(json.loads(path.read_text()))
-
 
 def parse_models(args: list[str] | None) -> dict[str, CostModel]:
-    """The models of NAME=PATH arguments, over the defaults."""
-    models = dict(DEFAULT_MODELS)
+    """
+    The models of NAME=PATH arguments, which fit_physical_data wrote, over the
+    models the optimizers use until they are fitted.
+    """
+    models = {"protocol": PROTOCOL_COST_MODEL, "format": PROTOCOL_COST_MODEL}
     for arg in args or ():
         name, _, path = arg.partition("=")
         if name not in BASES or not path:
             raise ValueError(
                 f"Expected NAME=PATH with NAME of {list(BASES)}, got {arg}"
             )
-        models[name] = load_model(name, Path(path))
+        basis = BASES[name]
+        untrained = CostModel(basis, np.zeros(basis.n_features))
+        models[name] = untrained.from_json(json.loads(Path(path).read_text()))
     return models
-
-
-def loop_orderer_model(
-    loop: LinearCostModel, transpose: LinearCostModel
-) -> LinearCostModel:
-    """
-    The model of the loop orderer, which prices a loop order by the loop model
-    on the concordant program and the transpose model on the inputs it would
-    have to transpose, as LOOP_COST_MODEL does with the built-in weights.
-    """
-    return LinearCostModel(
-        Concat(loop.basis, transpose.basis),
-        np.concatenate([loop.coefficients, transpose.coefficients]),
-    )
 
 
 def with_subsequence(order, fields):
@@ -168,14 +143,6 @@ def variant_plan(record: Mapping[str, Any], variant: Mapping[str, Any]) -> Plan:
     return fused_plan(query, order)
 
 
-def variant_formats(variant: Mapping[str, Any]) -> dict[Alias, list[LevelOption]]:
-    """The level options of each tensor which a variant gives a format."""
-    return {
-        HardAlias(name): [OPTIONS[kind] for kind in kinds]
-        for name, kinds in variant.get("formats", {}).items()
-    }
-
-
 def input_perms(
     record: Mapping[str, Any], plan: LogicStatement
 ) -> dict[Alias, tuple[int, ...]]:
@@ -193,7 +160,6 @@ def input_perms(
 
 
 def input_fields(plan: LogicStatement) -> dict[Alias, tuple]:
-    """The fields of the table of each alias plan reads, in field order."""
     fields = {}
     for node in PostOrderDFS(plan):
         match node:
@@ -203,7 +169,6 @@ def input_fields(plan: LogicStatement) -> dict[Alias, tuple]:
 
 
 def input_ftype(options: list[LevelOption], tensor: KroneckerTensor):
-    """The ftype of tensor stored with the level options."""
     shape_type = (ftype(tensor.idx_type),) * tensor.ndim
     return format_ftype(options, StaticFillFType(tensor.dtype(0)), shape_type)
 
@@ -263,19 +228,22 @@ def resolve(
     """
     The program and formats of a variant of the example of record, once the
     stages below its stage have made their choices from the exact stats of
-    inputs: the formats of every tensor, and the protocols each input is read
-    with, which the plans of the protocol and format stages already give. The
-    inputs the program reads are stored in the order it reads them, which is
-    the loop order in the loop stage.
+    inputs: the formats of every tensor, unless the variant gives them, and
+    the protocols each input is read with, unless the variant gives those too,
+    as the variants of the protocol and format stages do. The inputs the
+    program reads are stored in the order it reads them, which is the loop
+    order in the loop stage.
     """
-    stage = record["stage"]
     plan = variant_plan(record, variant)
-    formats = variant_formats(variant)
+    formats = {
+        HardAlias(name): [OPTIONS[kind] for kind in kinds]
+        for name, kinds in variant.get("formats", {}).items()
+    }
     inputs = read_inputs(record, plan, inputs)
     stats_factory = KroneckerStatsFactory(record["block_bits"])
-    if stage == "loop":
+    if "formats" not in variant:
         formats = choose_formats(plan, inputs, stats_factory, models["format"])
-    if stage not in ("protocol", "format"):
+    if "protocols" not in variant:
         fields = input_fields(plan)
         plan = optimize_protocols(
             plan,
@@ -288,13 +256,13 @@ def resolve(
 
 
 def features(
-    bases: Mapping[str, Basis], plan, formats, inputs, stats_factory, protocols=True
-) -> dict[str, np.ndarray]:
+    basis: Basis, plan, formats, inputs, stats_factory, protocols=True
+) -> np.ndarray:
     """
-    The features of each of bases of plan, with the level options of formats,
-    from the stats of inputs, which store their fields in the order plan reads
-    them. Unless protocols is false, each read without a protocol takes the
-    default of its level, as Finch.jl reads it.
+    The features of basis of plan, with the level options of formats, from the
+    stats of inputs, which store their fields in the order plan reads them.
+    Unless protocols is false, each read without a protocol takes the default
+    of its level, as Finch.jl reads it.
     """
     fields = input_fields(plan)
     stats = {tns: stats_factory(tensor, fields[tns]) for tns, tensor in inputs.items()}
@@ -306,43 +274,39 @@ def features(
     formats = {
         alias: [*options, ElementLevelOption()] for alias, options in formats.items()
     }
-    return {
-        name: basis.get_features(plan, formats, stats, stats_factory)
-        for name, basis in bases.items()
-    }
+    return basis.get_features(plan, formats, stats, stats_factory)
 
 
 def featurize_record(
     record: Mapping[str, Any],
     inputs: Mapping[Alias, KroneckerTensor],
-    names,
+    name: str,
     models: Mapping[str, CostModel],
-) -> dict[str, list[np.ndarray]]:
+) -> list[np.ndarray]:
     """
-    The features of each basis of names of each variant of the example of
-    record, whose inputs are inputs, as it was timed: the stages below make
-    their choices with models, as time_physical_data makes them, so nothing is
+    The features of the basis name of each variant of the example of record,
+    whose inputs are inputs, as it was timed: the stages below make their
+    choices with models, as time_physical_data makes them, so nothing is
     compiled or run. The loop stage orders loops before its inputs are
     formatted, so it reads them without protocols.
     """
     stage = record["stage"]
-    bases = {name: BASES[name] for name in names}
     stats_factory = KroneckerStatsFactory(record["block_bits"])
-    rows: dict[str, list[np.ndarray]] = {name: [] for name in names}
+    rows = []
     for variant in record["variants"]:
         plan, formats = resolve(record, variant, inputs, models)
         if stage == "loop":
             # The loop orderer prices the concordant program before the
             # formatter and the protocol optimizer run, without protocols.
             plan = variant_plan(record, variant)
-        found = features(
-            bases,
-            plan,
-            formats,
-            read_inputs(record, plan, inputs),
-            stats_factory,
-            protocols=stage != "loop",
+        rows.append(
+            features(
+                BASES[name],
+                plan,
+                formats,
+                read_inputs(record, plan, inputs),
+                stats_factory,
+                protocols=stage != "loop",
+            )
         )
-        for name in names:
-            rows[name].append(found[name])
     return rows

@@ -7,8 +7,7 @@ its index. The inputs of an example are drawn from the seeds in its record,
 so the file is small, and fit_physical_data featurizes and fits the examples
 from it alone, anywhere, without DIR/data.
 
-    pixi run -e fitting python -m scripts.fitting.coalesce_physical_data \\
-        DIR [--chunk K] [examples.json]
+    pixi run -e fitting python -m scripts.fitting.coalesce_physical_data DIR
 """
 
 import argparse

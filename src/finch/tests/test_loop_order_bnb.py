@@ -10,7 +10,7 @@ from finch import ffuncs
 from finch.autoschedule.cost_models import (
     LOOP_COST_MODEL,
     Concat,
-    LinearCostModel,
+    CostModel,
     LoopBasis,
     PigeonBasis,
     Prefix,
@@ -160,7 +160,7 @@ def test_loop_search_minimizes_nonlinear_component_cost(search):
     arg = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), arg, (j,))
     basis = Concat(PigeonBasis(), TransposeBasis())
-    model = LinearCostModel(Quadratic(basis), np.ones(49))
+    model = CostModel(Quadratic(basis), np.ones(49))
 
     def cost(order):
         query = fuse_loop_order(Query(Table(out, (i, k)), expr), order)
@@ -209,7 +209,7 @@ def test_loop_orderers_use_selected_model(search, orderer, inplace):
     a, out = HardAlias("a"), HardAlias("out")
     expr = Table(a, (i, j))
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((16, 16))), (i, j))}
-    model = LinearCostModel(PreferFieldBasis(j), [1.0])
+    model = CostModel(PreferFieldBasis(j), [1.0])
     assert search(expr, sf, stats, cost_model=model) == (j, i)
     if inplace:
         stats[out] = sf(fl.asarray(np.ones(())), ())
@@ -246,7 +246,7 @@ def test_loop_orderers_respect_output_order(search):
         sf,
         stats,
         (unit, i),
-        cost_model=LinearCostModel(PreferFieldBasis(j), [1.0]),
+        cost_model=CostModel(PreferFieldBasis(j), [1.0]),
     )
     assert order == (j, unit, i)
 

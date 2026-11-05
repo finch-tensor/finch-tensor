@@ -317,5 +317,7 @@ markers = [
     "slow: tests that are slow (not recommended for CI)",
 ]
 testpaths = ["src"]
+# The tests of the fitting scripts import them as scripts.fitting.
+pythonpath = ["."]
 junit_family = "xunit2"
 strict = true

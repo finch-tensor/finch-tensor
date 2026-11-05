@@ -3,41 +3,17 @@ Draw programs for fitting the cost model of a stage of physical_bases, and
 their inputs. Each program is a random subprogram of C_lmq += A_jlpq * B_kmpq,
 which loops in the order its inputs store their fields, and its inputs are
 Kronecker products of R-MAT blocks of drawn densities, as kronecker_stats draws
-them. A and B have at most MAX_RANK fields each, which bounds the variants of
-the format stage. Its variants are every option of the decision of the stage:
-the protocols A and B are read with under drawn formats, the formats and
-protocols of one of A, B, and C with the protocols of the loops over its
-fields, under drawn formats and protocols of the rest, the loop orders of the
-program, with its inputs stored in each, or, in the transpose stage, the
-orders a copy C of A can be stored in, which reads A as it is stored, under
-drawn formats. With --variants N, N of them are drawn without replacement when
-there are more, by default all of them, except 64 of the format stage, which
-has up to 6561, and 16 of the loop orders of the loop stage, which has up to
-720.
-The log sizes of the fields of a program add up to a fraction of the most
-they may, under --lg-max-space and --lg-max-dim, and the log nonzeros of each
-input to a fraction of its log size. Each fraction is drawn as the largest of
---size-bias or --density-bias uniform draws, which is uniform for a bias of 1
-and skews toward larger or denser inputs above it. Of the samples draws of the
-inputs of a program, keep are kept, spread over the densities of A, B, and C
-by the same distribution, and each makes an example with the program. In the
-protocol and format stages, the variants of the examples of a program compile
-to the same kernels, so they are compiled once for them all, and 10 are kept
-by default.
-The other stages choose protocols from the stats of each example, so their
-kernels can differ, and one is kept by default, for more programs instead.
+them. Its variants are every option of the decision of the stage, or VARIANTS
+of them drawn without replacement. Of SAMPLES draws of the inputs of a program,
+KEEP of the stage are kept, spread over the densities of A, B, and C, and each
+makes an example with the program.
 Each example is written to DIR/data as JSON, with the text of its query, its
 loop order, its variants, and the log shape, the R-MAT seed of each block, and
 the RNG seed of each of its inputs, with the version of numpy which drew its
 blocks and their checksum, under the name of its chunk and its index in the
-chunk, so jobs of different chunks can share DIR. No tensors are stored: load
-draws the blocks of the inputs from their seeds again, checking that they
-match, and materialize expands them into COO tensors.
-
-    pixi run -e fitting python -m scripts.fitting.generate_physical_data \\
-        DIR [--stage S] [--programs N] [--samples N] [--keep N] [--chunk K] \\
-        [--variants N] [--lg-max-space N] [--lg-max-dim N] [--size-bias D] \\
-        [--density-bias D] [--seed S]
+chunk, so jobs of different chunks can share DIR. No tensors are stored:
+record_inputs draws the blocks of the inputs from their seeds again, checking
+that they match, and materialize expands them into COO tensors.
 """
 
 import argparse
@@ -91,6 +67,24 @@ from scripts.fitting.physical_bases import (
 
 # The most fields of an input, which bounds the variants of the format stage.
 MAX_RANK = 3
+# log2 of the most entries all the fields of a program may address, and of the
+# most values of any one field.
+LG_MAX_SPACE = 30
+LG_MAX_DIM = 15
+# The draws of the seeds of the inputs of each program, of which KEEP of its
+# stage are kept as examples. In the protocol and format stages, the variants
+# of the examples of a program compile to the same kernels, so they are
+# compiled once for them all, and more are kept. The other stages choose
+# protocols from the stats of each example, so their kernels can differ, and
+# one is kept, for more programs instead.
+SAMPLES = 1000
+KEEP = {"protocol": 10, "format": 10, "transpose": 1, "loop": 1}
+# The most variants of a program, where a stage has too many to time: the
+# format stage has up to 6561, and the loop stage up to 720 loop orders.
+VARIANTS = {"format": 64, "loop": 16}
+# Each dimension is split into digits of BLOCK_BITS bits, and the block of each
+# digit is drawn by R-MAT.
+BLOCK_BITS = 4
 
 
 def choose(rng, options):
@@ -101,19 +95,7 @@ def shuffled(rng, items):
     return tuple(items[p] for p in rng.permutation(len(items)))
 
 
-def seed(skew, sparsity):
-    S = np.ones(())
-    for s in skew:
-        S = np.multiply.outer(S, [0.5 - s / 2, 0.5 + s / 2])
-    return S * sparsity
-
-
-# Each dimension is split into digits of BLOCK_BITS bits, and the block of each
-# digit is drawn by R-MAT.
-BLOCK_BITS = 4
-
-
-def block_seeds(S, lg_shape, block_bits) -> list[np.ndarray]:
+def block_seeds(S, lg_shape) -> list[np.ndarray]:
     """
     The seed of each block of a tensor of shape 2 ** lg_shape, with the skew of
     the seed S and a share of its log density for each bit of the block, so
@@ -123,7 +105,7 @@ def block_seeds(S, lg_shape, block_bits) -> list[np.ndarray]:
     lg_size = sum(lg_shape)
     return [
         S / density * density ** (math.log2(math.prod(shape)) / lg_size)
-        for shape in block_shapes(lg_shape, block_bits)
+        for shape in block_shapes(lg_shape, BLOCK_BITS)
     ]
 
 
@@ -131,9 +113,9 @@ def input_record(S, lg_shape, rng) -> dict[str, Any]:
     """
     The seeds of an input of shape 2 ** lg_shape with the seed S, and the
     version of numpy which draws its blocks from them and their checksum, which
-    kronecker_input checks when it draws them again.
+    record_inputs checks when it draws them again.
     """
-    seeds = block_seeds(S, lg_shape, BLOCK_BITS)
+    seeds = block_seeds(S, lg_shape)
     rng_seed = int(rng.integers(2**63))
     tensor = kronecker_rmat(
         lg_shape, seeds, np.random.default_rng(rng_seed), BLOCK_BITS
@@ -147,29 +129,27 @@ def input_record(S, lg_shape, rng) -> dict[str, Any]:
     }
 
 
-def program(rng, lg_max_space, lg_max_dim, size_bias):
+def program(rng):
     """
     A random subprogram of C_ilmq += A_jlpq * B_kmpq, and its loop order, which
     is the order its inputs store their fields in. C has no fields of its own,
     since nothing would give them extents. The log sizes of its fields add up
-    to skewed_fractions of the most they may, under lg_max_space and
-    lg_max_dim. A program whose A or B has more than MAX_RANK fields is drawn
+    to skewed_fractions of the most they may, under LG_MAX_SPACE and
+    LG_MAX_DIM. A program whose A or B has more than MAX_RANK fields is drawn
     again.
     """
     while True:
         idxs = [idx for idx in "jklmpq" if rng.random() < 0.5]
         if all(len(set(idxs) & set(tns)) <= MAX_RANK for tns in ("jlpq", "kmpq")):
             break
-    lg_space = round(
-        skewed_fractions(rng, size_bias) * min(lg_max_space, lg_max_dim * len(idxs))
-    )
+    lg_space = round(skewed_fractions(rng) * min(LG_MAX_SPACE, LG_MAX_DIM * len(idxs)))
     # Each field has a bit, and the rest are dealt to the fields with room by
     # weights of a Dirichlet draw, so the fields of a program vary in size.
     lg_dims = dict.fromkeys(idxs, 1)
     if idxs:
         weights = rng.dirichlet(np.ones(len(idxs)))
         for _ in range(lg_space - len(idxs)):
-            room = weights * [lg_dims[idx] < lg_max_dim for idx in idxs]
+            room = weights * [lg_dims[idx] < LG_MAX_DIM for idx in idxs]
             lg_dims[idxs[rng.choice(len(idxs), p=room / room.sum())]] += 1
     order = shuffled(rng, idxs)
     # The inputs store their fields in loop order, since the loop orderer
@@ -201,29 +181,28 @@ def program(rng, lg_max_space, lg_max_dim, size_bias):
         HardAlias("A"): A_idxs,
         HardAlias("B"): B_idxs,
     }
-    output_fields = {
-        HardAlias("C"): C_idxs,
-    }
     loop_order = tuple(Field(idx) for idx in order)
-    return prgm, input_fields, output_fields, lg_dims, loop_order
+    return prgm, input_fields, lg_dims, loop_order
 
 
-def skewed_fractions(rng, bias, size=None):
+def skewed_fractions(rng, size=None):
     """
-    Fractions in [0, 1] distributed as the largest of bias uniform draws, so
-    a bias of 1 is uniform and a larger bias skews toward 1.
+    Fractions in [0, 1] distributed as the largest of three uniform draws,
+    which skews toward 1: toward larger programs and denser inputs.
     """
-    return rng.random(size) ** (1 / bias)
+    return rng.random(size) ** (1 / 3)
 
 
-def choose_seed(rng, idxs, lg_dims, density_bias):
-    skews = [rng.choice([-1, 1]) * rng.random() for _ in idxs]
+def choose_seed(rng, idxs, lg_dims):
+    S = np.ones(())
+    for _ in idxs:
+        s = rng.choice([-1, 1]) * rng.random()
+        S = np.multiply.outer(S, [0.5 - s / 2, 0.5 + s / 2])
     lg_size = sum(lg_dims[idx.name] for idx in idxs)
-    sparsity = 2 ** -((1 - skewed_fractions(rng, density_bias)) * lg_size)
-    return seed(skews, sparsity)
+    return S * 2 ** -((1 - skewed_fractions(rng)) * lg_size)
 
 
-def seed_lg_densities(prgm, input_fields, output_fields, lg_dims, seeds):
+def seed_lg_densities(prgm, input_fields, lg_dims, seeds):
     """
     The log nonzeros of the inputs whose blocks block_seeds splits from seeds,
     and the log expected products of the output of prgm, each as a fraction of
@@ -231,7 +210,8 @@ def seed_lg_densities(prgm, input_fields, output_fields, lg_dims, seeds):
     product over levels of the sum of prgm run on the seeds of the level, which
     are the same at levels where the same fields have bits left.
     """
-    fields = {**input_fields, **output_fields}
+    query, _ = prgm.bodies
+    fields = {**input_fields, C: query.lhs.idxs}
     lg_size = {
         tns: sum(lg_dims[idx.name] for idx in idxs) for tns, idxs in fields.items()
     }
@@ -258,14 +238,14 @@ def seed_lg_densities(prgm, input_fields, output_fields, lg_dims, seeds):
     ]
 
 
-def spread(rng, points, n, density_bias):
+def spread(rng, points, n):
     """
     The indices of n of points, each the nearest to a draw from the unit cube
     which no earlier draw took, whose coordinates are skewed_fractions.
     """
     points = np.asarray(points)
     chosen: list[int] = []
-    for target in skewed_fractions(rng, density_bias, (n, points.shape[1])):
+    for target in skewed_fractions(rng, (n, points.shape[1])):
         distance = np.linalg.norm(points - target, axis=1)
         distance[chosen] = np.inf
         chosen.append(int(np.argmin(distance)))
@@ -273,7 +253,6 @@ def spread(rng, points, n, density_bias):
 
 
 def output_kinds(query: Query, loop_order: tuple[Field, ...]) -> list[list[str]]:
-    """The kinds each level of C can take under loop_order, which writes it."""
     plan = fused_plan(query, loop_order)
     return [
         [opt.kind for opt in allowed_options(C, depth, plan, LEVEL_OPTIONS)]
@@ -282,10 +261,6 @@ def output_kinds(query: Query, loop_order: tuple[Field, ...]) -> list[list[str]]
 
 
 def read_kinds(idxs, loop_order) -> list[list[tuple[str, str]]]:
-    """
-    The kinds and protocols each level of an input of idxs can take under
-    loop_order, as pairs of their names.
-    """
     return [
         [
             (option.kind, str(proto))
@@ -387,10 +362,6 @@ def variant_space(
 
 
 def variants(stage, query, input_fields, loop_order, rng, limit) -> tuple[list, bool]:
-    """
-    The variants of the decision of stage for query under loop_order, and
-    whether they are all of them, or limit drawn without replacement.
-    """
     spaces, make = variant_space(stage, query, input_fields, loop_order, rng)
     total = math.prod(map(len, spaces))
     exhaustive = limit is None or total <= limit
@@ -409,38 +380,20 @@ def variants(stage, query, input_fields, loop_order, rng, limit) -> tuple[list, 
     return result, exhaustive
 
 
-def program_inputs(
-    rng,
-    stage,
-    lg_max_space,
-    lg_max_dim,
-    samples,
-    keep,
-    limit,
-    density_bias,
-    size_bias,
-):
+def program_inputs(rng, stage):
     """
     The records of the examples of a drawn program, each with its query, its
-    loop order, its variants, and the seeds of its inputs, which are keep of
-    samples draws, spread over the log densities of A and B and the log
-    expected products of C, skewed toward denser inputs by density_bias. The
-    program is skewed toward larger fields by size_bias.
+    loop order, its variants, and the seeds of its inputs, which are KEEP of
+    SAMPLES draws, spread over the log densities of A and B and the log
+    expected products of C.
     """
-    prgm, input_fields, output_fields, lg_dims, loop_order = program(
-        rng, lg_max_space, lg_max_dim, size_bias
-    )
+    prgm, input_fields, lg_dims, loop_order = program(rng)
     dtype = choose(rng, ["float32", "float64"])
     seeds = [
-        {
-            tns: choose_seed(rng, idxs, lg_dims, density_bias)
-            for tns, idxs in input_fields.items()
-        }
-        for _ in range(samples)
+        {tns: choose_seed(rng, idxs, lg_dims) for tns, idxs in input_fields.items()}
+        for _ in range(SAMPLES)
     ]
-    points = [
-        seed_lg_densities(prgm, input_fields, output_fields, lg_dims, S) for S in seeds
-    ]
+    points = [seed_lg_densities(prgm, input_fields, lg_dims, S) for S in seeds]
     query, _ = prgm.bodies
     assert isinstance(query, Query)
     if stage == "transpose":
@@ -448,7 +401,9 @@ def program_inputs(
         # the copy in every order.
         query = Query(Table(C, input_fields[A]), Table(A, input_fields[A]))
         loop_order = input_fields[A]
-    options, exhaustive = variants(stage, query, input_fields, loop_order, rng, limit)
+    options, exhaustive = variants(
+        stage, query, input_fields, loop_order, rng, VARIANTS.get(stage)
+    )
     record = {
         "stage": stage,
         "query": str(Plan((query, Produces((C,))))),
@@ -469,46 +424,15 @@ def program_inputs(
                 for tns, idxs in input_fields.items()
             },
         }
-        for i in spread(rng, points, keep, density_bias)
+        for i in spread(rng, points, KEEP[stage])
     ]
 
 
-def coo(shape, coords, values: np.ndarray, idx_type) -> FiberTensor:
-    """
-    A Finch COO tensor of shape with values at coords, indexed by idx_type,
-    with positions of intp, which counts the nonzeros of any tensor.
-    """
-    fmt = element(values.dtype.type(0), ftype(values.dtype), ftype(np.intp))
-    if not shape:
-        return FiberTensor(ElementLevel(fmt, NumpyBuffer(values)))
-    ptr = NumpyBuffer(np.array([0, values.size], dtype=np.intp))
-    return FiberTensor(
-        SparseCOOLevel(
-            ElementLevel(fmt, NumpyBuffer(values)),
-            tuple(idx_type(n) for n in shape),
-            ptr,
-            tuple(NumpyBuffer(idx.astype(idx_type)) for idx in coords),
-        )
-    )
-
-
 def path(directory: Path, example, kind) -> Path:
-    """The file of a kind, such as program.json, of an example in directory."""
     return directory / "data" / f"{example}.{kind}"
 
 
-def write_json(file: Path, data) -> None:
-    # A job killed while writing leaves the file as it was, rather than cut off.
-    partial = file.with_name(f"{file.name}.partial")
-    partial.write_text(json.dumps(data))
-    partial.replace(file)
-
-
 def examples(directory: Path, chunk=None, kind="program.json") -> list[str]:
-    """
-    The names of the examples in directory, or of those of one chunk, which
-    have a file of kind.
-    """
     prefix = "*" if chunk is None else f"{chunk:04d}-*"
     return sorted(
         file.name.removesuffix(f".{kind}")
@@ -516,86 +440,57 @@ def examples(directory: Path, chunk=None, kind="program.json") -> list[str]:
     )
 
 
-def kronecker_input(record: dict[str, Any], tns: Alias) -> KroneckerTensor:
-    """
-    The input tns of the example of record, its blocks drawn from their seeds,
-    which must match the checksum of the blocks generate drew.
-    """
-    spec = record["inputs"][tns.name]
-    tensor = kronecker_rmat(
-        spec["lg_shape"],
-        [np.asarray(S) for S in spec["rmat_seeds"]],
-        np.random.default_rng(spec["rng_seed"]),
-        record["block_bits"],
-        np.dtype(record["dtype"]).type,
-        np.dtype(record["idx_type"]).type,
-    )
-    if tensor.checksum() != spec["checksum"]:
-        raise ValueError(
-            f"The blocks of {tns.name} drawn with numpy {np.__version__} differ "
-            f"from those generate drew with numpy {spec['numpy']}"
+def record_inputs(record: dict[str, Any]) -> dict[Alias, KroneckerTensor]:
+    inputs = {}
+    for tns in INPUTS:
+        spec = record["inputs"][tns.name]
+        tensor = kronecker_rmat(
+            spec["lg_shape"],
+            [np.asarray(S) for S in spec["rmat_seeds"]],
+            np.random.default_rng(spec["rng_seed"]),
+            record["block_bits"],
+            np.dtype(record["dtype"]).type,
+            np.dtype(record["idx_type"]).type,
         )
-    return tensor
+        if tensor.checksum() != spec["checksum"]:
+            raise ValueError(
+                f"The blocks of {tns.name} drawn with numpy {np.__version__} differ "
+                f"from those generate drew with numpy {spec['numpy']}"
+            )
+        inputs[tns] = tensor
+    return inputs
 
 
 def materialize(tensor: KroneckerTensor) -> FiberTensor:
-    """A COO tensor of the support of tensor."""
     # Values are in (0, 1], so neither a sum nor a product of them is zero.
     values = 1 - np.random.default_rng(0).random(tensor.nnz)
-    return coo(
-        tensor.shape, tensor.coords(), values.astype(tensor.dtype), tensor.idx_type
+    values = values.astype(tensor.dtype)
+    # Positions are intp, which counts the nonzeros of any tensor.
+    fmt = element(values.dtype.type(0), ftype(values.dtype), ftype(np.intp))
+    if not tensor.shape:
+        return FiberTensor(ElementLevel(fmt, NumpyBuffer(values)))
+    ptr = NumpyBuffer(np.array([0, values.size], dtype=np.intp))
+    return FiberTensor(
+        SparseCOOLevel(
+            ElementLevel(fmt, NumpyBuffer(values)),
+            tuple(tensor.idx_type(n) for n in tensor.shape),
+            ptr,
+            tuple(NumpyBuffer(idx.astype(tensor.idx_type)) for idx in tensor.coords()),
+        )
     )
 
 
-def load(
-    directory: Path, example
-) -> tuple[dict[str, Any], dict[Alias, KroneckerTensor]]:
-    """The record of an example which generate wrote, and its inputs."""
-    record = json.loads(path(directory, example, "program.json").read_text())
-    return record, record_inputs(record)
-
-
-def record_inputs(record: dict[str, Any]) -> dict[Alias, KroneckerTensor]:
-    """The inputs of the example of record, drawn from their seeds."""
-    return {tns: kronecker_input(record, tns) for tns in INPUTS}
-
-
-def write_example(directory: Path, name, record) -> None:
-    path(directory, name, "program.json").write_text(json.dumps(record, indent=2))
-
-
-def generate(
-    directory: Path,
-    stage,
-    programs,
-    chunk,
-    lg_max_space,
-    lg_max_dim,
-    samples,
-    keep,
-    limit,
-    density_bias,
-    size_bias,
-    rng,
-) -> None:
+def generate(directory: Path, stage, programs, chunk, rng) -> None:
     (directory / "data").mkdir(parents=True, exist_ok=True)
     example = 0
     for i in range(programs):
         start = time.perf_counter()
-        records = program_inputs(
-            rng,
-            stage,
-            lg_max_space,
-            lg_max_dim,
-            samples,
-            keep,
-            limit,
-            density_bias,
-            size_bias,
-        )
+        records = program_inputs(rng, stage)
         for record in records:
             name = f"{chunk:04d}-{example:05d}"
-            write_example(directory, name, record)
+            path(directory, name, "program.json").write_text(
+                json.dumps(record, indent=2)
+            )
             example += 1
         record = records[0]
         drawn = "all" if record["exhaustive"] else f"{len(record['variants'])} of"
@@ -616,74 +511,13 @@ def main() -> None:
     )
     parser.add_argument("--programs", type=int, default=512)
     parser.add_argument(
-        "--samples",
-        type=int,
-        default=1000,
-        help="the draws of the seeds of the inputs of each program",
-    )
-    parser.add_argument(
-        "--keep",
-        type=int,
-        help="the draws of the inputs of each program which are kept as examples; "
-        "10 in the protocol and format stages and 1 in the others by default",
-    )
-    parser.add_argument(
         "--chunk", type=int, default=0, help="the chunk which names the examples"
-    )
-    parser.add_argument(
-        "--variants",
-        type=int,
-        help="the most variants of a program; all of them by default, except 64 "
-        "in the format stage and 16 in the loop stage",
-    )
-    parser.add_argument(
-        "--lg-max-space",
-        type=int,
-        default=30,
-        help="log2 of the most entries all the fields of a program may address",
-    )
-    parser.add_argument(
-        "--lg-max-dim",
-        type=int,
-        default=15,
-        help="log2 of the most values of any one field",
-    )
-    parser.add_argument(
-        "--density-bias",
-        type=float,
-        default=3.0,
-        help="the uniform draws whose largest is the log density of an input",
-    )
-    parser.add_argument(
-        "--size-bias",
-        type=float,
-        default=3.0,
-        help="the uniform draws whose largest is the log size of a program",
     )
     parser.add_argument("--seed", type=int)
     args = parser.parse_args()
-    if args.keep is None:
-        args.keep = 10 if args.stage in ("protocol", "format") else 1
-    if args.variants is None:
-        args.variants = {"format": 64, "loop": 16}.get(args.stage)
-    if args.keep > args.samples:
-        parser.error("--keep may be at most --samples")
     # Chunks drawn with one seed still draw different programs.
     rng = np.random.default_rng(None if args.seed is None else (args.seed, args.chunk))
-    generate(
-        args.directory,
-        args.stage,
-        args.programs,
-        args.chunk,
-        args.lg_max_space,
-        args.lg_max_dim,
-        args.samples,
-        args.keep,
-        args.variants,
-        args.density_bias,
-        args.size_bias,
-        rng,
-    )
+    generate(args.directory, args.stage, args.programs, args.chunk, rng)
 
 
 if __name__ == "__main__":

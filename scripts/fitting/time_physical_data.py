@@ -8,12 +8,11 @@ after they are materialized as COO from their blocks and copied into their
 formats. The variants of the examples of a program compile to the same
 kernels, which are compiled once and kept for as long as this runs. The
 runtime of each variant is written to DIR/data as JSON after it is measured,
-by its index. With --hours H, no variant is timed after H hours, so a job
-measures for about as long as it is given, whatever its programs cost.
+by its index, and the variants already timed are skipped. With --hours H, no
+variant is timed after H hours, so a job measures for about as long as it is
+given, whatever its programs cost.
 
-    pixi run -e fitting python -m scripts.fitting.time_physical_data \\
-        DIR [--model NAME=PATH]... [--chunk K] [--repeat N] [--resume] \\
-        [--hours H]
+    pixi run -e fitting python -m scripts.fitting.time_physical_data DIR [options]
 """
 
 import argparse
@@ -35,17 +34,14 @@ from finch.compile_jl.compiler import FinchJLCompiler
 from finch.finch_logic import Alias, Field, HardAlias, Plan, Produces, Query, Table
 from scripts.fitting.generate_physical_data import (
     examples,
-    load,
     materialize,
     path,
-    write_json,
+    record_inputs,
 )
 from scripts.fitting.physical_bases import input_perms, parse_models, resolve
 
 
 class FixedFormatter(CostFormatter):
-    """A formatter which gives each alias the level options of formats."""
-
     def __init__(self, loader, formats: Mapping[Alias, list[LevelOption]]):
         super().__init__(loader)
         self.formats = formats
@@ -62,10 +58,6 @@ def julia_loader():
 
 
 def reformat(tns: Tensor, options: list[LevelOption], perm=()) -> Tensor:
-    """
-    A copy of tns with the level options, made by Finch.jl, storing the fields
-    of tns in the order of perm, if given.
-    """
     src, dst = HardAlias("src"), HardAlias("dst")
     idxs = tuple(Field(f"i{n}") for n in range(tns.ndim))
     stored = tuple(idxs[p] for p in perm) if perm else idxs
@@ -78,23 +70,29 @@ def reformat(tns: Tensor, options: list[LevelOption], perm=()) -> Tensor:
 
 class Reformatter:
     """
-    Copies tensors into formats and field orders with copy, keeping the last
-    copy of each tensor: the variants of an example mostly keep the format of
-    each input from one to the next, and every copy of a large input takes
-    its memory.
+    Copies tensors into formats and field orders with reformat, keeping the
+    last copy of each tensor: the variants of an example mostly keep the
+    format of each input from one to the next, and every copy of a large
+    input takes its memory.
     """
 
-    def __init__(self, copy=reformat):
-        self.copy = copy
+    def __init__(self):
         self.copies: dict[int, tuple[tuple, Tensor]] = {}
 
     def __call__(self, tns: Tensor, options: list[LevelOption], perm=()) -> Tensor:
         key = (tuple(option.kind for option in options), tuple(perm))
         cached = self.copies.get(id(tns))
         if cached is None or cached[0] != key:
-            cached = (key, self.copy(tns, options, perm))
+            cached = (key, reformat(tns, options, perm))
             self.copies[id(tns)] = cached
         return cached[1]
+
+
+def write_json(file: Path, data) -> None:
+    # A job killed while writing leaves the file as it was, rather than cut off.
+    partial = file.with_name(f"{file.name}.partial")
+    partial.write_text(json.dumps(data))
+    partial.replace(file)
 
 
 class Timer:
@@ -110,7 +108,6 @@ class Timer:
         self.executors: dict[str, LogicExecutor] = {}
 
     def measure(self, plan, formats, bindings) -> float:
-        """The fastest of the runs of plan."""
         kinds = {tns.name: [opt.kind for opt in opts] for tns, opts in formats.items()}
         key = json.dumps([str(plan), kinds], sort_keys=True)
         if key not in self.executors:
@@ -126,21 +123,20 @@ class Timer:
         )
         return min(runs)
 
-    def time_example(
-        self, directory: Path, example, resume, deadline=math.inf
-    ) -> dict[str, float]:
+    def time_example(self, directory: Path, example, deadline) -> dict[str, float]:
         """
-        Time each variant of example which hasn't been timed, if resuming, and
-        write their runtimes to its timing.json after each, until the time of
+        Time each variant of example which hasn't been timed, and write their
+        runtimes to its timing.json after each, until the time of
         time.monotonic passes deadline.
         """
-        record, inputs = load(directory, example)
+        record = json.loads(path(directory, example, "program.json").read_text())
         timing_path = path(directory, example, "timing.json")
         runtimes: dict[str, float] = {}
-        if resume and timing_path.exists():
+        if timing_path.exists():
             runtimes = json.loads(timing_path.read_text())["runtimes"]
         if len(runtimes) == len(record["variants"]):
             return runtimes
+        inputs = record_inputs(record)
         materialized = {tns: materialize(tensor) for tns, tensor in inputs.items()}
         reformatter = Reformatter()
         for index, variant in enumerate(record["variants"]):
@@ -161,12 +157,12 @@ class Timer:
         return runtimes
 
 
-def time_programs(directory: Path, models, chunk, repeat, resume, hours) -> None:
+def time_programs(directory: Path, models, chunk, repeat, hours) -> None:
     timer = Timer(models, repeat)
     names = examples(directory, chunk)
     deadline = time.monotonic() + 3600 * hours
     for i, example in enumerate(names, 1):
-        runtimes = timer.time_example(directory, example, resume, deadline)
+        runtimes = timer.time_example(directory, example, deadline)
         if runtimes:
             print(
                 f"[{i}/{len(names)}] {example}: {len(runtimes)} variants, "
@@ -192,9 +188,6 @@ def main() -> None:
     parser.add_argument("--chunk", type=int, help="the only chunk to time")
     parser.add_argument("--repeat", type=int, default=5)
     parser.add_argument(
-        "--resume", action="store_true", help="skip the variants already timed"
-    )
-    parser.add_argument(
         "--hours",
         type=float,
         default=math.inf,
@@ -202,12 +195,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     time_programs(
-        args.directory,
-        parse_models(args.model),
-        args.chunk,
-        args.repeat,
-        args.resume,
-        args.hours,
+        args.directory, parse_models(args.model), args.chunk, args.repeat, args.hours
     )
 
 

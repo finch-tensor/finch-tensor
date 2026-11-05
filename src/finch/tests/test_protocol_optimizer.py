@@ -1,5 +1,3 @@
-from dataclasses import replace
-
 import numpy as np
 
 import finch as fl
@@ -16,9 +14,9 @@ from finch.autoschedule import (
 from finch.autoschedule.cost_models import (
     PROTOCOL_BASIS,
     PROTOCOL_COST_MODEL,
+    CostModel,
     DenseLevelOption,
     LevelOption,
-    LinearCostModel,
     Prefix,
     ProtocolBasis,
     ProtocolChoice,
@@ -119,7 +117,12 @@ def test_level_reads_reach_each_level_at_its_loop():
 
     def reads(loops):
         return [
-            (read.alias, read.depth, read.field, read.kind)
+            (
+                read.alias,
+                read.depth,
+                read.fields[-1],
+                f"{read.option.kind}.{read.protocol}",
+            )
             for read in level_reads(Prefix(loops, expr, (i,)), formats)
         ]
 
@@ -223,7 +226,7 @@ def test_protocol_basis_counts_writes_apart_from_their_locations():
     basis = ProtocolBasis()
     names = basis.feature_names
 
-    def writes(loop_order, parents=None):
+    def writes(loop_order):
         plan = Plan((fuse_loop_order(query, loop_order), Produces((c,))))
         machine = StatsMachine(sf, dict(stats))
         accesses = []
@@ -233,7 +236,7 @@ def test_protocol_basis_counts_writes_apart_from_their_locations():
                     accesses.append(component)
         # c has one level, written at one loop.
         (access,) = accesses
-        row = basis.get_component_features(replace(access, parents=parents), machine)
+        row = basis.get_component_features(access, machine)
         return [
             row[0, names.index(f"sparse_hash.{name}")]
             for name in (
@@ -248,11 +251,9 @@ def test_protocol_basis_counts_writes_apart_from_their_locations():
     # Looping over j outside, c is reached at the loop over i, which runs in
     # the 3 rows of x, and laminated at each of the 5 entries of x, to 3
     # distinct entries. Looping over i outside, it is extruded once per row.
-    # The level is the root of c, so it is one fiber, and the fibers it is
-    # entered as are a feature of their own, which changes nothing else.
+    # The level is the root of c, so it is one fiber.
     assert writes((j, i)) == [3, 1, 0, 5, 3]
     assert writes((i, j)) == [1, 1, 3, 0, 3]
-    assert writes((j, i), parents=2.0) == [3, 2, 0, 5, 3]
 
 
 def test_optimize_protocols_chooses_the_cheaper_read():
@@ -376,7 +377,7 @@ def test_optimize_protocols_prices_a_follow_by_its_lookups():
 
     def model(lookup):
         weights = {"follow_visits": lookup, "walk_visits": 1.0, "gallop_visits": 4.0}
-        return LinearCostModel(
+        return CostModel(
             PROTOCOL_BASIS,
             [
                 weights.get(name.partition(".")[2], 0.0)
