@@ -177,7 +177,9 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
 
     def block(protocol, executions, iterations, visits, parents, distinct):
         values = (executions, iterations, visits, parents, distinct)
-        return dict(zip((f"sparse_list.{protocol}.{n}" for n in FEATURES), values))
+        return dict(
+            zip((f"sparse_list.{protocol}.{n}" for n in FEATURES), values, strict=True)
+        )
 
     # Each list seeks one fiber. Walks step through the 5 entries of each,
     # and the loop runs at the 3 they share. Each has 5 distinct entries,
@@ -237,7 +239,9 @@ def test_protocol_basis_counts_writes_apart_from_their_locations():
 
     def block(protocol, executions, iterations, visits, parents, distinct):
         values = (executions, iterations, visits, parents, distinct)
-        return dict(zip((f"sparse_hash.{protocol}.{n}" for n in FEATURES), values))
+        return dict(
+            zip((f"sparse_hash.{protocol}.{n}" for n in FEATURES), values, strict=True)
+        )
 
     # Looping over j outside, c is reached at the loop over i, which runs in
     # the 3 rows of x, and laminated at each of the 5 entries of x, to 3
