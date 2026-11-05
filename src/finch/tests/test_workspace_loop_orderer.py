@@ -1,6 +1,7 @@
 import pytest
 
 import numpy as np
+import scipy.sparse as sps
 
 import finch as fl
 from finch import ffuncs
@@ -9,11 +10,7 @@ from finch.autoschedule import CompilerFormLowerer, NotationGenerator
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.cost_models import Prefix, WriteBasis
 from finch.autoschedule.formatter.smart_formatter import WorkspaceCostFormatter
-from finch.autoschedule.loop_orderer import (
-    BFSLoopOrderer,
-    CostedWorkspaceLoopOrderer,
-    WorkspaceLoopOrderer,
-)
+from finch.autoschedule.loop_orderer import BFSLoopOrderer, WorkspaceLoopOrderer
 from finch.autoschedule.loop_orderer.loop_order_workspace import (
     add_workspace,
     workspace_depth,
@@ -67,18 +64,6 @@ def _matmul(c, a, b, loop_order=()):
     )
     query = fuse_loop_order(Query(Table(c, (i, k)), rhs), loop_order)
     return Plan((query, Produces((c,)))), rhs
-
-
-def _sparse_matmul(n, per_row, seed=0):
-    # Two n by n matrices with per_row entries in each row, in random columns.
-    rng = np.random.default_rng(seed)
-    data = []
-    for _ in range(2):
-        mat = np.zeros((n, n))
-        for row in range(n):
-            mat[row, rng.choice(n, per_row, replace=False)] = rng.random(per_row)
-        data.append(mat)
-    return data
 
 
 def test_workspace_depth_counts_the_fields_written_in_order():
@@ -138,19 +123,26 @@ def test_add_workspace_copies_each_slice_after_its_query():
     )
 
 
-def _csr(mat):
-    # A dense root over sorted lists of the non-zeros of each row.
-    rows, cols = np.nonzero(mat)
-    ptr = np.zeros(mat.shape[0] + 1, dtype=np.intp)
-    np.add.at(ptr, rows + 1, 1)
+def _random_csr(n, per_row, seed):
+    """
+    An n by n matrix with per_row entries in random columns of each row, as a
+    dense root over sorted lists, and as SciPy CSR.
+    """
+    rng = np.random.default_rng(seed)
+    cols = np.concatenate(
+        [np.sort(rng.choice(n, per_row, replace=False)) for _ in range(n)]
+    )
+    vals = rng.random(n * per_row)
+    ptr = np.arange(0, n * per_row + 1, per_row, dtype=np.intp)
     fmt = element(np.float64(0), ftype(np.float64), ftype(np.intp))
     lvl = SparseListLevel(
-        ElementLevel(fmt, NumpyBuffer(mat[rows, cols])),
-        np.intp(mat.shape[1]),
-        NumpyBuffer(np.cumsum(ptr)),
+        ElementLevel(fmt, NumpyBuffer(vals)),
+        np.intp(n),
+        NumpyBuffer(ptr),
         NumpyBuffer(cols.astype(np.intp)),
     )
-    return FiberTensor(DenseLevel(lvl, np.intp(mat.shape[0])))
+    tensor = FiberTensor(DenseLevel(lvl, np.intp(n)))
+    return tensor, sps.csr_array((vals, cols, ptr), shape=(n, n))
 
 
 def _order(orderer_cls, tensor_a, tensor_b):
@@ -172,10 +164,12 @@ def _order(orderer_cls, tensor_a, tensor_b):
 def test_workspace_loop_orderer_accumulates_rows_in_a_workspace():
     i, j, k = Field("i"), Field("j"), Field("k")
     c = HardAlias("c")
-    # Sparse inputs only write their products into the workspace, so that the
-    # output is sparse enough for its rows not to be dense.
-    data_a, data_b = _sparse_matmul(256, 3)
-    tensor_a, tensor_b = _csr(data_a), _csr(data_b)
+    # The output is sparse enough that a workspace for each row costs less
+    # than storing the output densely.
+    (tensor_a, csr_a), (tensor_b, csr_b) = (
+        _random_csr(10_000, 4, 0),
+        _random_csr(10_000, 4, 1),
+    )
 
     # The search scatters into the columns of c, for each of its rows.
     capture = _order(BFSLoopOrderer, tensor_a, tensor_b)
@@ -221,48 +215,36 @@ def test_workspace_loop_orderer_accumulates_rows_in_a_workspace():
         NumbaCompiler(), ctx_transforms=(LowerPackedStructSlots(), AssemblySimplify())
     )
     (result,) = compiler(program).main(*bindings)
-    np.testing.assert_allclose(result.to_scipy().toarray(), data_a @ data_b)
+    assert abs(result.to_scipy() - csr_a @ csr_b).max() < 1e-12
 
 
-@pytest.mark.parametrize(
-    ("loop_order", "limit", "staged"),
-    [
-        # A slice of a workspace fused over i has the 4 entries of a row.
-        (("i", "j", "k"), 4, True),
-        (("i", "j", "k"), 3, False),
-        # The loops scatter into i, so a workspace would store all of c.
-        (("k", "i", "j"), 16, False),
-    ],
-)
-def test_workspace_loop_orderer_adds_small_workspaces_with_fewer_fields(
-    loop_order, limit, staged
-):
-    i, j = Field("i"), Field("j")
+def test_workspace_loop_orderer_needs_a_field_written_in_order():
+    i, j, k = Field("i"), Field("j"), Field("k")
     a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
     sf = DCStatsFactory()
     stats: dict[Alias, TensorStats] = {
         a: sf(fl.asarray(np.ones((4, 4))), (i, j)),
-        b: sf(fl.asarray(np.ones((4, 4))), (j, Field("k"))),
+        b: sf(fl.asarray(np.ones((4, 4))), (j, k)),
     }
-    plan, _ = _matmul(c, a, b, tuple(map(Field, loop_order)))
-    orderer = WorkspaceLoopOrderer(workspace_limit=limit)
-    prgm = orderer.add_workspaces(plan, {}, stats, sf)
-    fused = []
-    for node in PostOrderDFS(prgm):
-        match node:
-            case FusedAlias():
-                fused.append(node)
-    assert bool(fused) == staged
+    # The loops scatter into i, so a workspace would store all of c.
+    plan, _ = _matmul(c, a, b, (k, i, j))
+    assert WorkspaceLoopOrderer().add_workspaces(plan, {}, stats, sf) == plan
 
 
-@pytest.mark.parametrize(("per_row", "staged"), [(3, True), (16, False)])
-def test_costed_workspace_loop_orderer_keeps_workspaces_which_cost_less(
-    per_row, staged
-):
-    # A sparse product is accumulated row by row in a workspace, but one which
-    # fills most of its output costs less written into a dense output.
-    data_a, data_b = _sparse_matmul(256, per_row)
-    capture = _order(CostedWorkspaceLoopOrderer, _csr(data_a), _csr(data_b))
+@pytest.mark.parametrize(
+    ("n", "per_row", "staged"),
+    [
+        (10_000, 4, True),
+        # A product which fills most of its output costs less stored densely.
+        (256, 16, False),
+    ],
+)
+def test_workspace_loop_orderer_keeps_workspaces_which_cost_less(n, per_row, staged):
+    (tensor_a, _), (tensor_b, _) = (
+        _random_csr(n, per_row, 0),
+        _random_csr(n, per_row, 1),
+    )
+    capture = _order(WorkspaceLoopOrderer, tensor_a, tensor_b)
     fused = []
     for node in PostOrderDFS(capture.last_prgm):
         match node:

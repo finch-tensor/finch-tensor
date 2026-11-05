@@ -45,10 +45,8 @@ from .normalize import LogicNormalizer, normalize_names
 from .protocolizer import (
     CostProtocolizer,
     LogicProtocolizer,
-    SmartProtocolizer,
     optimize_protocols,
     protocolize,
-    smart_protocolize,
 )
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 
@@ -94,7 +92,6 @@ __all__ = [
     "Relabel",
     "Reorder",
     "SmartFormatter",
-    "SmartProtocolizer",
     "Table",
     "Value",
     "get_default_scheduler",
@@ -102,6 +99,5 @@ __all__ = [
     "optimize_protocols",
     "protocolize",
     "set_default_scheduler",
-    "smart_protocolize",
     "with_default_scheduler",
 ]
