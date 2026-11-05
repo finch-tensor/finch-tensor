@@ -76,8 +76,8 @@ INPUTS = (A, B)
 # The formatter and the protocol optimizer price the same basis, so the level
 # stage fits it again, to examples whose formats vary.
 BASES: dict[str, Basis] = {
-    "protocol": Affine(PROTOCOL_BASIS),
-    "level": Affine(PROTOCOL_BASIS),
+    "protocol": PROTOCOL_BASIS,
+    "level": PROTOCOL_BASIS,
     "transpose": Affine(TransposeBasis()),
     "loop": Affine(PigeonBasis()),
 }

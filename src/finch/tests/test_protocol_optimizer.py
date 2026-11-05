@@ -16,7 +16,6 @@ from finch.autoschedule import (
 from finch.autoschedule.cost_models import (
     PROTOCOL_BASIS,
     PROTOCOL_COST_MODEL,
-    Affine,
     DenseLevelOption,
     LevelOption,
     LinearCostModel,
@@ -153,9 +152,11 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
     }
     basis = ProtocolBasis()
     names = basis.feature_names
-    assert names[:2] == ("loop.executions", "loop.iterations")
-    block = [name.removeprefix("sparse_list.") for name in names[12:22]]
+    assert names[:2] == ("dense.positions", "dense.slots")
+    block = [name.removeprefix("sparse_list.") for name in names[28:40]]
     assert block == [
+        "executions",
+        "iterations",
         "seeks",
         "parents",
         "follow_visits",
@@ -171,18 +172,17 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
     def lists(protocols):
         plan = product_plan(x, y, c, i, [(proto,) for proto in protocols])
         machine = StatsMachine(sf, dict(stats))
-        rows = [
-            basis.get_component_features(component, machine)[0]
-            for component in basis.components(plan, formats, machine)
-        ]
-        # The loop over i is entered once, and reads both lists, each an
-        # access which only fills the columns of its kind. c has no format,
-        # so it isn't written.
-        assert len(rows) == 3
-        assert rows[0][0] == 1 and not rows[0][2:].any()
-        total = sum(rows[1:])
-        assert not total[:12].any() and not total[22:].any()
-        return total[12:19].tolist()
+        accesses = []
+        for component in basis.components(plan, formats, machine):
+            match component:
+                case ProtocolChoice():
+                    accesses.append(basis.get_component_features(component, machine)[0])
+        # The loop over i reads both lists, each an access which only fills
+        # the columns of its kind. c has no format, so it isn't written.
+        assert len(accesses) == 2
+        total = sum(accesses)
+        assert not total[:28].any() and not total[40:].any()
+        return total[30:37].tolist()
 
     # Each list seeks one fiber. Walks step through the 5 entries of each,
     # and either would visit the 5 of the other if it were dense. Each has 5
@@ -197,9 +197,10 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
     # x would visit the 5 entries y gallops to.
     assert lists((Walk(), Gallop())) == [2, 2, 0, 5, 5, 10, 10]
     plan = product_plan(x, y, c, i, ((Walk(),), (Follow(),)))
-    rows = Affine(PROTOCOL_BASIS).get_features(plan, formats, stats, sf)
-    assert rows.shape == (3, 43)
-    assert PROTOCOL_COST_MODEL.predict(rows[:, :-1]) > 0
+    # The level of each list, and the reads of them, with the constant.
+    rows = PROTOCOL_BASIS.get_features(plan, formats, stats, sf)
+    assert rows.shape == (4, 65)
+    assert PROTOCOL_COST_MODEL.predict(rows) > 0
 
 
 def test_protocol_basis_counts_writes_apart_from_their_locations():
@@ -356,11 +357,11 @@ def test_optimize_protocols_prices_a_follow_by_its_lookups():
         """The seeks and steps of the lists at the loop over j."""
         plan = product_of_matrices(x, y, c, i, j, protocols)
         machine = StatsMachine(sf, dict(stats))
-        total = sum(
-            basis.get_component_features(component, machine)[0]
-            for component in basis.components(plan, formats, machine)
-            if len(component.prefix.prefix) == 2
-        )
+        total = np.zeros(basis.n_features)
+        for component in basis.components(plan, formats, machine):
+            match component:
+                case ProtocolChoice(prefix=Prefix(prefix=(_, _))):
+                    total += basis.get_component_features(component, machine)[0]
         return [
             total[names.index(f"sparse_list.{name}")]
             for name in ("seeks", "walk_visits")
@@ -377,7 +378,7 @@ def test_optimize_protocols_prices_a_follow_by_its_lookups():
         return LinearCostModel(
             PROTOCOL_BASIS,
             [
-                weights.get(name.split(".")[1], 0.0)
+                weights.get(name.partition(".")[2], 0.0)
                 for name in PROTOCOL_BASIS.feature_names
             ],
         )

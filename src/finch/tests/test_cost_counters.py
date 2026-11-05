@@ -297,12 +297,12 @@ def test_gallops_jump_within_the_smallest_support():
     def jumps(px, py):
         machine = StatsMachine(sf, dict(stats))
         basis = ProtocolBasis()
-        # The loop over i is a component, and reads x and y, each an access.
+        # The levels of x and y, and the reads of them at the loop over i, are
+        # components, of which only the reads fill the gallop column.
         rows = [
             basis.get_component_features(component, machine)[0]
             for component in basis.components(program(px, py), formats, machine)
         ]
-        assert len(rows) == 3
         return sum(rows)[basis.feature_names.index("sparse_list.gallop_visits")]
 
     # Two gallops each jump at most as often as the smaller list has entries,

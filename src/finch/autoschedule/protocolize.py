@@ -15,9 +15,9 @@ from .cost_models import (
     CostModel,
     Prefix,
     ProtocolComponent,
+    level_accesses,
     level_formats,
     level_reads,
-    loop_components,
     read_options,
 )
 from .stages import FormattedForm
@@ -202,7 +202,7 @@ def choose_protocols(
                 prefix = Prefix(loops, expr(rhs_2), lhs_idxs, formats, output=lhs.tns)
                 total = sum(
                     cost_model.predict_component_cost(component, machine)
-                    for component in loop_components(prefix, formats)
+                    for component in level_accesses(prefix, formats)
                 )
                 if total < best[0]:
                     best = (total, rhs_2)

@@ -25,7 +25,9 @@ from finch.autoschedule.cost_models import (
     SparseHashLevelOption,
     SparseListLevelOption,
     allowed_options,
+    level_formats,
     read_protocols,
+    storage_choices,
     write_protocols,
 )
 from finch.autoschedule.protocolize import choose_protocols
@@ -92,13 +94,15 @@ def optimize_formats(
     gives and the fill of fill_types, under which prgm costs least by
     cost_model, with its other tensors formatted as bindings says. Each level
     takes an option which supports the protocols prgm reads and writes it
-    with, as allowed_options lists them. The cost of a format depends on the
-    formats of the other tensors through the loops they share, so the aliases
-    are searched one at a time, by brute force: each in turn takes every
-    format of its levels, and keeps the one under which the program costs
-    least with the protocols chosen for the queries which read or write it,
-    as choose_protocols chooses them, taking the costs of the other queries
-    as they are. The aliases are swept until none changes, or sweeps times.
+    with, as allowed_options lists them. The cost of a format is that of the
+    levels it stores, as storage_choices lists them, and of the queries which
+    read or write the tensor, which depends on the formats of the other
+    tensors through the loops they share, so the aliases are searched one at
+    a time, by brute force: each in turn takes every format of its levels,
+    and keeps the one under which the program costs least with the protocols
+    chosen for the queries which read or write it, as choose_protocols
+    chooses them, taking the costs of the other queries as they are. The
+    aliases are swept until none changes, or sweeps times.
     Each starts with the first option of each level which filters, so that
     its loops run only where it has entries.
     """
@@ -131,12 +135,23 @@ def optimize_formats(
         )
         for alias, levels in allowed.items()
     }
+
+    def storage_cost(alias, fmt):
+        machine = StatsMachine(stats_factory, OrderedDict(stats))
+        options = level_formats({alias: fmt})[alias]
+        return sum(
+            cost_model.predict_component_cost(choice, machine)
+            for choice in storage_choices(alias, options, prgm, machine)
+        )
+
     bindings = {**bindings, **formats}
+    storage = {alias: storage_cost(alias, fmt) for alias, fmt in formats.items()}
     _, costs = choose_protocols(prgm, bindings, stats, stats_factory, cost_model)
     for _ in range(sweeps):
         changed = False
         for alias, levels in allowed.items():
-            best = (sum(costs), bindings[alias], costs)
+            others = sum(storage.values()) - storage[alias]
+            best = (sum(costs) + storage[alias], bindings[alias], costs, storage[alias])
             for kinds in product(*levels):
                 fmt = ftype_of(alias, kinds)
                 if fmt == bindings[alias]:
@@ -150,11 +165,13 @@ def optimize_formats(
                     only={alias},
                     costs=costs,
                 )
-                if sum(costs_2) < best[0]:
-                    best = (sum(costs_2), fmt, costs_2)
+                storage_2 = storage_cost(alias, fmt)
+                if sum(costs_2) + storage_2 < best[0]:
+                    best = (sum(costs_2) + storage_2, fmt, costs_2, storage_2)
             if best[1] != bindings[alias]:
-                _, bindings[alias], costs = best
+                _, bindings[alias], costs, storage[alias] = best
                 changed = True
+            del others
         if not changed:
             break
     return {alias: bindings[alias] for alias in stored}
