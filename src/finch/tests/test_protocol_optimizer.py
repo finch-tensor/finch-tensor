@@ -440,6 +440,53 @@ def test_a_dense_level_above_is_entered_at_every_slot():
     assert inner(DenseLevelOption()) == {x: [8, 8, 6], y: [8, 8, 10]}
 
 
+def test_a_dense_tensor_never_filters_the_loops_within_it():
+    sf = ExactStatsFactory()
+    i, j = Field("i"), Field("j")
+    x, y, c = HardAlias("x"), HardAlias("y"), HardAlias("c")
+    # x has 3 entries in each of rows 0-3, and y 5 in each of rows 2-9, of 10.
+    n = 10
+    xd, yd = np.zeros((n, n)), np.zeros((n, n))
+    xd[:4, :3] = 1.0
+    yd[2:, :5] = 1.0
+    stats: dict[Alias, TensorStats] = {
+        x: sf(fl.asarray(xd), (i, j)),
+        y: sf(fl.asarray(yd), (i, j)),
+    }
+    lst, dense_ = SparseListLevelOption(), DenseLevelOption()
+    basis = ProtocolBasis()
+    names = basis.feature_names
+
+    def inner(formats, protocols):
+        """The iterations of the loop over j and the visits of each table."""
+        plan = product_of_matrices(x, y, c, i, j, protocols)
+        machine = StatsMachine(sf, dict(stats))
+        rows = {}
+        for component in basis.components(plan, formats, machine):
+            match component:
+                case ProtocolChoice(prefix=Prefix(prefix=(_, _))) as access:
+                    row = basis.get_component_features(access, machine)[0]
+                    kind = access.option.kind
+                    rows[access.alias] = [
+                        row[names.index(f"{kind}.{name}")]
+                        for name in ("iterations", "follow_visits", "walk_visits")
+                    ]
+        return rows
+
+    # A dense x is looked up at every entry of y, whatever its rows hold, so
+    # the walk of y steps through all 40 of its entries, with x's fill where x
+    # has none, and the loop over j runs at each of them.
+    assert inner(
+        {x: [dense_, dense_], y: [lst, lst]}, ((Follow(), Follow()), (Walk(), Walk()))
+    ) == {x: [40, 40, 0], y: [40, 0, 40]}
+    # A list below the dense level of x has entries only in the 4 rows of x,
+    # so the merge steps through y only in the 2 rows both have, and runs at
+    # the 3 entries of each they share.
+    assert inner(
+        {x: [dense_, lst], y: [lst, lst]}, ((Follow(), Walk()), (Walk(), Walk()))
+    ) == {x: [6, 0, 6], y: [6, 0, 10]}
+
+
 def test_cost_protocolizer_states_the_protocols_it_chooses():
     loader = asm.AssemblyInterpreter()
     sf = DCStatsFactory()
