@@ -110,6 +110,18 @@ def formats_of(prgm, bindings, stats, sf, **kwargs):
     }
 
 
+def charging(weights):
+    """A model which charges a feature of a kind of level, whatever the
+    protocol, as weights say by (kind, feature), and nothing else."""
+    return CostModel(
+        PROTOCOL_BASIS,
+        [
+            weights.get((name.partition(".")[0], name.rpartition(".")[2]), 0.0)
+            for name in PROTOCOL_BASIS.feature_names
+        ],
+    )
+
+
 def sparse_matrix():
     matrix = np.zeros((100, 100))
     matrix[0, 0] = 1.0
@@ -144,9 +156,16 @@ def test_a_dense_matrix_is_copied_into_dense_levels():
         )
     )
     capture = LogicCapture()
-    CostFormatter(capture).lower(prgm, {A: tensor.ftype}, stats, sf)
+    # Every slot of B is written, which a dense level has ready, while the
+    # sparse levels insert each.
+    inserts = {
+        (kind, "distinct"): 1.0
+        for kind in ("sparse_list", "sparse_hash", "sparse_bytemap")
+    }
+    CostFormatter(capture, cost_model=charging(inserts)).lower(
+        prgm, {A: tensor.ftype}, stats, sf
+    )
     fmt = capture.last_bindings[B]
-    # Every slot of B is written, which a dense level has ready.
     assert [option.kind for option in level_options(fmt) or ()] == ["dense", "dense"]
     np.testing.assert_array_equal(fmt.construct((2, 3)).to_numpy(), np.zeros((2, 3)))
 
@@ -200,7 +219,13 @@ def test_a_transposed_copy_laminates_its_output():
     )
     prgm = Plan((copy, sums, Produces((y,))))
     # A dense A would make the sums span the whole matrix.
-    kinds = formats_of(prgm, {M: lists(2)}, stats, sf)[A]
+    kinds = formats_of(
+        prgm,
+        {M: lists(2)},
+        stats,
+        sf,
+        cost_model=charging({("dense", "iterations"): 1.0}),
+    )[A]
     assert all(kind in {"sparse_hash", "sparse_bytemap"} for kind in kinds)
 
 
@@ -306,21 +331,15 @@ def test_format_selection_uses_custom_model():
     )
     prgm = Plan((copy, sums, Produces((y,))))
 
-    def model(weights):
-        """A model which charges a feature of a kind of level, whatever the
-        protocol, as weights say."""
-        return CostModel(
-            PROTOCOL_BASIS,
-            [
-                weights.get((name.partition(".")[0], name.rpartition(".")[2]), 0.0)
-                for name in PROTOCOL_BASIS.feature_names
-            ],
-        )
-
     def choose(weights):
         options = (DenseLevelOption(), SparseListLevelOption())
         formats = formats_of(
-            prgm, {M: lists(2)}, stats, sf, cost_model=model(weights), options=options
+            prgm,
+            {M: lists(2)},
+            stats,
+            sf,
+            cost_model=charging(weights),
+            options=options,
         )
         return formats[T]
 

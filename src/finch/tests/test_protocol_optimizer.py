@@ -251,6 +251,25 @@ def test_protocol_basis_counts_writes_apart_from_their_locations():
     assert writes((i, j)) == block("extrude", 1, 3, 3, 1, 3)
 
 
+def weighted(**visits):
+    """A model which charges each visit of a protocol as visits says, by the
+    name of the protocol, whatever the level, and nothing else."""
+    costs = {f"{protocol}.visits": cost for protocol, cost in visits.items()}
+    return CostModel(
+        PROTOCOL_BASIS,
+        [
+            costs.get(name.partition(".")[2], 0.0)
+            for name in PROTOCOL_BASIS.feature_names
+        ],
+    )
+
+
+# A walk costs 1 for each entry it steps through, and a gallop 4 for each
+# jump, as does a follow for each lookup, which searches a list; of reads
+# which cost the same, the earliest of READ_PROTOCOLS is chosen.
+SIMPLE = weighted(walk=1.0, gallop=4.0, follow=4.0)
+
+
 def test_optimize_protocols_chooses_the_cheaper_read():
     sf = DCStatsFactory()
     i = Field("i")
@@ -261,16 +280,16 @@ def test_optimize_protocols_chooses_the_cheaper_read():
     stats: dict[Alias, TensorStats] = {x: sf(sparse, (i,)), y: sf(full, (i,))}
     # Walking y steps through every entry for the one entry of x, so y is
     # galloped, or followed by a hash, which can't gallop.
-    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf)
+    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf, SIMPLE)
     assert read_protocols(out, x, y) == [(Walk(),), (Gallop(),)]
-    out = optimize_protocols(plan, {x: LIST, y: HASH}, stats, sf)
+    out = optimize_protocols(plan, {x: LIST, y: HASH}, stats, sf, SIMPLE)
     assert read_protocols(out, x, y) == [(Walk(),), (Follow(),)]
     # Tensors of the same density are walked together.
     stats = {x: sf(full, (i,)), y: sf(full, (i,))}
-    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf)
+    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf, SIMPLE)
     assert read_protocols(out, x, y) == [(Walk(),), (Walk(),)]
     # A tensor without level options keeps the protocols it is given.
-    out = optimize_protocols(plan, {x: LIST, y: full.ftype}, stats, sf)
+    out = optimize_protocols(plan, {x: LIST, y: full.ftype}, stats, sf, SIMPLE)
     assert read_protocols(out, x, y) == [(Walk(),), (Follow(),)]
 
 
@@ -283,11 +302,11 @@ def test_optimize_protocols_keeps_the_protocols_a_program_gives():
     stats: dict[Alias, TensorStats] = {x: sf(sparse, (i,)), y: sf(full, (i,))}
     # Galloping y would cost less, but the program follows x and walks y.
     plan = product_plan(x, y, c, i, ((Follow(),), (Walk(),)))
-    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf)
+    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf, SIMPLE)
     assert read_protocols(out, x, y) == [(Follow(),), (Walk(),)]
     # Only the read without a protocol is chosen.
     plan = product_plan(x, y, c, i, ((Walk(),), ()))
-    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf)
+    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf, SIMPLE)
     assert read_protocols(out, x, y) == [(Walk(),), (Gallop(),)]
 
 
@@ -304,10 +323,10 @@ def test_optimize_protocols_only_follows_levels_read_out_of_order():
         Aggregate(Literal(ffuncs.add), Literal(0.0), Table(A, (i, j)), (i,)),
     )
     plan = Plan((fuse_loop_order(query, (j, i)), Produces((C,))))
-    out = optimize_protocols(plan, {A: fmt}, stats, sf)
+    out = optimize_protocols(plan, {A: fmt}, stats, sf, SIMPLE)
     assert read_protocols(out, A) == [(Walk(), Follow())]
     plan = Plan((fuse_loop_order(query, (i, j)), Produces((C,))))
-    out = optimize_protocols(plan, {A: fmt}, stats, sf)
+    out = optimize_protocols(plan, {A: fmt}, stats, sf, SIMPLE)
     assert read_protocols(out, A) == [(Walk(), Walk())]
 
 
@@ -497,7 +516,10 @@ def test_cost_protocolizer_states_the_protocols_it_chooses():
     stats = {x: sf(fl.asarray(data_x), (i,)), y: sf(fl.asarray(data_y), (i,))}
     plan = product_plan(x, y, c, i)
     capture = LogicCapture()
-    formatter = CostFormatter(CostProtocolizer(CompilerFormLowerer(capture)))
+    formatter = CostFormatter(
+        CostProtocolizer(CompilerFormLowerer(capture), cost_model=SIMPLE),
+        cost_model=SIMPLE,
+    )
     formatter(plan, {var: tns.ftype for var, tns in bindings.items()}, stats, sf)
     assert read_protocols(capture.last_prgm, x, y) == [(Walk(),), (Gallop(),)]
     program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)

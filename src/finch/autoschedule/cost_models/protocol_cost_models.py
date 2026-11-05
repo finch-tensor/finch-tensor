@@ -6,9 +6,11 @@ protocol optimizer can choose the protocol of each read, and the formatter the
 kind of each level.
 """
 
+import json
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Any, ClassVar
 
 import numpy as np
@@ -727,62 +729,11 @@ STORAGE_BASIS = StorageBasis()
 # the levels together, with a constant for each access.
 PROTOCOL_BASIS = Affine(Concat(STORAGE_BASIS, ProtocolBasis()))
 
-# Until the model is fitted, each byte a level stores costs 1, a byte of flags
-# among them, and its positions and entries nothing more. Each execution of
-# an access seeks a fiber, which costs 1, and entering a loop or iterating it
-# costs nothing more. A walk costs 1 for each entry it steps through, a gallop
-# costs 4 for each jump, and a follow costs a lookup for each visit: 1 in a
-# dense level or a bytemap, 3 in a hash table, and 4 in a list, which is
-# searched. A write costs a lookup, a lamination of a list costs a search like
-# a follow, and each distinct entry written costs 1 more to insert, except in
-# a dense level, which has a slot for each. The fibers entered and the
-# distinct entries read are free, since the seeks and visits already count
-# them, and the element level costs nothing beyond its storage.
-_STORAGE_COSTS: dict[str, tuple[float, ...]] = {
-    "dense": (0, 0),
-    "sparse_list": (0, 0, 1, 1),
-    "sparse_hash": (0, 0, 1, 1),
-    "sparse_bytemap": (0, 1, 0, 1),
-    "element": (0, 1),
-}
-# The costs of an execution, a visit, and a distinct entry written, by the kind
-# of the level and the protocol.
-_ACCESS_COSTS: dict[tuple[str, str], tuple[float, float, float]] = {
-    ("dense", "follow"): (1, 1, 0),
-    ("dense", "extrude"): (1, 1, 0),
-    ("dense", "laminate"): (1, 1, 0),
-    ("sparse_list", "walk"): (1, 1, 0),
-    ("sparse_list", "gallop"): (1, 4, 0),
-    ("sparse_list", "follow"): (1, 4, 0),
-    ("sparse_list", "extrude"): (1, 1, 1),
-    ("sparse_hash", "walk"): (1, 1, 0),
-    ("sparse_hash", "follow"): (1, 3, 0),
-    ("sparse_hash", "extrude"): (1, 3, 1),
-    ("sparse_hash", "laminate"): (1, 3, 1),
-    ("sparse_bytemap", "walk"): (1, 1, 0),
-    ("sparse_bytemap", "gallop"): (1, 4, 0),
-    ("sparse_bytemap", "follow"): (1, 1, 0),
-    ("sparse_bytemap", "extrude"): (1, 1, 1),
-    ("sparse_bytemap", "laminate"): (1, 1, 1),
-}
-
-
-def _access_costs(kind: str, protocol: str) -> tuple[float, ...]:
-    executions, visits, distinct = _ACCESS_COSTS.get((kind, protocol), (0, 0, 0))
-    return (executions, 0, visits, 0, distinct)
-
-
+# The coefficients are those scripts/fitting fitted to the timings of its
+# format stage, which fit_physical_data writes, so that a basis which changes
+# refuses them until it is fitted again.
 PROTOCOL_COST_MODEL = CostModel(
-    PROTOCOL_BASIS,
-    np.concatenate(
-        [
-            *(_STORAGE_COSTS[option.kind] for option in KINDS),
-            *(
-                _access_costs(option.kind, protocol)
-                for option in KINDS
-                for protocol in protocol_names(option)
-            ),
-            [0.0],
-        ]
-    ),
+    PROTOCOL_BASIS, np.zeros(PROTOCOL_BASIS.n_features)
+).from_json(
+    json.loads(Path(__file__).with_name("protocol_cost_model.json").read_text())
 )
