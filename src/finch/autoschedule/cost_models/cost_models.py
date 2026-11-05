@@ -74,11 +74,7 @@ class Basis(Form, Generic[C]):
 
 
 class Concat(Basis[C]):
-    """
-    The features of several bases side by side, over the components of the
-    first. A basis prices a component of another kind at zero, so bases of
-    different kinds of component can be concatenated over the union of them.
-    """
+    """The features of several bases of the same kind of component, side by side."""
 
     def __init__(self, *bases: Basis[C]):
         if not bases:
@@ -125,8 +121,7 @@ class ByKind(Concat[C], Generic[C, K]):
     The features of each component under the basis of its kind, which key
     returns, by default the kind attribute of the component. The features of a
     component fill the columns of its basis, and the other columns are zero,
-    so a linear model has separate coefficients for each kind. A component of
-    a kind the basis doesn't list is zero in every column.
+    so a linear model has separate coefficients for each kind.
     """
 
     def __init__(
@@ -160,7 +155,7 @@ class ByKind(Concat[C], Generic[C, K]):
                 features[:, start : start + basis.n_features] = rows
                 return features
             start += basis.n_features
-        return np.zeros((1, self.n_features))
+        raise KeyError(kind)
 
 
 class RowMap(Basis[C]):

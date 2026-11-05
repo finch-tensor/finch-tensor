@@ -64,6 +64,18 @@
     "sparse_bytemap.extrude_visits",
     "sparse_bytemap.laminate_visits",
     "sparse_bytemap.distinct_writes",
+    "element.executions",
+    "element.iterations",
+    "element.seeks",
+    "element.parents",
+    "element.follow_visits",
+    "element.walk_visits",
+    "element.gallop_visits",
+    "element.dense_visits",
+    "element.distinct_reads",
+    "element.extrude_visits",
+    "element.laminate_visits",
+    "element.distinct_writes",
     "constant"
   ],
   "coefficients": [
@@ -131,6 +143,18 @@
     0.0,
     1.8960151108957363e-09,
     2.612057065419111e-09,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
     4.484418642901013e-05
   ]
 }

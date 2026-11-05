@@ -203,7 +203,7 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
     # The reads of the lists, with the constant; the lists are already stored,
     # so their levels cost nothing.
     rows = PROTOCOL_BASIS.get_features(plan, formats, stats, sf)
-    assert rows.shape == (2, 65)
+    assert rows.shape == (2, 77)
     assert PROTOCOL_COST_MODEL.predict(rows) > 0
 
 

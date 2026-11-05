@@ -14,7 +14,7 @@ from .cost_models import (
     PROTOCOL_COST_MODEL,
     CostModel,
     Prefix,
-    ProtocolComponent,
+    ProtocolChoice,
     level_accesses,
     level_formats,
     level_reads,
@@ -126,7 +126,7 @@ def choose_protocols(
     bindings: Mapping[lgc.Alias, TensorFType],
     stats: Mapping[lgc.Alias, TensorStats],
     stats_factory: StatsFactory,
-    cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
+    cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
     only: set[lgc.Alias] | None = None,
     costs: Sequence[float] | None = None,
 ) -> tuple[lgc.LogicStatement, list[float]]:
@@ -236,7 +236,7 @@ def optimize_protocols(
     bindings: Mapping[lgc.Alias, TensorFType],
     stats: Mapping[lgc.Alias, TensorStats],
     stats_factory: StatsFactory,
-    cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
+    cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
 ) -> lgc.LogicStatement:
     """prgm, reading each level with the protocol which costs least under
     cost_model, as choose_protocols chooses them."""
@@ -253,7 +253,7 @@ class CostProtocolizer(FormattedForm, LogicLoader):
     def __init__(
         self,
         ctx: LogicLoader,
-        cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
+        cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
     ):
         self.ctx = ctx
         self.cost_model = cost_model

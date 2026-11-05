@@ -19,14 +19,12 @@ from finch.autoschedule.cost_models import (
     PROTOCOL_COST_MODEL,
     CostModel,
     LevelOption,
-    ProtocolComponent,
+    ProtocolChoice,
     allowed_options,
-    level_formats,
     read_protocols,
-    storage_choices,
     write_protocols,
 )
-from finch.autoschedule.cost_models.protocol_cost_models import KINDS
+from finch.autoschedule.cost_models.protocol_cost_models import FIELD_KINDS
 from finch.autoschedule.protocolize import choose_protocols
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
@@ -51,7 +49,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 # The level options CostFormatter chooses from by default, and their builders.
 # Of options which cost the same, the earliest is chosen, so a list is chosen
 # over a hash wherever it can be written.
-LEVEL_OPTIONS = KINDS
+LEVEL_OPTIONS = FIELD_KINDS
 LEVEL_BUILDERS = {
     "dense": dense,
     "sparse_list": sparse_list,
@@ -77,7 +75,7 @@ def optimize_formats(
     stats_factory: StatsFactory,
     stored: Mapping[lgc.Alias, tuple[FType, ...]],
     fill_types: Mapping[lgc.Alias, AbstractFillFType],
-    cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
+    cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
     options: Sequence[LevelOption] = LEVEL_OPTIONS,
 ) -> dict[lgc.Alias, TensorFType]:
     """
@@ -119,22 +117,13 @@ def optimize_formats(
         for alias, levels in allowed.items()
     }
 
-    def storage_cost(alias, fmt):
-        machine = StatsMachine(stats_factory, OrderedDict(stats))
-        options = level_formats({alias: fmt})[alias]
-        return sum(
-            cost_model.predict_component_cost(choice, machine)
-            for choice in storage_choices(alias, options, prgm, machine)
-        )
-
     bindings = {**bindings, **formats}
-    storage = {alias: storage_cost(alias, fmt) for alias, fmt in formats.items()}
     _, costs = choose_protocols(prgm, bindings, stats, stats_factory, cost_model)
     # A second sweep lets each alias answer the formats chosen after it.
     for _ in range(2):
         changed = False
         for alias, levels in allowed.items():
-            best = (sum(costs) + storage[alias], bindings[alias], costs, storage[alias])
+            best_fmt, best_costs = bindings[alias], costs
             for kinds in product(*levels):
                 fmt = ftype_of(alias, kinds)
                 if fmt == bindings[alias]:
@@ -148,16 +137,10 @@ def optimize_formats(
                     only={alias},
                     costs=costs,
                 )
-                storage_2 = storage_cost(alias, fmt)
-                if sum(costs_2) + storage_2 < best[0]:
-                    best = (sum(costs_2) + storage_2, fmt, costs_2, storage_2)
-            _, best_fmt, best_costs, best_storage = best
+                if sum(costs_2) < sum(best_costs):
+                    best_fmt, best_costs = fmt, costs_2
             if best_fmt != bindings[alias]:
-                bindings[alias], costs, storage[alias] = (
-                    best_fmt,
-                    best_costs,
-                    best_storage,
-                )
+                bindings[alias], costs = best_fmt, best_costs
                 changed = True
         if not changed:
             break
@@ -297,7 +280,7 @@ class CostFormatter(LogicFormatter):
     def __init__(
         self,
         loader: LogicLoader | None = None,
-        cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
+        cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
         options: Sequence[LevelOption] = LEVEL_OPTIONS,
     ):
         super().__init__()

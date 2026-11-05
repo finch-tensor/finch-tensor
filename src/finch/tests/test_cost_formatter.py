@@ -16,7 +16,6 @@ from finch.autoschedule.cost_models import (
     SparseByteMapLevelOption,
     SparseHashLevelOption,
     SparseListLevelOption,
-    alias_blocks,
     allowed_options,
     level_options,
     nnz_after,
@@ -326,7 +325,8 @@ def test_format_selection_uses_custom_model():
     assert choose({"dense.seeks": 1.0}) == ["sparse_list", "sparse_list"]
 
 
-def test_fused_alias_levels_describe_the_largest_slice():
+def test_storage_is_priced_at_the_writes_in_the_largest_fused_slice():
+    # Each slice of the diagonal is written into scratch at the loop over i.
     t, i = Field("t"), Field("i")
     a, scratch = HardAlias("a"), HardAlias("scratch")
     fused = FusedAlias(scratch, 1)
@@ -334,30 +334,34 @@ def test_fused_alias_levels_describe_the_largest_slice():
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.eye(4)), (t, i))}
     copy = fuse_loop_order(Query(Table(fused, (t, i)), Table(a, (t, i))), (t, i))
     plan = Plan((copy, Produces((fused,))))
+    lst = SparseListLevelOption()
     formats: dict[Alias, list[LevelOption]] = {
-        scratch: [SparseHashLevelOption(), ElementLevelOption()]
+        a: [lst, lst, ElementLevelOption()],
+        scratch: [SparseHashLevelOption(), ElementLevelOption()],
     }
     basis = STORAGE_BASIS
     machine = StatsMachine(sf, dict(stats))
-    # The levels price from the blocks they list, however far the machine has
-    # advanced.
-    sparse, element = basis.components(plan, formats, machine)
-
-    # Each slice of the diagonal stores the one entry of its row.
-    assert (sparse.alias, sparse.depth, sparse.num_pos) == (scratch, 0, 1.0)
-    assert element.depth == 1
-    assert element.num_pos == pytest.approx(1.0)
+    rows = {}
+    for access in basis.components(plan, formats, machine):
+        row = basis.get_component_features(access, machine)[0]
+        rows[access.alias.unfused, access.depth] = row
+    assert set(rows) == {(a, 0), (a, 1), (scratch, 0), (scratch, 1)}
+    # a is already stored, so reading it costs no storage.
+    assert not rows[a, 0].any() and not rows[a, 1].any()
+    # scratch stores one slice at a time, the largest of which holds the one
+    # entry of its row, in one fiber of the hash level.
     size = np.dtype(np.intp).itemsize
     names = basis.feature_names
     columns = [
         names.index(f"sparse_hash.{name}")
         for name in ("positions", "entries", "position_bytes", "index_bytes")
     ]
-    features = basis.get_component_features(sparse, machine)
-    np.testing.assert_allclose(features[0, columns], [1, 1, 2 * size, size])
+    np.testing.assert_allclose(rows[scratch, 0][columns], [1, 1, 2 * size, size])
+    columns = [names.index(f"element.{name}") for name in ("values", "value_bytes")]
+    np.testing.assert_allclose(rows[scratch, 1][columns], [1, 8])
 
 
-def test_storage_basis_prices_the_levels_of_each_block():
+def test_storage_basis_prices_what_each_query_writes():
     i = Field("i")
     a, b, c, out = (HardAlias(name) for name in ("a", "b", "c", "out"))
     sf = DCStatsFactory()
@@ -366,7 +370,8 @@ def test_storage_basis_prices_the_levels_of_each_block():
         b: sf(fl.asarray(np.array([0.0, 1.0, 0.0, 0.0])), (i,)),
         c: sf(fl.asarray(np.array([0.0, 0.0, 1.0, 1.0])), (i,)),
     }
-    # The first block defines out and updates it, and the second redefines it.
+    # The first query defines out, the second updates it, and the third
+    # redefines it, each storing what out holds after it.
     define = Query(Table(out, (i,)), Table(a, (i,)))
     update = QueryInto(Table(out, (i,)), Literal(ffuncs.add), Table(b, (i,)))
     redefine = Query(Table(out, (i,)), Table(c, (i,)))
@@ -375,40 +380,30 @@ def test_storage_basis_prices_the_levels_of_each_block():
         (*(fuse_loop_order(query, (i,)) for query in queries), Produces((out,)))
     )
     machine = StatsMachine(sf, dict(stats))
-    states = []
+    nnz = []
     for query in queries:
         machine(query)
-        states.append(machine(out))
-    union = sf.mapjoin(ffuncs.or_, sf.support(states[0]), sf.support(states[1]))
-    nnz = [union.estimate_non_fill_values(), states[2].estimate_non_fill_values()]
-    assert nnz[0] > states[1].estimate_non_fill_values()
-
-    machine = StatsMachine(sf, dict(stats))
-    blocks = alias_blocks(out, plan, machine)
-    assert [block.estimate_non_fill_values() for block, _ in blocks] == nnz
-    assert all(block.fill_type == states[0].fill_type for block, _ in blocks)
+        nnz.append(machine(out).estimate_non_fill_values())
+    assert nnz[1] > nnz[0]
 
     formats: dict[Alias, list[LevelOption]] = {
         out: [SparseHashLevelOption(), ElementLevelOption()]
     }
     basis = STORAGE_BASIS
     machine = StatsMachine(sf, dict(stats))
-    rows = np.concatenate(
-        [
-            basis.get_component_features(level, machine)
-            for level in list(basis.components(plan, formats, machine))
-        ]
-    )
-    # A row for each block of the hash level, then of the element level.
-    assert rows.shape == (4, basis.n_features)
+    rows: dict[int, list[np.ndarray]] = {0: [], 1: []}
+    for access in basis.components(plan, formats, machine):
+        rows[access.depth].append(basis.get_component_features(access, machine)[0])
+    # Each query writes the hash level, which is one fiber, and the element
+    # level under it.
     names = basis.feature_names
     size = np.dtype(np.intp).itemsize
     columns = [
         names.index(f"sparse_hash.{name}")
         for name in ("positions", "entries", "position_bytes", "index_bytes")
     ]
-    np.testing.assert_array_equal(
-        rows[:2][:, columns], [[1, n, 2 * size, n * size] for n in nnz]
+    np.testing.assert_allclose(
+        np.array(rows[0])[:, columns], [[1, n, 2 * size, n * size] for n in nnz]
     )
     columns = [names.index(f"element.{name}") for name in ("values", "value_bytes")]
-    np.testing.assert_array_equal(rows[2:][:, columns], [[n, 8 * n] for n in nnz])
+    np.testing.assert_allclose(np.array(rows[1])[:, columns], [[n, 8 * n] for n in nnz])
