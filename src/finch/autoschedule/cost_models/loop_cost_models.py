@@ -308,7 +308,7 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
                     stat = machine(node)
                     inputs.append(stat)
                     match spaces.protocol(node):
-                        case Follow() | Gallop() | DefaultProtocol():
+                        case Follow() | Gallop():
                             lookups += 1
                         case _:
                             walks.append(spaces.project(stat, (idx,)))
