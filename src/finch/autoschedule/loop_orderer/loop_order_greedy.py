@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import Generic, TypeVar
 
 from finch.autoschedule.cost_models import WORKSPACE_LOOP_COST_MODEL, CostModel, Prefix
@@ -24,19 +24,6 @@ from finch.finch_logic import (
 from .loop_ordering import AbstractLoopOrderer, with_loop_order
 
 NS = TypeVar("NS", bound=NumericStats)
-
-
-def connected_loop_candidates(
-    prefix: tuple[Field, ...],
-    remaining: Sequence[Field],
-    output_vars: tuple[Field, ...] | None = None,
-) -> list[Field]:
-    """
-    The fields which may come next, in candidate order. Any field may, even one
-    of the output out of the order the output stores it in, since the cost
-    model charges the writes that scatter.
-    """
-    return list(remaining)
 
 
 def greedy_loop_order(
@@ -66,8 +53,7 @@ def greedy_loop_order(
         )
 
     while remaining:
-        candidates = connected_loop_candidates(tuple(prefix), remaining, output_vars)
-        best = min(candidates, key=candidate_cost)
+        best = min(remaining, key=candidate_cost)
         prefix.append(best)
         remaining.remove(best)
 
