@@ -475,6 +475,7 @@ def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
         case ffuncs._NotFType() | ffuncs._InvertFType():
             return c_unary_function_call(c_symbol, ctx, *args)
         case ffuncs._PowFType():
+            ctx.add_header("#include <math.h>")
             a, b = args
             return f"{c_symbol}({ctx(a)}, {ctx(b)})"
         case COperator():
