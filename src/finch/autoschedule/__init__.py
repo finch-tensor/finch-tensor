@@ -40,6 +40,7 @@ from .formatter.formatter import (
     LogicFormatter,
 )
 from .formatter.smart_formatter import FDFormatter, SmartFormatter
+from .fuse_merger import LogicFuseMerger
 from .loop_orderer.loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
 from .protocolizer import (
@@ -79,6 +80,7 @@ __all__ = [
     "LogicEinsumLowerer",
     "LogicExecutor",
     "LogicFormatter",
+    "LogicFuseMerger",
     "LogicNormalizer",
     "LogicNotationLowerer",
     "LogicProtocolizer",
