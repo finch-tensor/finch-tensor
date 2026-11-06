@@ -28,6 +28,7 @@ from finch.autoschedule.workspacer import (
 )
 from finch.codegen import NumbaCompiler, NumpyBuffer
 from finch.compile import NotationCompiler
+from finch.compile_jl.julia import julia_available
 from finch.finch_assembly import AssemblySimplify, LowerPackedStructSlots
 from finch.finch_logic import (
     Aggregate,
@@ -128,7 +129,8 @@ def test_add_workspace_copies_each_slice_after_its_query():
 def _random_csr(n, per_row, seed):
     """
     An n by n matrix with per_row entries in random columns of each row, as a
-    dense root over sorted lists, and as SciPy CSR.
+    dense root over sorted lists, and as SciPy CSR. The stats of a FiberTensor
+    are computed by Finch.jl, so the tests which take them need Julia.
     """
     rng = np.random.default_rng(seed)
     cols = np.concatenate(
@@ -166,6 +168,7 @@ def _order(tensor_a, tensor_b, workspaces):
     return capture
 
 
+@pytest.mark.skipif(not julia_available(), reason="Finch.jl is not installed")
 def test_workspacer_accumulates_rows_in_a_workspace():
     i, k = Field("i"), Field("k")
     c = HardAlias("c")
@@ -208,6 +211,7 @@ def test_workspacer_accumulates_rows_in_a_workspace():
     assert isinstance(fmt.lvl_t.lvl_t, fl.SparseListLevelFType)
 
 
+@pytest.mark.skipif(not julia_available(), reason="Finch.jl is not installed")
 def test_workspace_kernels_compute_the_product():
     i, j, k = Field("i"), Field("j"), Field("k")
     a, b, c, w = (HardAlias(name) for name in "abcw")
@@ -255,6 +259,7 @@ def test_workspacer_needs_a_field_written_in_order():
     assert add_workspaces(plan, {}, stats, sf, PROTOCOL_COST_MODEL) == plan
 
 
+@pytest.mark.skipif(not julia_available(), reason="Finch.jl is not installed")
 @pytest.mark.parametrize(
     ("n", "per_row", "staged"),
     [
