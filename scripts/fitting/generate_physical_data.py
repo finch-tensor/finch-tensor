@@ -75,8 +75,8 @@ LG_MAX_DIM = 15
 # stage are kept as examples. In the protocol and format stages, the variants
 # of the examples of a program compile to the same kernels, so they are
 # compiled once for them all, and more are kept. The other stages choose
-# protocols from the stats of each example, so their kernels can differ, and
-# one is kept, for more programs instead.
+# workspaces, formats and protocols from the stats of each example, so their
+# kernels can differ, and one is kept, for more programs instead.
 SAMPLES = 1000
 KEEP = {"protocol": 10, "format": 10, "transpose": 1, "loop": 1}
 # The most variants of a program, where a stage has too many to time: the

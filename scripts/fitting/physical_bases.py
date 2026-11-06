@@ -19,10 +19,13 @@ examples coalesce_physical_data collects, so a new basis needs no new timings.
   it would read out of order. The loop orderer charges such copies with the
   transpose model, on top of the loop model.
 - loop: for a random program, every loop order, with its inputs stored in
-  that order, so that the program is concordant, the formats the formatter
-  chooses, from the supports of its inputs, and the protocols the protocol
-  optimizer chooses. Its features are those of the supports, before the
-  formatter and the protocol optimizer run.
+  that order, so that the program is concordant, and the output stored as the
+  program stores it, which the loops may scatter into. Each order is passed
+  to the workspacer, which stages the writes which scatter in a workspace
+  where that costs less, then to the formatter, which chooses the formats
+  from the supports of its inputs, and then to the protocol optimizer. Its
+  features are those of the supports, before any of them run, so the model
+  learns what a loop order costs once they have.
 """
 
 import json
@@ -32,18 +35,20 @@ from typing import Any
 
 import numpy as np
 
-from finch.algebra import StaticFillFType, ftype, ftypes
+from finch.algebra import StaticFillFType, TensorFType, ftype, ftypes
 from finch.autoschedule import optimize_protocols, protocolize
 from finch.autoschedule.cost_models import (
     PROTOCOL_BASIS,
     PROTOCOL_COST_MODEL,
     Affine,
     Basis,
+    Concat,
     CostModel,
     ElementLevelOption,
     LevelOption,
     PigeonBasis,
     TransposeBasis,
+    WriteBasis,
     level_options,
 )
 from finch.autoschedule.formatter.smart_formatter import (
@@ -52,6 +57,7 @@ from finch.autoschedule.formatter.smart_formatter import (
     optimize_formats,
 )
 from finch.autoschedule.util import fuse_loop_order
+from finch.autoschedule.workspacer import add_workspaces
 from finch.finch_logic import (
     Alias,
     Field,
@@ -62,6 +68,7 @@ from finch.finch_logic import (
     Query,
     StatsFactory,
     Table,
+    TensorStats,
     parse_logic,
 )
 from finch.finch_logic.parser import PROTOCOLS
@@ -79,7 +86,7 @@ BASES: dict[str, Basis] = {
     "protocol": PROTOCOL_BASIS,
     "format": PROTOCOL_BASIS,
     "transpose": Affine(TransposeBasis()),
-    "loop": Affine(PigeonBasis()),
+    "loop": Affine(Concat(PigeonBasis(), WriteBasis())),
 }
 
 
@@ -190,26 +197,47 @@ def read_inputs(
     }
 
 
+def input_stats(
+    plan: LogicStatement,
+    inputs: Mapping[Alias, KroneckerTensor],
+    stats_factory: StatsFactory,
+) -> dict[Alias, TensorStats]:
+    fields = input_fields(plan)
+    return {tns: stats_factory(tensor, fields[tns]) for tns, tensor in inputs.items()}
+
+
 def choose_formats(
     plan: LogicStatement,
     inputs: Mapping[Alias, KroneckerTensor],
     stats_factory: StatsFactory,
     cost_model: CostModel,
+    bindings: Mapping[Alias, TensorFType] | None = None,
 ) -> dict[Alias, list[LevelOption]]:
     """
-    The level options of each tensor of plan under cost_model, as the
-    formatter would choose them from the supports of inputs, which store their
-    fields in the order plan reads them, for the inputs too, which it takes to
-    be unformatted.
+    The level options of each tensor of plan without a format in bindings
+    under cost_model, as the formatter would choose them from the supports of
+    inputs, which store their fields in the order plan reads them. Without
+    bindings, the inputs are formatted too. A tensor which plan fuses stores
+    the fields its first definition doesn't fuse.
     """
-    fields = input_fields(plan)
-    stats = {tns: stats_factory(tensor, fields[tns]) for tns, tensor in inputs.items()}
+    bindings = bindings or {}
+    stats = input_stats(plan, inputs, stats_factory)
     fill_types = plan.infer_fill_type(
         {tns: StaticFillFType(tensor.dtype(0)) for tns, tensor in inputs.items()}
     )
-    stored = {tns: (ftypes.intp,) * len(idxs) for tns, idxs in fields.items()}
+    stored = {}
+    for tns, idxs in input_fields(plan).items():
+        if tns.unfused not in bindings:
+            stored.setdefault(tns.unfused, (ftypes.intp,) * (len(idxs) - tns.nfused))
     ftypes_2 = optimize_formats(
-        plan, {}, stats, stats_factory, stored, fill_types, cost_model, LEVEL_OPTIONS
+        plan,
+        bindings,
+        stats,
+        stats_factory,
+        stored,
+        fill_types,
+        cost_model,
+        LEVEL_OPTIONS,
     )
     formats = {}
     for tns, fmt in ftypes_2.items():
@@ -230,9 +258,12 @@ def resolve(
     stages below its stage have made their choices from the exact stats of
     inputs: the formats of every tensor, unless the variant gives them, and
     the protocols each input is read with, unless the variant gives those too,
-    as the variants of the protocol and format stages do. The inputs the
-    program reads are stored in the order it reads them, which is the loop
-    order in the loop stage.
+    as the variants of the protocol and format stages do. Where the formats
+    are chosen, the inputs are formatted first, as they are when the program
+    runs, then the workspacer stages the writes which scatter in workspaces
+    where that costs less, and then the formatter formats the outputs of the
+    program it leaves. The inputs the program reads are stored in the order it
+    reads them, which is the loop order in the loop stage.
     """
     plan = variant_plan(record, variant)
     formats = {
@@ -243,12 +274,25 @@ def resolve(
     stats_factory = KroneckerStatsFactory(record["block_bits"])
     if "formats" not in variant:
         formats = choose_formats(plan, inputs, stats_factory, models["format"])
+        bindings = {
+            tns: input_ftype(formats[tns], tensor) for tns, tensor in inputs.items()
+        }
+        plan = add_workspaces(
+            plan,
+            bindings,
+            input_stats(plan, inputs, stats_factory),
+            stats_factory,
+            models["format"],
+        )
+        formats = {
+            **{tns: formats[tns] for tns in inputs},
+            **choose_formats(plan, inputs, stats_factory, models["format"], bindings),
+        }
     if "protocols" not in variant:
-        fields = input_fields(plan)
         plan = optimize_protocols(
             plan,
             {tns: input_ftype(formats[tns], tensor) for tns, tensor in inputs.items()},
-            {tns: stats_factory(tensor, fields[tns]) for tns, tensor in inputs.items()},
+            input_stats(plan, inputs, stats_factory),
             stats_factory,
             models["protocol"],
         )
@@ -264,8 +308,7 @@ def features(
     Unless protocols is false, each read without a protocol takes the default
     of its level, as Finch.jl reads it.
     """
-    fields = input_fields(plan)
-    stats = {tns: stats_factory(tensor, fields[tns]) for tns, tensor in inputs.items()}
+    stats = input_stats(plan, inputs, stats_factory)
     if protocols:
         ftypes = {
             tns: input_ftype(formats[tns], tensor) for tns, tensor in inputs.items()
@@ -287,8 +330,9 @@ def featurize_record(
     The features of the basis name of each variant of the example of record,
     whose inputs are inputs, as it was timed: the stages below make their
     choices with models, as time_physical_data makes them, so nothing is
-    compiled or run. The loop stage orders loops before its inputs are
-    formatted, so it reads them without protocols.
+    compiled or run. The loop stage orders loops before the workspacer and
+    the formatter run, so its features are those of the program as ordered,
+    reading its inputs without protocols.
     """
     stage = record["stage"]
     stats_factory = KroneckerStatsFactory(record["block_bits"])
@@ -297,7 +341,7 @@ def featurize_record(
         plan, formats = resolve(record, variant, inputs, models)
         if stage == "loop":
             # The loop orderer prices the concordant program before the
-            # formatter and the protocol optimizer run, without protocols.
+            # workspacer, the formatter and the protocol optimizer run.
             plan = variant_plan(record, variant)
         rows.append(
             features(

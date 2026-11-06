@@ -49,6 +49,7 @@ from .protocolize import (
     protocolize,
 )
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
+from .workspacer import DefaultLogicWorkspacer, LogicWorkspacer
 
 __all__ = [
     "COMPILE_JULIA",
@@ -68,6 +69,7 @@ __all__ = [
     "CostProtocolizer",
     "DefaultLogicFactorizer",
     "DefaultLogicFormatter",
+    "DefaultLogicWorkspacer",
     "DefaultLoopOrderer",
     "FDFormatter",
     "Field",
@@ -80,6 +82,7 @@ __all__ = [
     "LogicNormalizer",
     "LogicNotationLowerer",
     "LogicProtocolizer",
+    "LogicWorkspacer",
     "MapJoin",
     "NotationGenerator",
     "Plan",

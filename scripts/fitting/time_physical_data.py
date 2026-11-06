@@ -1,9 +1,10 @@
 """
 Time the variants of the programs which generate_physical_data wrote to DIR,
-or those of one chunk. The stages below that of DIR make their choices with
-the models of --model, or the built-in ones, from the exact stats of the
-Kronecker blocks of the inputs, as physical_bases resolves them, and then each
-variant is compiled by Finch.jl with its format of C, and reads its inputs
+or those of one chunk. The stages below that of DIR, the workspacer, the
+formatter and the protocol optimizer, make their choices with the models of
+--model, or the built-in ones, from the exact stats of the Kronecker blocks of
+the inputs, as physical_bases resolves them, and then each variant is compiled
+by Finch.jl with its formats of C and of any workspace, and reads its inputs
 after they are materialized as COO from their blocks and copied into their
 formats. The variants of the examples of a program compile to the same
 kernels, which are compiled once and kept for as long as this runs. The
