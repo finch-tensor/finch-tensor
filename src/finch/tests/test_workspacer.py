@@ -259,14 +259,20 @@ def test_workspacer_keeps_workspaces_which_cost_less(n, per_row, staged):
 
 
 def test_workspacer_leaves_queries_which_write_in_order():
-    # The product of dense matrices is cheapest as an inner product, which
-    # writes c in order, so it needs no workspace.
+    # An inner product writes c in order, so it needs no workspace.
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
     rng = np.random.default_rng(0)
-    data_a, data_b = rng.random((8, 8)), rng.random((8, 8))
-    tensor_a, tensor_b = fl.asarray(data_a), fl.asarray(data_b)
-    ordered = _order(tensor_a, tensor_b, workspaces=False).last_prgm
-    assert workspace_depth(ordered, HardAlias("c")) is None
-    assert _order(tensor_a, tensor_b, workspaces=True).last_prgm == ordered
+    tensor_a, tensor_b = fl.asarray(rng.random((8, 8))), fl.asarray(rng.random((8, 8)))
+    sf = DCStatsFactory()
+    stats: dict[Alias, TensorStats] = {
+        a: sf(tensor_a, (i, j)),
+        b: sf(tensor_b, (j, k)),
+    }
+    bindings: dict[Alias, TensorFType] = {a: tensor_a.ftype, b: tensor_b.ftype}
+    plan, _ = _matmul(c, a, b, (i, k, j))
+    assert workspace_depth(plan, c) is None
+    assert add_workspaces(plan, bindings, stats, sf, PROTOCOL_COST_MODEL) == plan
 
 
 def test_only_small_workspaces_make_scattered_writes_cheap():
