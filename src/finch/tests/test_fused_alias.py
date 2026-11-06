@@ -300,7 +300,9 @@ def test_fused_alias_compilation(compiler, n):
     assert scratch in capture.last_bindings
     assert fused not in capture.last_bindings
     program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
-    bindings[scratch] = capture.last_bindings[scratch].construct((2, 2))
+    # A scratch fused over both fields stores neither, so it is a scalar.
+    scratch_t = capture.last_bindings[scratch]
+    bindings[scratch] = scratch_t.construct((2, 2)[: scratch_t.ndim])
     bindings[materialized] = capture.last_bindings[materialized].construct((2, 2))
     bindings[out] = capture.last_bindings[out].construct((2, 2))
     result, intermediate = compiler()(program).main(

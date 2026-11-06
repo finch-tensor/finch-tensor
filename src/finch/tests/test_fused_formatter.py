@@ -6,6 +6,7 @@ import finch as ft
 import finch.finch_logic as lgc
 from finch.algebra import StaticFillFType
 from finch.autoschedule.capture import LogicCapture
+from finch.autoschedule.formatter.formatter import scalar_ftype
 from finch.autoschedule.formatter.galley_formatter import GalleyFormatter
 from finch.autoschedule.formatter.smart_formatter import (
     CostFormatter,
@@ -135,6 +136,9 @@ def test_galley_uses_support_projected_over_fused_dimensions(
         factory,
         fields[nfused:],
     )
+    # A scratch fused over every field stores none of them, so it is a scalar.
+    if nfused == len(fields):
+        expected = scalar_ftype(stats.fill_type)
     assert capture.last_bindings[scratch] == expected
     assert capture.last_stats[fused].index_order == fields
     assert stats.index_order == fields

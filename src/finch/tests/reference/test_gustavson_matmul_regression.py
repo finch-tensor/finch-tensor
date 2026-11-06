@@ -139,8 +139,7 @@ def main(_a_0: builtins.tuple, _b_4: builtins.tuple, _w_8: Numba_BufferizedNDArr
             i_end: int32 = min((min(i_stop) + 1), min(_a_dim_1_3, (i_last + 1)))
             _j_16__pos: int32 = q
             for _j_16 in range(i_start, min(i_end, i_stop)):
-                for _k_17 in range(0, _b_dim_1_7):
-                    pass
+                pass
             for _j_16 in range(max(i_start, i_stop), i_end):
                 _j_16__pos_2: int32 = ((0 * __b_5_lvl_dimension) + _j_16)
                 q_2: int32 = __b_5_lvl_lvl_ptr_slot_arr[_j_16__pos_2]
@@ -208,8 +207,7 @@ def main(_a_0: builtins.tuple, _b_4: builtins.tuple, _w_8: Numba_BufferizedNDArr
                     i_stop = __a_1_lvl_lvl_dimension
             i_start = i_end
         for _j_16 in range(max(0, (i_last + 1)), _a_dim_1_3):
-            for _k_17 in range(0, _b_dim_1_7):
-                pass
+            pass
         qos: int32 = __c_12_lvl_lvl_qos_fill
         for _k_20 in range(0, _w_dim_1_19):
             _k_20__pos: int64 = (0 + (__w_9_strides_element_0 * _k_20))
