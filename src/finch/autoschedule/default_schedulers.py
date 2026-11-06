@@ -240,14 +240,7 @@ _NON_RECURSIVE_BACKEND = (
     FDFormatter(CompilerFormLowerer(LogicCompiler(FinchJLCompiler())))
     if julia_available()
     else DefaultLogicFormatter(
-        CompilerFormLowerer(
-            LogicCompiler(
-                NotationCompiler(
-                    NumbaCompiler(),
-                    ctx_transforms=(LowerPackedStructSlots(), AssemblySimplify()),
-                )
-            )
-        )
+        CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
     )
 )
 

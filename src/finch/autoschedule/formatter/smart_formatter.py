@@ -30,7 +30,6 @@ from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
 from finch.finch_logic.tensor_stats import TensorStats
-from finch.symbolic import PostOrderDFS
 from finch.tensor import (
     FiberTensorFType,
     dense,
@@ -78,15 +77,16 @@ def optimize_formats(
     fill_types: Mapping[lgc.Alias, AbstractFillFType],
     cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
     options: Sequence[LevelOption] = LEVEL_OPTIONS,
-) -> dict[lgc.Alias, TensorFType]:
+) -> tuple[dict[lgc.Alias, TensorFType], float]:
     """
     The format of each alias of stored, whose levels have the shape types it
     gives and the fill of fill_types, under which prgm costs least by
-    cost_model, with its other tensors formatted as bindings says, by
-    coordinate descent: each alias in turn tries every product of the options
-    its levels allow, re-choosing protocols only for the queries which touch
-    it, for two sweeps or until none changes. Each starts from the first
-    allowed option of each level which filters.
+    cost_model, with its other tensors formatted as bindings says, and the cost
+    of prgm with those formats, once choose_protocols chooses its protocols.
+    The formats are found by coordinate descent: each alias in turn tries every
+    product of the options its levels allow, re-choosing protocols only for the
+    queries which touch it, for two sweeps or until none changes. Each starts
+    from the first allowed option of each level which filters.
     """
     allowed = {
         alias: [
@@ -145,50 +145,7 @@ def optimize_formats(
                 changed = True
         if not changed:
             break
-    return {alias: bindings[alias] for alias in stored}
-
-
-def program_cost(
-    prgm: lgc.LogicStatement,
-    bindings: Mapping[lgc.Alias, TensorFType],
-    stats: Mapping[lgc.Alias, TensorStats],
-    stats_factory: StatsFactory,
-    cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
-    options: Sequence[LevelOption] = LEVEL_OPTIONS,
-) -> float:
-    """
-    The cost of prgm under cost_model, once each alias it defines is formatted
-    as optimize_formats chooses and its tables read with the protocols
-    choose_protocols chooses, as optimize_formats sums the costs of its queries.
-    """
-    shape_types = prgm.infer_shape_type(
-        {var: val.shape_type for var, val in bindings.items()}
-    )
-    # Each new alias stores the fields its first definition doesn't fuse.
-    nfused: dict[lgc.Alias, int] = {}
-    for node in PostOrderDFS(prgm):
-        match node:
-            case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
-                lgc.Table(lgc.Alias() as lhs, _), _, _
-            ) if lhs.unfused not in bindings:
-                nfused.setdefault(lhs.unfused, lhs.nfused)
-    stored = {
-        alias: tuple(
-            ftype(dim) if dim is not None else ftypes.intp
-            for dim in shape_types[alias][n:]
-        )
-        for alias, n in nfused.items()
-    }
-    fill_types = prgm.infer_fill_type(
-        {var: val.fill_type for var, val in bindings.items()}
-    )
-    formats = optimize_formats(
-        prgm, bindings, stats, stats_factory, stored, fill_types, cost_model, options
-    )
-    _, costs = choose_protocols(
-        prgm, {**bindings, **formats}, stats, stats_factory, cost_model
-    )
-    return sum(costs)
+    return {alias: bindings[alias] for alias in stored}, sum(costs)
 
 
 TS = TypeVar("TS", bound=TensorStats)
@@ -345,7 +302,7 @@ class CostFormatter(LogicFormatter):
     ) -> dict[lgc.Alias, TensorFType]:
         """The format of each alias of stored, whose levels have the shape
         types it gives, from the stats before prgm."""
-        return optimize_formats(
+        formats, _ = optimize_formats(
             prgm,
             bindings,
             stats,
@@ -355,6 +312,7 @@ class CostFormatter(LogicFormatter):
             self.cost_model,
             self.options,
         )
+        return formats
 
     def lower(
         self,
