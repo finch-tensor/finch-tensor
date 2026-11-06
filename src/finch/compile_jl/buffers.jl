@@ -15,12 +15,17 @@ end
 
 Buffer(data::Vector{T}) where {T} = Buffer{T}(data, data, true)
 
-function borrow(::Type{T}, bytes, writable=true) where {T}
+function borrow(::Type{T}, bytes, writable = true) where {T}
     isbitstype(T) && sizeof(T) > 0 ||
         throw(ArgumentError("buffer elements must be nonempty isbits"))
     eltype(bytes) == UInt8 && stride(bytes, 1) == 1 && length(bytes) % sizeof(T) == 0 ||
         throw(ArgumentError("buffer storage must be contiguous bytes"))
-    data = unsafe_wrap(Vector{T}, Ptr{T}(pointer(bytes)), length(bytes) ÷ sizeof(T); own=false)
+    data = unsafe_wrap(
+        Vector{T},
+        Ptr{T}(pointer(bytes)),
+        length(bytes) ÷ sizeof(T);
+        own = false,
+    )
     Buffer{T}(data, bytes, writable)
 end
 
@@ -42,10 +47,23 @@ Base.similar(::Buffer, ::Type{T}, dims::Dims) where {T} = Array{T}(undef, dims)
 Base.dataids(buf::Buffer) = Base.dataids(buf.data)
 Base.copy(buf::Buffer{T}) where {T} = Buffer{T}(copy(buf.data), nothing, true)
 
-function Base.copyto!(dest::Buffer, dstart::Integer, src::Buffer, sstart::Integer, n::Integer)
+function Base.copyto!(
+    dest::Buffer,
+    dstart::Integer,
+    src::Buffer,
+    sstart::Integer,
+    n::Integer,
+)
     if dest !== src
-        return invoke(copyto!, Tuple{AbstractArray,Integer,AbstractArray,Integer,Integer},
-                      dest, dstart, src, sstart, n)
+        return invoke(
+            copyto!,
+            Tuple{AbstractArray,Integer,AbstractArray,Integer,Integer},
+            dest,
+            dstart,
+            src,
+            sstart,
+            n,
+        )
     end
     n == 0 || dest.writable || throw(ReadOnlyMemoryError())
     # The AbstractArray fallback copies the entire source to handle aliasing.
