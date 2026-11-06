@@ -1,9 +1,9 @@
 from .workspacer import (
     DefaultLogicWorkspacer,
     LogicWorkspacer,
-    add_scatter_workspaces,
+    add_1d_workspaces,
+    add_cost_effective_workspaces,
     add_workspace,
-    add_workspaces,
     stage_workspaces,
     workspace_depth,
 )
@@ -11,9 +11,9 @@ from .workspacer import (
 __all__ = [
     "DefaultLogicWorkspacer",
     "LogicWorkspacer",
-    "add_scatter_workspaces",
+    "add_1d_workspaces",
+    "add_cost_effective_workspaces",
     "add_workspace",
-    "add_workspaces",
     "stage_workspaces",
     "workspace_depth",
 ]

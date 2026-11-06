@@ -208,7 +208,7 @@ def choose_formats(
         {tns: StaticFillFType(tensor.dtype(0)) for tns, tensor in inputs.items()}
     )
     stored = {tns: (ftypes.intp,) * len(idxs) for tns, idxs in fields.items()}
-    ftypes_2 = optimize_formats(
+    ftypes_2, _ = optimize_formats(
         plan, {}, stats, stats_factory, stored, fill_types, cost_model, LEVEL_OPTIONS
     )
     formats = {}

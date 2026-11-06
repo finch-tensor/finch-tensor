@@ -22,9 +22,9 @@ from finch.autoschedule.tensor_stats.uniform_stats import UniformStats
 from finch.autoschedule.util import fuse_loop_order
 from finch.autoschedule.workspacer import (
     LogicWorkspacer,
-    add_scatter_workspaces,
+    add_1d_workspaces,
+    add_cost_effective_workspaces,
     add_workspace,
-    add_workspaces,
     workspace_depth,
 )
 from finch.codegen import NumbaCompiler, NumpyBuffer
@@ -233,7 +233,9 @@ def test_workspacer_needs_a_field_written_in_order():
     }
     # The loops scatter into i, so a workspace would store all of c.
     plan, _ = _matmul(c, a, b, (k, i, j))
-    assert add_workspaces(plan, {}, stats, sf, PROTOCOL_COST_MODEL) == plan
+    assert (
+        add_cost_effective_workspaces(plan, {}, stats, sf, PROTOCOL_COST_MODEL) == plan
+    )
 
 
 @pytest.mark.parametrize(
@@ -272,7 +274,10 @@ def test_workspacer_leaves_queries_which_write_in_order():
     bindings: dict[Alias, TensorFType] = {a: tensor_a.ftype, b: tensor_b.ftype}
     plan, _ = _matmul(c, a, b, (i, k, j))
     assert workspace_depth(plan, c) is None
-    assert add_workspaces(plan, bindings, stats, sf, PROTOCOL_COST_MODEL) == plan
+    assert (
+        add_cost_effective_workspaces(plan, bindings, stats, sf, PROTOCOL_COST_MODEL)
+        == plan
+    )
 
 
 def test_only_small_workspaces_make_scattered_writes_cheap():
@@ -317,9 +322,7 @@ def test_scatter_workspaces_store_the_one_field_scattered_into():
     a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
     # Gustavson scatters into k alone, within each row of c.
     plan, _ = _matmul(c, a, b, (i, j, k))
-    assert add_scatter_workspaces(plan, {}) == add_workspace(
-        plan, c, 1, HardAlias("c_ws")
-    )
+    assert add_1d_workspaces(plan, {}) == add_workspace(plan, c, 1, HardAlias("c_ws"))
 
     # The j loop scatters into both k and m, so a workspace would store two.
     rhs = Aggregate(
@@ -330,4 +333,4 @@ def test_scatter_workspaces_store_the_one_field_scattered_into():
     )
     query = fuse_loop_order(Query(Table(c, (i, k, m)), rhs), (i, j, k, m))
     plan = Plan((query, Produces((c,))))
-    assert add_scatter_workspaces(plan, {}) == plan
+    assert add_1d_workspaces(plan, {}) == plan
