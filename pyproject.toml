@@ -40,6 +40,9 @@ benchmark = [
     "pytest-codspeed>=5",
     {include-group = "test"},
 ]
+fitting = [
+    "matplotlib>=3.8",
+]
 docs = [
     "zensical>=0.0.73",
     "mkdocstrings-python>=2.0.10",
@@ -95,6 +98,7 @@ c-gcc = { features = ["c-gcc"], solve-group = "default" }
 c-clang = { features = ["c-clang"], solve-group = "default" }
 julia = { features = ["julia"], solve-group = "julia" }
 test-julia = { features = ["test", "julia"], solve-group = "julia" }
+fitting = { features = ["julia", "fitting"], solve-group = "julia" }
 benchmark-julia = { features = ["test", "julia", "benchmark"], solve-group = "julia" }
 docs = { features = ["docs"], solve-group = "default" }
 pre-commit = { features = ["pre-commit"], no-default-feature = true }
@@ -314,5 +318,7 @@ markers = [
     "slow: tests that are slow (not recommended for CI)",
 ]
 testpaths = ["src"]
+# The tests of the fitting scripts import them as scripts.fitting.
+pythonpath = ["."]
 junit_family = "xunit2"
 strict = true
