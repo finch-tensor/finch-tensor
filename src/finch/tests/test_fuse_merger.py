@@ -278,6 +278,7 @@ def test_reads_of_one_tensor_in_a_merged_loop_share_one_walk():
         )
     )
     plan = merge_sibling_fuses(plan, lambda _: True)
+    assert isinstance(plan, Plan)
     data = np.array([[2.0, 0, 3, 0], [0, 0, 0, 0], [1, 5, 0, 7]])
     bindings = {
         a: fl.asarray(sps.csr_array(data)),
@@ -291,14 +292,15 @@ def test_reads_of_one_tensor_in_a_merged_loop_share_one_walk():
 
     # The rows of a are walked once, so the walk splits each row into its gaps
     # and its entries, rather than into the four cases of two walks.
-    walks = [
-        node
-        for node in PostOrderDFS(asm_program)
-        if isinstance(node, asm.WhileLoop)
-        and any(isinstance(child, asm.ForLoop) for child in node.body.bodies)
-    ]
+    walks = []
+    for node in PostOrderDFS(asm_program):
+        match node:
+            case asm.WhileLoop(_, asm.Block(bodies)) if any(
+                isinstance(child, asm.ForLoop) for child in bodies
+            ):
+                walks.append(bodies)
     assert len(walks) == 1
-    assert sum(isinstance(child, asm.ForLoop) for child in walks[0].body.bodies) == 2
+    assert sum(isinstance(child, asm.ForLoop) for child in walks[0]) == 2
 
     row_degrees, col_degrees = NumbaCompiler()(asm_program).main(*bindings.values())
     np.testing.assert_array_equal(row_degrees.to_numpy(), np.count_nonzero(data, 1))
