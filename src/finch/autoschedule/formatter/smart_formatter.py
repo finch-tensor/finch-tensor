@@ -30,6 +30,7 @@ from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
 from finch.finch_logic.tensor_stats import TensorStats
+from finch.symbolic import PostOrderDFS
 from finch.tensor import (
     FiberTensorFType,
     dense,
@@ -147,54 +148,6 @@ def optimize_formats(
     return {alias: bindings[alias] for alias in stored}
 
 
-def stored_shape_types(
-    prgm: lgc.LogicStatement,
-    bindings: Mapping[lgc.Alias, TensorFType],
-    machine: StatsMachine,
-) -> dict[lgc.Alias, tuple[FType, ...]]:
-    """
-    The dimensions each alias of prgm which bindings doesn't format stores, at
-    its first definition, advancing machine past prgm. No definition may
-    change the rank an alias stores.
-    """
-    shape_types: dict[lgc.Alias, tuple[FType | None, ...]] = {
-        var: val.shape_type for var, val in bindings.items()
-    }
-    stored: dict[lgc.Alias, tuple[FType, ...]] = {}
-    ranks = {var: len(val.shape_type) for var, val in bindings.items()}
-
-    def visit(node: lgc.LogicStatement):
-        match node:
-            case lgc.Plan(bodies):
-                for body in bodies:
-                    visit(body)
-            case lgc.Fuse(_, body):
-                visit(body)
-            case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
-                lgc.Table(lgc.Alias() as lhs, _), _, _
-            ):
-                node.infer_shape_type(shape_types)
-                machine(node)
-                alias, nfused = lhs.unfused, lhs.nfused
-                shape_type = tuple(
-                    ftype(dim) if dim is not None else ftypes.intp
-                    for dim in shape_types[alias][nfused:]
-                )
-                if ranks.setdefault(alias, len(shape_type)) != len(shape_type):
-                    raise ValueError(
-                        f"Cannot change the rank of allocated tensor {alias}."
-                    )
-                if alias not in bindings and alias not in stored:
-                    stored[alias] = shape_type
-            case lgc.Produces():
-                return
-            case _:
-                raise ValueError(f"Unsupported logic statement for formatting: {node}")
-
-    visit(prgm)
-    return stored
-
-
 def program_cost(
     prgm: lgc.LogicStatement,
     bindings: Mapping[lgc.Alias, TensorFType],
@@ -208,9 +161,24 @@ def program_cost(
     as optimize_formats chooses and its tables read with the protocols
     choose_protocols chooses, as optimize_formats sums the costs of its queries.
     """
-    stored = stored_shape_types(
-        prgm, bindings, StatsMachine(stats_factory, OrderedDict(stats))
+    shape_types = prgm.infer_shape_type(
+        {var: val.shape_type for var, val in bindings.items()}
     )
+    # Each new alias stores the fields its first definition doesn't fuse.
+    nfused: dict[lgc.Alias, int] = {}
+    for node in PostOrderDFS(prgm):
+        match node:
+            case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
+                lgc.Table(lgc.Alias() as lhs, _), _, _
+            ) if lhs.unfused not in bindings:
+                nfused.setdefault(lhs.unfused, lhs.nfused)
+    stored = {
+        alias: tuple(
+            ftype(dim) if dim is not None else ftypes.intp
+            for dim in shape_types[alias][n:]
+        )
+        for alias, n in nfused.items()
+    }
     fill_types = prgm.infer_fill_type(
         {var: val.fill_type for var, val in bindings.items()}
     )
@@ -397,13 +365,51 @@ class CostFormatter(LogicFormatter):
     ):
         bindings = bindings.copy()
         machine = StatsMachine(stats_factory, OrderedDict(stats))
-        stored = stored_shape_types(prgm, bindings, machine)
+        shape_types: dict[lgc.Alias, tuple[FType | None, ...]] = {
+            var: val.shape_type for var, val in bindings.items()
+        }
         fill_types = prgm.infer_fill_type(
             {var: val.fill_type for var, val in bindings.items()}
         )
+        # The dimensions each new alias stores, at its first definition, and
+        # the rank each alias stores, which no definition may change.
+        stored_shape_types: dict[lgc.Alias, tuple[FType, ...]] = {}
+        ranks = {var: len(val.shape_type) for var, val in bindings.items()}
+
+        def formatter(node: lgc.LogicStatement):
+            match node:
+                case lgc.Plan(bodies):
+                    for body in bodies:
+                        formatter(body)
+                case lgc.Fuse(_, body):
+                    formatter(body)
+                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
+                    lgc.Table(lgc.Alias() as lhs, _), _, _
+                ):
+                    node.infer_shape_type(shape_types)
+                    machine(node)
+                    alias, nfused = lhs.unfused, lhs.nfused
+                    shape_type = tuple(
+                        ftype(dim) if dim is not None else ftypes.intp
+                        for dim in shape_types[alias][nfused:]
+                    )
+                    if ranks.setdefault(alias, len(shape_type)) != len(shape_type):
+                        raise ValueError(
+                            f"Cannot change the rank of allocated tensor {alias}."
+                        )
+                    if alias not in bindings and alias not in stored_shape_types:
+                        stored_shape_types[alias] = shape_type
+                case lgc.Produces():
+                    return
+                case _:
+                    raise ValueError(
+                        f"Unsupported logic statement for formatting: {node}"
+                    )
+
+        formatter(prgm)
         bindings.update(
             self.choose_formats(
-                prgm, bindings, stats, stats_factory, stored, fill_types
+                prgm, bindings, stats, stats_factory, stored_shape_types, fill_types
             )
         )
 
