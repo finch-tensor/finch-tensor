@@ -4,7 +4,6 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import scipy.sparse as sps
 
 from finch import finch_assembly as asm
 from finch.algebra import (
@@ -20,7 +19,6 @@ from finch.algebra import (
     normalize_device,
     resolve_fill,
 )
-from finch.codegen import NumpyBuffer
 from finch.compile.lower import FinchTensorFType
 
 from . import level as levels
@@ -105,176 +103,19 @@ class FiberTensor(OverrideTensor):
         return self.lvl.buffer_factory
 
     def to_numpy(self) -> np.ndarray:
-        # TODO: temporary for dense only. TBD in sparse_level PR
-        return np.reshape(self.lvl.val.to_numpy(), self.shape, copy=False)
+        from finch.interface.constructor import to_numpy
+
+        return to_numpy(self)
 
     def to_scipy(self):
-        from .level import (
-            DenseLevel,
-            ElementLevel,
-            SparseCOOLevel,
-            SparseListLevel,
-        )
+        from finch.interface.constructor import to_scipy
 
-        if self.ndim != 2:
-            raise ValueError("SciPy sparse arrays must be two-dimensional.")
-
-        if self.fill_value != 0:
-            raise ValueError("SciPy CSR conversion requires a zero fill value.")
-
-        assert self.pos == 0
-
-        match self.lvl:
-            case SparseCOOLevel(
-                lvl=ElementLevel() as element,
-                tbl=(row, col),
-            ):
-                return sps.coo_array(
-                    (element.val.to_numpy(), (row.to_numpy(), col.to_numpy())),
-                    shape=self.shape,
-                    copy=False,
-                )
-
-            case DenseLevel(
-                lvl=SparseListLevel(
-                    lvl=ElementLevel() as element,
-                    ptr=ptr,
-                    idx=idx,
-                )
-            ):
-                return sps.csr_array(
-                    (element.val.to_numpy(), idx.to_numpy(), ptr.to_numpy()),
-                    shape=self.shape,
-                    copy=False,
-                )
-
-            case _:
-                raise NotImplementedError(
-                    f"Finch format {self.ftype} is not supported by SciPy conversion."
-                )
+        return to_scipy(self)
 
     def item(self):
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
         return self.to_numpy().item()
-
-    @classmethod
-    def from_scipy_csr(
-        cls,
-        obj: Any,
-        /,
-        *,
-        dtype=None,
-        device=None,
-        copy=None,
-    ):
-        from .level import (
-            DenseLevel,
-            ElementLevel,
-            SparseListLevel,
-            dense,
-            element,
-            sparse_list,
-        )
-
-        if dtype is not None:
-            if copy is False:
-                obj = obj.astype(dtype, copy=False)
-            else:
-                obj = obj.astype(dtype, copy=True)
-        elif copy is True:
-            obj = obj.copy()
-
-        if not obj.has_canonical_format:
-            if copy is False:
-                raise ValueError(
-                    "Unable to avoid copy while creating an array as requested."
-                )
-            obj = obj.copy()
-            obj.sum_duplicates()
-
-        data = obj.data
-        indices = obj.indices
-        indptr = obj.indptr
-
-        element_lvl = element(
-            fill_type=np.zeros((), dtype=data.dtype)[()],
-            element_type=ftype(data.dtype),
-            position_type=ftype(indices.dtype),
-        )
-        sparse_lvl = sparse_list(element_lvl, dimension_type=ftype(indices.dtype))
-        dense_lvl = dense(sparse_lvl, dimension_type=ftype(indices.dtype))
-
-        return cls(
-            DenseLevel(
-                SparseListLevel(
-                    ElementLevel(
-                        _format=element_lvl,
-                        _val=NumpyBuffer(data),
-                    ),
-                    dimension=sparse_lvl.dimension_type(obj.shape[1]),
-                    ptr=NumpyBuffer(indptr),
-                    idx=NumpyBuffer(indices),
-                ),
-                dimension=dense_lvl.dimension_type(obj.shape[0]),
-            ),
-            _device=device,
-        )
-
-    @classmethod
-    def from_scipy_coo(
-        cls,
-        obj: Any,
-        /,
-        *,
-        dtype=None,
-        device=None,
-        copy=None,
-    ):
-        from .level import (
-            ElementLevel,
-            SparseCOOLevel,
-            element,
-        )
-
-        if dtype is not None:
-            if copy is False:
-                obj = obj.astype(dtype, copy=False)
-            else:
-                obj = obj.astype(dtype, copy=True)
-        elif copy is True:
-            obj = obj.copy()
-
-        if not obj.has_canonical_format:
-            if copy is False:
-                raise ValueError(
-                    "Unable to avoid copy while creating an array as requested."
-                )
-            obj = obj.copy()
-            obj.sum_duplicates()
-
-        data = obj.data
-        row = obj.row
-        col = obj.col
-        index_type = ftype(row.dtype)
-
-        element_lvl = element(
-            fill_type=np.zeros((), dtype=data.dtype)[()],
-            element_type=ftype(data.dtype),
-            position_type=index_type,
-        )
-
-        return cls(
-            SparseCOOLevel(
-                ElementLevel(
-                    _format=element_lvl,
-                    _val=NumpyBuffer(data),
-                ),
-                shape=tuple(index_type(d) for d in obj.shape),
-                tbl=(NumpyBuffer(row), NumpyBuffer(col)),
-            ),
-            _device=device,
-        )
 
 
 @dataclass(unsafe_hash=True)

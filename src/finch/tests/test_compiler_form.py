@@ -4,7 +4,6 @@ import pytest
 
 import numpy as np
 
-import finch as fl
 import finch.finch_notation as ntn
 from finch.algebra import ffuncs
 from finch.autoschedule import (
@@ -32,6 +31,7 @@ from finch.finch_logic import (
     QueryInto,
     Table,
 )
+from finch.interface.constructor import from_scipy
 from finch.symbolic import PostOrderDFS
 from finch.tensor import BufferizedNDArray
 
@@ -410,8 +410,8 @@ def test_sparse_transpose(compiler):
     import scipy.sparse as sps
 
     data = np.array([[0.0, 1.0, 0.0], [2.0, 0.0, 3.0]])
-    source = fl.FiberTensor.from_scipy_csr(sps.csr_array(data))
-    output = fl.FiberTensor.from_scipy_csr(sps.csr_array(np.zeros(data.T.shape)))
+    source = from_scipy(sps.csr_array(data))
+    output = from_scipy(sps.csr_array(np.zeros(data.T.shape)))
     capture = LogicCapture()
     transpose = fuse_loop_order(Query(Table(C, (j, i)), Table(A, (i, j))), (j, i))
     plan = Plan((transpose, Produces((C,))))
