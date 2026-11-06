@@ -1,3 +1,5 @@
+import math
+
 import pytest
 
 import numpy as np
@@ -14,9 +16,11 @@ from finch.autoschedule.loop_orderer import BFSLoopOrderer
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.tensor_stats import (
     BaseTensorStats,
+    DCStats,
     DCStatsFactory,
     UniformStatsFactory,
 )
+from finch.autoschedule.tensor_stats.bound_stats import DC
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.tensor_stats.uniform_stats import UniformStats
 from finch.autoschedule.util import fuse_loop_order
@@ -148,13 +152,40 @@ def _random_csr(n, per_row, seed):
     return tensor, sps.csr_array((vals, cols, ptr), shape=(n, n))
 
 
-def _order(tensor_a, tensor_b, workspaces):
+def _csr_stats(tensor, csr, fields):
+    """
+    The stats DCStatsFactory gives tensor, from the degree sequences of its
+    SciPy copy csr, since the stats scheduler can't read a fiber tensor: the
+    rows and columns with entries, the entries, and the most in a row and in a
+    column.
+    """
+    i, j = fields
+    rows = np.diff(csr.indptr)
+    cols = np.bincount(csr.indices, minlength=csr.shape[1])
+    base = BaseTensorStats(
+        fields,
+        dict(zip(fields, map(float, csr.shape), strict=True)),
+        tensor.ftype.fill_type,
+        dict(zip(fields, tensor.ftype.shape_type, strict=True)),
+    )
+    dcs = {
+        DC(frozenset(), frozenset({i}), float(np.count_nonzero(rows)), math.inf),
+        DC(frozenset(), frozenset({j}), float(np.count_nonzero(cols)), math.inf),
+        DC(frozenset(), frozenset(fields), float(csr.nnz), math.inf),
+        DC(frozenset({i}), frozenset(fields), float(np.max(rows)), math.inf),
+        DC(frozenset({j}), frozenset(fields), float(np.max(cols)), math.inf),
+    }
+    return DCStats(base, dcs, DCStatsFactory().ps)
+
+
+def _order(a_csr, b_csr, workspaces):
     i, j, k = Field("i"), Field("j"), Field("k")
     a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
+    (tensor_a, csr_a), (tensor_b, csr_b) = a_csr, b_csr
     sf = DCStatsFactory()
     stats: dict[Alias, TensorStats] = {
-        a: sf(tensor_a, (i, j)),
-        b: sf(tensor_b, (j, k)),
+        a: _csr_stats(tensor_a, csr_a, (i, j)),
+        b: _csr_stats(tensor_b, csr_b, (j, k)),
     }
     capture = LogicCapture()
     plan, _ = _matmul(c, a, b)
@@ -176,7 +207,7 @@ def test_workspacer_accumulates_rows_in_a_workspace():
     )
 
     # The search scatters into the columns of c, for each of its rows.
-    capture = _order(tensor_a, tensor_b, workspaces=False)
+    capture = _order((tensor_a, csr_a), (tensor_b, csr_b), workspaces=False)
     match capture.last_prgm:
         case Plan((Fuse(i_, Fuse(j_, Fuse(k_, Query(Table(lhs, _), _)))), Produces())):
             assert (i_, j_, k_, lhs) == (i, j, k, c)
@@ -186,7 +217,7 @@ def test_workspacer_accumulates_rows_in_a_workspace():
     # The loop orderer propagates copies before the workspacer adds the
     # workspace, so its copy stays, and the writes scatter into a workspace for
     # each row instead.
-    capture = _order(tensor_a, tensor_b, workspaces=True)
+    capture = _order((tensor_a, csr_a), (tensor_b, csr_b), workspaces=True)
     match capture.last_prgm:
         case Plan(
             (
@@ -247,11 +278,9 @@ def test_workspacer_needs_a_field_written_in_order():
     ],
 )
 def test_workspacer_keeps_workspaces_which_cost_less(n, per_row, staged):
-    (tensor_a, _), (tensor_b, _) = (
-        _random_csr(n, per_row, 0),
-        _random_csr(n, per_row, 1),
+    capture = _order(
+        _random_csr(n, per_row, 0), _random_csr(n, per_row, 1), workspaces=True
     )
-    capture = _order(tensor_a, tensor_b, workspaces=True)
     fused = []
     for node in PostOrderDFS(capture.last_prgm):
         match node:
