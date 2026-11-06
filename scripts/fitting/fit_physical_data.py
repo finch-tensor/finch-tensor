@@ -8,8 +8,10 @@ models of --model, as time_physical_data made them, so no example is compiled
 or run, and the stats are counted exactly from the Kronecker blocks of its
 inputs, so none is materialized. The formats of a variant enter only through
 the bases, as in the optimizers, which see the supports of their inputs. The
-loop stage orders loops before its inputs are formatted, so it reads them
-without protocols. The variants of each example are every option of one
+loop stage orders loops before the workspacer, the formatter and the protocol
+optimizer run, so it reads its inputs as their formats read them by default,
+as the loop orderer prices them, and its outputs without protocols. The
+variants of each example are every option of one
 decision, so the model is also scored by its regret: the runtime of the
 variant it predicts to be fastest over that of the fastest, for each example.
 To show how the fit improves with data, a held-out tenth of the examples

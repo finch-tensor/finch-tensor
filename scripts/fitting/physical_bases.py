@@ -24,8 +24,10 @@ examples coalesce_physical_data collects, so a new basis needs no new timings.
   to the workspacer, which stages the writes which scatter in a workspace
   where that costs less, then to the formatter, which chooses the formats
   from the supports of its inputs, and then to the protocol optimizer. Its
-  features are those of the supports, before any of them run, so the model
-  learns what a loop order costs once they have.
+  features are those of the program as ordered, before any of them run, with
+  its inputs read as their formats read them by default and its outputs
+  unformatted, as the loop orderer prices it, so the model learns what a loop
+  order costs once they have run.
 """
 
 import json
@@ -332,7 +334,8 @@ def featurize_record(
     choices with models, as time_physical_data makes them, so nothing is
     compiled or run. The loop stage orders loops before the workspacer and
     the formatter run, so its features are those of the program as ordered,
-    reading its inputs without protocols.
+    reading its inputs as their formats read them by default, as the loop
+    orderer prices them, and its outputs without protocols.
     """
     stage = record["stage"]
     stats_factory = KroneckerStatsFactory(record["block_bits"])
@@ -350,7 +353,6 @@ def featurize_record(
                 formats,
                 read_inputs(record, plan, inputs),
                 stats_factory,
-                protocols=stage != "loop",
             )
         )
     return rows

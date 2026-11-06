@@ -111,7 +111,8 @@ def test_resolve_stages_a_workspace_where_it_pays():
 
 def test_loop_features_charge_writes_before_the_workspacer_runs():
     record = gustavson_record(np.random.default_rng(0))
-    rows = featurize_record(record, record_inputs(record), "loop", parse_models(None))
+    models = parse_models(None)
+    rows = featurize_record(record, record_inputs(record), "loop", models)
     basis = BASES["loop"]
     names = basis.feature_names
     totals = {
@@ -130,6 +131,12 @@ def test_loop_features_charge_writes_before_the_workspacer_runs():
     assert totals[("i", "k", "j")]["sequential_writes"] > 0
     # An outer product scatters into all of C, which no workspace fits.
     assert totals[("j", "i", "k")]["scatter_writes"] > 0
+    # The inputs are read as their formats read them by default, so a dense
+    # level is looked up where a list is walked.
+    _, formats = resolve(record, record["variants"][0], record_inputs(record), models)
+    assert record["variants"][0]["loop_order"] == ["i", "j", "k"]
+    dense_levels = any(opt.kind == "dense" for tns in (A, B) for opt in formats[tns])
+    assert (totals[("i", "j", "k")]["lookups"] > 0) == dense_levels
 
 
 @pytest.mark.skipif(not julia_available(), reason="Finch.jl is not installed")

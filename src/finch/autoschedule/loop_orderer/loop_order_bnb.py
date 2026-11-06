@@ -4,6 +4,7 @@ import itertools
 from collections.abc import Mapping, MutableMapping
 from typing import Generic, TypeVar
 
+from finch.algebra.tensor import TensorFType
 from finch.autoschedule.cost_models import LOOP_COST_MODEL, CostModel, Prefix
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.autoschedule.tensor_stats.stats_interpreter import (
@@ -25,7 +26,7 @@ from finch.finch_logic import (
 )
 
 from .loop_order_greedy import connected_loop_candidates, greedy_loop_order
-from .loop_ordering import AbstractLoopOrderer, with_loop_order
+from .loop_ordering import AbstractLoopOrderer, priced_expr, with_loop_order
 
 NS = TypeVar("NS", bound=NumericStats)
 
@@ -216,6 +217,7 @@ class BFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         prgm: Plan,
         stats: MutableMapping[Alias, NS],
         stats_factory: StatsFactory[NS],
+        bindings: Mapping[Alias, TensorFType] | None = None,
     ) -> Plan:
         stats_bindings = dict(stats)
 
@@ -224,12 +226,10 @@ class BFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
             match query:
                 case QueryInto(_, _, Literal()):
                     new_queries.append(query)
-                case Query(Table(_, out_idxs), Aggregate() as arg) | QueryInto(
-                    Table(_, out_idxs), _, arg
+                case Query(Table(_, out_idxs), Aggregate()) | QueryInto(
+                    Table(_, out_idxs), _, _
                 ):
-                    match query:
-                        case QueryInto():
-                            arg = query.as_query().rhs
+                    arg = priced_expr(query, bindings)
                     idxs_2 = loop_order_bfs(
                         arg,
                         stats_factory,
@@ -264,6 +264,7 @@ class DFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         prgm: Plan,
         stats: MutableMapping[Alias, NS],
         stats_factory: StatsFactory[NS],
+        bindings: Mapping[Alias, TensorFType] | None = None,
     ) -> Plan:
         stats_bindings = dict(stats)
 
@@ -272,12 +273,10 @@ class DFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
             match query:
                 case QueryInto(_, _, Literal()):
                     new_queries.append(query)
-                case Query(Table(_, out_idxs), Aggregate() as arg) | QueryInto(
-                    Table(_, out_idxs), _, arg
+                case Query(Table(_, out_idxs), Aggregate()) | QueryInto(
+                    Table(_, out_idxs), _, _
                 ):
-                    match query:
-                        case QueryInto():
-                            arg = query.as_query().rhs
+                    arg = priced_expr(query, bindings)
                     idxs_2 = loop_order_dfs(
                         arg,
                         stats_factory,
@@ -311,6 +310,7 @@ class BruteForceLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         prgm: Plan,
         stats: MutableMapping[Alias, NS],
         stats_factory: StatsFactory[NS],
+        bindings: Mapping[Alias, TensorFType] | None = None,
     ) -> Plan:
         stats_bindings = dict(stats)
 
@@ -319,12 +319,10 @@ class BruteForceLoopOrderer(AbstractLoopOrderer, Generic[NS]):
             match query:
                 case QueryInto(_, _, Literal()):
                     new_queries.append(query)
-                case Query(Table(_, out_idxs), Aggregate() as arg) | QueryInto(
-                    Table(_, out_idxs), _, arg
+                case Query(Table(_, out_idxs), Aggregate()) | QueryInto(
+                    Table(_, out_idxs), _, _
                 ):
-                    match query:
-                        case QueryInto():
-                            arg = query.as_query().rhs
+                    arg = priced_expr(query, bindings)
                     idxs_2 = loop_order_brute_force(
                         arg,
                         stats_factory,

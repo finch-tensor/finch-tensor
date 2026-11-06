@@ -116,7 +116,7 @@ class FixedLoopOrderer(AbstractLoopOrderer):
         super().__init__(ctx)
         self.order = order
 
-    def set_loop_orders(self, prgm, stats, stats_factory):
+    def set_loop_orders(self, prgm, stats, stats_factory, bindings=None):
         return Plan(
             tuple(
                 fuse_loop_order(body, self.order)

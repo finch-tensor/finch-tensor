@@ -1,6 +1,7 @@
 from collections.abc import Mapping, Sequence
 from typing import Generic, TypeVar
 
+from finch.algebra.tensor import TensorFType
 from finch.autoschedule.cost_models import LOOP_COST_MODEL, CostModel, Prefix
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.autoschedule.tensor_stats.stats_interpreter import (
@@ -21,7 +22,7 @@ from finch.finch_logic import (
     Table,
 )
 
-from .loop_ordering import AbstractLoopOrderer, with_loop_order
+from .loop_ordering import AbstractLoopOrderer, priced_expr, with_loop_order
 
 NS = TypeVar("NS", bound=NumericStats)
 
@@ -78,6 +79,7 @@ def set_greedy_loop_order(
     stats_factory: StatsFactory[NS],
     stats: dict[Alias, NS],
     cost_model: CostModel[Prefix] | None = None,
+    bindings: Mapping[Alias, TensorFType] | None = None,
 ) -> Plan:
     stats_bindings = dict(stats)
     new_queries = []
@@ -85,12 +87,10 @@ def set_greedy_loop_order(
         match query:
             case QueryInto(_, _, Literal()):
                 new_queries.append(query)
-            case Query(Table(_, out_idxs), Aggregate() as arg) | QueryInto(
-                Table(_, out_idxs), _, arg
+            case Query(Table(_, out_idxs), Aggregate()) | QueryInto(
+                Table(_, out_idxs), _, _
             ):
-                match query:
-                    case QueryInto():
-                        arg = query.as_query().rhs
+                arg = priced_expr(query, bindings)
                 idxs_2 = greedy_loop_order(
                     arg, stats_factory, stats_bindings, out_idxs, cost_model=cost_model
                 )
@@ -120,5 +120,8 @@ class GreedyLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         prgm: Plan,
         stats: dict[Alias, NS],
         stats_factory: StatsFactory[NS],
+        bindings: Mapping[Alias, TensorFType] | None = None,
     ) -> Plan:
-        return set_greedy_loop_order(prgm, stats_factory, stats, self.cost_model)
+        return set_greedy_loop_order(
+            prgm, stats_factory, stats, self.cost_model, bindings
+        )
