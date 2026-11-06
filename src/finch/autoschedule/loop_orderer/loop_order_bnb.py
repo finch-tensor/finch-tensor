@@ -24,7 +24,7 @@ from finch.finch_logic import (
     Table,
 )
 
-from .loop_order_greedy import connected_loop_candidates, greedy_loop_order
+from .loop_order_greedy import greedy_loop_order
 from .loop_ordering import AbstractLoopOrderer, with_loop_order
 
 NS = TypeVar("NS", bound=NumericStats)
@@ -73,10 +73,10 @@ def loop_order_bfs(
         new_optimal_orders: list[tuple[tuple[Field, ...], float]] = []
         for prefix, prefix_cost in prev_new_optimal_orders:
             prefix_set = set(prefix)
+            # The fields stay in the order of all_vars, so ties break the same
+            # way in every process.
             remaining = [field for field in all_vars if field not in prefix_set]
-            # Preserves remaining / all_vars order (see connected_loop_candidates).
-            candidates = connected_loop_candidates(prefix, remaining, output_vars)
-            for field in candidates:
+            for field in remaining:
                 new_prefix = prefix + (field,)
                 new_cost = prefix_cost + cost_model.predict_component_cost(
                     Prefix(new_prefix, expr, output_vars), machine
@@ -134,12 +134,12 @@ def loop_order_dfs(
     while stack:
         prefix, prefix_cost = stack.pop()
         prefix_set = set(prefix)
+        # The fields stay in the order of all_vars, so ties break the same way
+        # in every process.
         remaining = [field for field in all_vars if field not in prefix_set]
         children: list[tuple[tuple[Field, ...], float]] = []
 
-        # Preserves remaining / all_vars order (see connected_loop_candidates).
-        candidates = connected_loop_candidates(prefix, remaining, output_vars)
-        for field in candidates:
+        for field in remaining:
             new_prefix = prefix + (field,)
             new_cost = prefix_cost + cost_model.predict_component_cost(
                 Prefix(new_prefix, expr, output_vars), machine
