@@ -116,13 +116,14 @@ def is_annihilator(op: FinchOperatorFType, val: Any) -> bool:
     return ok and op.is_annihilator(value)
 
 
-SPECIALIZABLE_VALUES = (0, 1, -1, math.inf, -math.inf)
+SPECIALIZABLE_VALUES = (0, 1, -1, 2, -2, math.inf, -math.inf)
 
 
 def is_specializable_value(val: Any) -> bool:
     """
-    A constant is only worth specializing on if some operator's identity or
-    annihilator rule can fire against it; see `SPECIALIZABLE_VALUES`.
+    A constant is only worth specializing on if the compiler can exploit its
+    value, e.g. when an operator's identity or annihilator rule can fire
+    against it; see `SPECIALIZABLE_VALUES`.
     """
     try:
         return any(bool(val == candidate) for candidate in SPECIALIZABLE_VALUES)

@@ -223,7 +223,7 @@ def test_plain_scalar_shares_one_kernel():
     executor, ctx = _cached_scheduler()
     arr = np.arange(3.0)
     x = finch.asarray(arr)
-    for v in [1.0, 2.0, 3.0, 4.0, 5.0]:
+    for v in [1.0, 3.0, 4.0, 5.0]:
         out = finch.compute(finch.defer(x) + v, ctx=ctx)
         finch_assert_allclose(out, arr + v)
     assert len(executor.cached_kernels) == 2
@@ -302,7 +302,7 @@ def test_a_produced_constant_keeps_its_binding():
 
 def test_plain_scalar_becomes_binding():
     x = finch.defer(finch.asarray(np.arange(3.0)))
-    y = x + 2.0
+    y = x + 3.0
     queries = [s for s in y.ctx.trace() if isinstance(s, Query)]
     # The plain scalar is a real 0-d tensor binding: input table, scalar
     # table, and the mapjoin.
@@ -320,12 +320,12 @@ def test_scalar_annihilator_keeps_known_fill():
     executor, ctx = _cached_scheduler()
     arr = np.arange(3.0)
     x = finch.asarray(arr)
-    for v in [1.0, 2.0, 3.0]:
+    for v in [1.0, 3.0, 4.0]:
         out = finch.compute(finch.defer(x) * v, ctx=ctx)
         finch_assert_allclose(out, arr * v)
         assert out.fill_value == 0.0
     # 1.0 is mul's identity, so it inlines and simplifies to its own kernel;
-    # 2.0 and 3.0 share the other.
+    # 3.0 and 4.0 share the other.
     assert len(executor.cached_kernels) == 2
 
 
@@ -367,12 +367,12 @@ def test_stale_fill_regression():
     executor, ctx = _cached_scheduler()
     arr = np.arange(3.0)
     x = finch.asarray(arr)
-    out_a = finch.compute(finch.defer(x) + 2.0, ctx=ctx)
+    out_a = finch.compute(finch.defer(x) + 3.0, ctx=ctx)
     out_b = finch.compute(finch.defer(x) + 7.0, ctx=ctx)
     finch_assert_allclose(out_b, arr + 7.0)
     assert out_b.fill_value == 7.0
-    finch_assert_allclose(out_a, arr + 2.0)
-    assert out_a.fill_value == 2.0
+    finch_assert_allclose(out_a, arr + 3.0)
+    assert out_a.fill_value == 3.0
     assert len(executor.cached_kernels) == 1
 
 
@@ -387,10 +387,10 @@ def test_order_independence():
         }
         return outs, len(executor.cached_kernels)
 
-    outs_a, kernels_a = run([0.0, 2.0])
-    outs_b, kernels_b = run([2.0, 0.0])
+    outs_a, kernels_a = run([0.0, 3.0])
+    outs_b, kernels_b = run([3.0, 0.0])
     assert kernels_a == kernels_b == 2
-    for v in [0.0, 2.0]:
+    for v in [0.0, 3.0]:
         np.testing.assert_array_equal(outs_a[v], outs_b[v])
 
 
@@ -416,11 +416,11 @@ def test_galley_scalar_cache_counts():
     executor, ctx = _cached_galley_scheduler()
     arr = np.arange(3.0)
     x = finch.asarray(arr)
-    for v in [1.0, 2.0, 3.0]:
+    for v in [1.0, 3.0, 4.0]:
         out = finch.compute(finch.defer(x) + v, ctx=ctx)
         finch_assert_allclose(out, arr + v)
         assert out.fill_value == v
-    for v in [0.0, 2.0, 5.0]:
+    for v in [0.0, 3.0, 5.0]:
         out = finch.compute(finch.defer(x) * v, ctx=ctx)
         finch_assert_allclose(out, arr * v)
         assert out.fill_value == 0.0
@@ -437,10 +437,10 @@ def test_galley_order_independence():
         }
         return outs, len(executor.cached_kernels)
 
-    outs_a, kernels_a = run([0.0, 2.0])
-    outs_b, kernels_b = run([2.0, 0.0])
+    outs_a, kernels_a = run([0.0, 3.0])
+    outs_b, kernels_b = run([3.0, 0.0])
     assert kernels_a == kernels_b == 2
-    for v in [0.0, 2.0]:
+    for v in [0.0, 3.0]:
         np.testing.assert_array_equal(outs_a[v], outs_b[v])
 
 
@@ -614,7 +614,7 @@ def test_backend_refusal_propagates():
     ctx = LogicNormalizer(LogicExecutor(loader, cache=True))
     x = finch.asarray(np.arange(3.0))
     with pytest.raises(DynamicFillError):
-        finch.compute(finch.defer(x) + 2.0, ctx=ctx)
+        finch.compute(finch.defer(x) + 3.0, ctx=ctx)
 
 
 def test_ftype_reports_a_fill_and_tensor_reports_a_value():
@@ -659,7 +659,7 @@ def test_dynamic_output_feeds_a_reusable_kernel():
     arr = np.arange(3.0)
     x = finch.asarray(arr)
 
-    for v in [2.0, 3.0, 4.0]:
+    for v in [3.0, 4.0, 5.0]:
         step1 = finch.compute(finch.defer(x) + v, ctx=ctx)
         assert is_dynamic(step1.ftype.fill_type)
         step2 = finch.compute(finch.defer(step1) * 2.0, ctx=ctx)

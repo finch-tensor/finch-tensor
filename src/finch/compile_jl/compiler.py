@@ -13,7 +13,6 @@ from finch.algebra.fill import (
     StaticFillFType,
     is_dynamic,
 )
-from finch.algebra.ftypes import FDTypeBoolean
 from finch.compile import NotationCompiler, dimension
 from finch.compile.lower import make_extent
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
@@ -64,11 +63,12 @@ _JULIA_OPS = {
     ffuncs.invert.ftype: "~",
     ffuncs.lshift.ftype: "<<",
     ffuncs.rshift.ftype: ">>",
-    ffuncs.logical_and.ftype: "Finch.and",
-    ffuncs.logical_or.ftype: "Finch.or",
-    # NumPy's logical_not is true exactly for zeros; Julia's ! takes only Bools.
+    # NumPy's logical operators read their operands' truth, but Julia's (&&, ||,
+    # !, xor) take Bools, or act bitwise on integers.
+    ffuncs.logical_and.ftype: "Finch.logical_and",
+    ffuncs.logical_or.ftype: "Finch.logical_or",
     ffuncs.logical_not.ftype: "iszero",
-    ffuncs.logical_xor.ftype: "xor",
+    ffuncs.logical_xor.ftype: "Finch.logical_xor",
     # math / elementwise
     ffuncs.max.ftype: "max",
     ffuncs.min.ftype: "min",
@@ -82,37 +82,30 @@ _JULIA_OPS = {
     ffuncs.clip.ftype: "clamp",
     ffuncs.truth.ftype: "Bool",
     ffuncs.first_arg.ftype: "first_arg",
+    # vector norms
+    ffuncs.scaled_square.ftype: "Finch.scaled_square",
+    ffuncs.add_scaled_square.ftype: "Finch.add_scaled_square",
+    ffuncs.root_scaled_square.ftype: "Finch.root_scaled_square",
 }
 
-# Logical operators read their operands' truth, as NumPy's do, but their Julia
-# counterparts (&&, ||, &, |, xor) take Bools, or act bitwise on integers, so
-# operands of other types are converted with !iszero first.
-_LOGICAL_OPS = {
-    ffuncs.logical_and.ftype,
-    ffuncs.logical_or.ftype,
-    ffuncs.logical_xor.ftype,
+# Operators parameterized by an exponent, and the Finch.jl functions that
+# construct them from it.
+_JULIA_EXPONENT_OPS = {
+    ffuncs._ScaledPower: "Finch.scaled_power",
+    ffuncs._AddScaledPower: "Finch.add_scaled_power",
+    ffuncs._RootScaledPower: "Finch.root_scaled_power",
+    ffuncs._ScaledNegativePower: "Finch.scaled_negative_power",
+    ffuncs._AddScaledNegativePower: "Finch.add_scaled_negative_power",
+    ffuncs._RootScaledNegativePower: "Finch.root_scaled_negative_power",
 }
 
-
-def _julia_truth(node, code: str) -> str:
-    """code, read as a Bool. !iszero is right for Bools too, so it is only
-    skipped when node is known to be one."""
-    try:
-        is_bool = isinstance(node.result_type, FDTypeBoolean)
-    except (AttributeError, AssertionError):
-        is_bool = False
-    return code if is_bool else f"!iszero({code})"
-
-
+# Reductions with an update operator of their own. Others are written with
+# Finch's <<op>>= syntax.
 _JULIA_REDUCTION_OPS = {
     ffuncs.add.ftype: "+",
     ffuncs.mul.ftype: "*",
-    ffuncs.max.ftype: "<<max>>",
-    ffuncs.min.ftype: "<<min>>",
     ffuncs.and_.ftype: "&",
     ffuncs.or_.ftype: "|",
-    ffuncs.logical_and.ftype: "&",
-    ffuncs.logical_or.ftype: "|",
 }
 _INFIX_OPS = {
     "+",
@@ -406,11 +399,6 @@ class FinchJLGenerator:
 
             case ntn.Call(op, args):
                 arg_strs = [self.generate_julia(arg, nestingLvl) for arg in args]
-                if op.result_type in _LOGICAL_OPS:
-                    arg_strs = [
-                        _julia_truth(arg, arg_str)
-                        for arg, arg_str in zip(args, arg_strs, strict=True)
-                    ]
                 if op.result_type == make_tuple.ftype:
                     return f"({', '.join(arg_strs)}{',' if len(arg_strs) == 1 else ''})"
                 julia_op = _JULIA_OPS.get(op.result_type) or self.generate_julia(
@@ -446,11 +434,14 @@ class FinchJLGenerator:
                         stmt = f"{lhs_str} <<{op}>>= {rhs_str}"
                     case ffuncs._OverwriteFType():
                         stmt = f"{lhs_str} := {rhs_str}"
-                    case _:
-                        op = _JULIA_REDUCTION_OPS[lhs.mode.op.result_type]
-                        if lhs.mode.op.result_type in _LOGICAL_OPS:
-                            rhs_str = _julia_truth(rhs, rhs_str)
+                    case op_type if op_type in _JULIA_REDUCTION_OPS:
+                        op = _JULIA_REDUCTION_OPS[op_type]
                         stmt = f"{lhs_str} {op}= {rhs_str}"
+                    case op_type:
+                        op = _JULIA_OPS.get(op_type) or self.generate_julia(
+                            lhs.mode.op, nestingLvl
+                        )
+                        stmt = f"{lhs_str} <<{op}>>= {rhs_str}"
                 return f"{tab_str}{stmt}"
 
             case ntn.Unwrap(arg):
@@ -495,6 +486,10 @@ class FinchJLGenerator:
                     raise DynamicFillError("Julia choose requires a static fill")
                 value = self.generate_julia(ntn.Literal(fill.value), nestingLvl)
                 return f"Finch.choose({value})"
+
+            case ntn.Literal(op) if type(op) in _JULIA_EXPONENT_OPS:
+                exponent = _julia_literal(op.exponent)
+                return f"{_JULIA_EXPONENT_OPS[type(op)]}({exponent})"
 
             case ntn.Literal(val):
                 if isinstance(val, AbstractFill | AbstractFillFType):

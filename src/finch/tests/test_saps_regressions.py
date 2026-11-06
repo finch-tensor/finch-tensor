@@ -63,18 +63,24 @@ def test_reduction_without_repeat_operator():
     np.testing.assert_array_equal(_dense(y), np.arange(1.0, 7.0).reshape(3, 2))
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=KeyError,
-    reason=(
-        "The Julia backend has no reduction for vector_norm's tuple-valued "
-        "add_scaled_square (_JULIA_REDUCTION_OPS), nor ops for scaled_square "
-        "and root_scaled_square."
-    ),
-)
-def test_vector_norm():
-    v = ft.asarray(np.array([3.0, 4.0]))
-    assert float(ft.linalg.vector_norm(v)[()]) == 5.0
+@pytest.mark.parametrize("ord", [2, 3, 0.5, -1, -2])
+def test_vector_norm(ord):
+    # fastsv, gmres: vector_norm sums tuple-valued scaled powers, which the
+    # Julia backend had no operators for.
+    v = np.array([3.0, 4.0])
+    assert float(ft.linalg.vector_norm(ft.asarray(v), ord=ord)[()]) == pytest.approx(
+        np.linalg.vector_norm(v, ord=ord)
+    )
+    x = np.array([[0.0, 3.0, -4.0], [1.0, 0.5, 2.0]])
+    np.testing.assert_allclose(
+        _dense(ft.linalg.vector_norm(ft.asarray(x), ord=ord, axis=1)),
+        np.linalg.vector_norm(x, ord=ord, axis=1),
+    )
+    # The sums are scaled, so powers of large values don't overflow as NumPy's do.
+    big = np.array([3e200, 4e200])
+    assert float(ft.linalg.vector_norm(ft.asarray(big), ord=ord)[()]) == pytest.approx(
+        np.linalg.vector_norm(big / 1e200, ord=ord) * 1e200
+    )
 
 
 def test_logical_operators_on_integers():
@@ -90,6 +96,15 @@ def test_logical_operators_on_integers():
     )
     np.testing.assert_array_equal(
         _dense(ft.logical_or(ft.asarray(x), ft.asarray(y))), np.logical_or(x, y)
+    )
+    z = np.array([[0, 2, 0], [3, 1, 0]])
+    np.testing.assert_array_equal(
+        _dense(ft.reduce(ffuncs.logical_or, ft.asarray(z), axis=1, init=False)),
+        np.any(z, axis=1),
+    )
+    np.testing.assert_array_equal(
+        _dense(ft.reduce(ffuncs.logical_and, ft.asarray(z), axis=1, init=True)),
+        np.all(z, axis=1),
     )
 
 
