@@ -30,7 +30,7 @@ from .formatter import DefaultLogicFormatter, FDFormatter, GalleyFormatter
 from .loop_orderer import BFSLoopOrderer, DefaultLoopOrderer
 from .normalize import LogicNormalizer
 from .protocolizer import CostProtocolizer
-from .workspacer import DefaultLogicWorkspacer, LogicWorkspacer
+from .workspacer import LogicWorkspacer
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
@@ -175,11 +175,7 @@ COMPILE_JULIA = LogicNormalizer(
         DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
-                    DefaultLogicWorkspacer(
-                        FDFormatter(
-                            CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
-                        )
-                    )
+                    FDFormatter(CompilerFormLowerer(LogicCompiler(FinchJLCompiler())))
                 )
             )
         ),
@@ -229,9 +225,7 @@ _NON_RECURSIVE_BACKEND = (
 NON_RECURSIVE_SCHEDULER = LogicNormalizer(
     LogicExecutor(
         DefaultLogicFactorizer(
-            LogicSimplify(
-                DefaultLoopOrderer(DefaultLogicWorkspacer(_NON_RECURSIVE_BACKEND))
-            )
+            LogicSimplify(DefaultLoopOrderer(_NON_RECURSIVE_BACKEND))
         ),
         stats_factory=FDStatsFactory(),
         cache=True,
@@ -246,14 +240,12 @@ CACHING_SCHEDULER = LogicNormalizer(FactorCacheEvaluator(NON_RECURSIVE_SCHEDULER
 NON_RECURSIVE_STANDARD_SCHEDULER = LogicNormalizer(
     LogicExecutor(
         LogicSimplify(
-            DefaultLogicWorkspacer(
-                DefaultLogicFormatter(
-                    CompilerFormLowerer(
-                        LogicCompiler(
-                            FinchJLCompiler()
-                            if julia_available()
-                            else NotationInterpreter()
-                        )
+            DefaultLogicFormatter(
+                CompilerFormLowerer(
+                    LogicCompiler(
+                        FinchJLCompiler()
+                        if julia_available()
+                        else NotationInterpreter()
                     )
                 )
             )
