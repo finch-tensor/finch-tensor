@@ -1,0 +1,658 @@
+---------------------------------------
+Begin Slurm Prolog: Nov-06-2026 12:38:24
+Job ID:    15228675
+User ID:   wahrens6
+Account:   gts-wahrens6
+Job name:  time
+Partition: cpu-small
+QOS:       inferno
+---------------------------------------
+installing the environment in /tmp/physical-data-EFplpi
+ ⚠ warning PyPI package 'binsparse' has no conda-forge mapping, skipping
+
+ ╭─ Running build for recipe: finch-tensor-0.7.0-pyh4616a5c_0
+ │
+ │ ╭─ Fetching source code
+ │ │ No sources to fetch
+ │ │
+ │ ╰─────────────────── (took 0 seconds)
+ │
+ │ ╭─ Externally resolved dependencies recipe: finch-tensor-0.7.0-pyh4616a5c_0
+ │ │ 
+ │ │ Resolved build dependencies(finch-tensor-0.7.0-pyh4616a5c_0):
+ │ │ ╭─────────┬──────┬─────────┬───────┬─────────┬──────╮
+ │ │ │ Package ┆ Spec ┆ Version ┆ Build ┆ Channel ┆ Size │
+ │ │ ╞═════════╪══════╪═════════╪═══════╪═════════╪══════╡
+ │ │ ╰─────────┴──────┴─────────┴───────┴─────────┴──────╯
+ │ │ Resolved host dependencies(finch-tensor-0.7.0-pyh4616a5c_0):
+ │ │ ╭──────────────────┬────────────────────┬──────────────┬──────────────────────┬─────────────┬────────────╮
+ │ │ │ Package          ┆ Spec               ┆ Version      ┆ Build                ┆ Channel     ┆       Size │
+ │ │ ╞══════════════════╪════════════════════╪══════════════╪══════════════════════╪═════════════╪════════════╡
+ │ │ │ python           ┆ python >=3.11,<4   ┆ 3.15.1       ┆ h6e52b48_100_cp315   ┆ conda-forge ┆  27.86 MiB │
+ │ │ │ uv               ┆ uv                 ┆ 0.13.5       ┆ h535ca38_0           ┆ conda-forge ┆  14.07 MiB │
+ │ │ │ uv-build         ┆ uv-build >=0.11.25 ┆ 0.13.5       ┆ hd0df7c4_0           ┆ conda-forge ┆   1.44 MiB │
+ │ │ │ _openmp_mutex    ┆                    ┆ 4.5          ┆ 20_gnu               ┆ conda-forge ┆  28.27 KiB │
+ │ │ │ bzip2            ┆                    ┆ 1.0.8        ┆ hda65f42_10          ┆ conda-forge ┆ 251.77 KiB │
+ │ │ │ ca-certificates  ┆                    ┆ 2026.10.23   ┆ hbd8a1cb_0           ┆ conda-forge ┆ 127.01 KiB │
+ │ │ │ ld_impl_linux-64 ┆                    ┆ 2.46.1       ┆ default_hbd61a6d_103 ┆ conda-forge ┆ 724.72 KiB │
+ │ │ │ libedit          ┆                    ┆ 3.1.20260512 ┆ pl5321h373387f_0     ┆ conda-forge ┆ 132.69 KiB │
+ │ │ │ libexpat         ┆                    ┆ 2.8.5        ┆ hd2095e1_0           ┆ conda-forge ┆  76.07 KiB │
+ │ │ │ libffi           ┆                    ┆ 3.7.0        ┆ h81df57d_1           ┆ conda-forge ┆  66.41 KiB │
+ │ │ │ libgcc           ┆                    ┆ 16.2.0       ┆ ha9f2e26_7           ┆ conda-forge ┆   1.01 MiB │
+ │ │ │ libgomp          ┆                    ┆ 16.2.0       ┆ he0feb66_7           ┆ conda-forge ┆ 625.55 KiB │
+ │ │ │ liblzma          ┆                    ┆ 5.8.3        ┆ hb03c661_1           ┆ conda-forge ┆ 110.35 KiB │
+ │ │ │ libmpdec         ┆                    ┆ 4.0.0        ┆ hb03c661_2           ┆ conda-forge ┆  90.58 KiB │
+ │ │ │ libsqlite        ┆                    ┆ 3.54.1       ┆ h0737f62_100         ┆ conda-forge ┆ 957.44 KiB │
+ │ │ │ libstdcxx        ┆                    ┆ 16.2.0       ┆ h934c35e_7           ┆ conda-forge ┆   6.31 MiB │
+ │ │ │ libuuid          ┆                    ┆ 2.42.4       ┆ hcfc3c73_0           ┆ conda-forge ┆  33.63 KiB │
+ │ │ │ libzlib          ┆                    ┆ 1.3.2        ┆ h25fd6f3_3           ┆ conda-forge ┆  62.22 KiB │
+ │ │ │ ncurses          ┆                    ┆ 6.6          ┆ hdb14827_1           ┆ conda-forge ┆ 889.84 KiB │
+ │ │ │ openssl          ┆                    ┆ 3.6.5        ┆ h781a0a9_0           ┆ conda-forge ┆   3.05 MiB │
+ │ │ │ python_abi       ┆                    ┆ 3.15         ┆ 9_cp315              ┆ conda-forge ┆   6.64 KiB │
+ │ │ │ tk               ┆                    ┆ 8.6.13       ┆ noxft_h1df4ec4_4     ┆ conda-forge ┆   3.40 MiB │
+ │ │ │ tzdata           ┆                    ┆ 2026e        ┆ h5d301ff_0           ┆ conda-forge ┆ 116.41 KiB │
+ │ │ │ zstd             ┆                    ┆ 1.5.7        ┆ hb78ec9c_7           ┆ conda-forge ┆ 587.21 KiB │
+ │ │ ╰──────────────────┴────────────────────┴──────────────┴──────────────────────┴─────────────┴────────────╯
+ │ │ Resolved run dependencies(finch-tensor-0.7.0-pyh4616a5c_0):
+ │ │ ╭──────────────────┬──────────────────────────╮
+ │ │ │ Name             ┆ Spec                     │
+ │ │ ╞══════════════════╪══════════════════════════╡
+ │ │ │ Run dependencies ┆                          │
+ │ │ │ donfig           ┆ >=0.8.1.post1,<0.9.0     │
+ │ │ │ lark             ┆ >=1.3.0,<2               │
+ │ │ │ numba            ┆ >=0.61,<2                │
+ │ │ │ numpy            ┆ >=2.0,<3                 │
+ │ │ │ python           ┆ >=3.11,<4                │
+ │ │ │                  ┆ * (RE of [host: python]) │
+ │ │ │ scipy            ┆ >=1.7,<2                 │
+ │ │ ╰──────────────────┴──────────────────────────╯
+ │ │
+ │ ╰─────────────────── (took 0 seconds)
+ │
+ │ ╭─ Running build script
+ │ │ + uv pip install --python $PREFIX/bin/python --reinstall -vv --no-deps --no-build-isolation --no-index --editable /tmp/physical-data-EFplpi/repo
+ │ │ [34mDEBUG[39m Found workspace root: /tmp/physical-data-EFplpi/repo
+ │ │ [35mTRACE[39m Discovering workspace members for: /tmp/physical-data-EFplpi/repo
+ │ │ [34mDEBUG[39m Adding root workspace member: /tmp/physical-data-EFplpi/repo
+ │ │ [34mDEBUG[39m Found workspace configuration at `/tmp/physical-data-EFplpi/repo/pyproject.toml`
+ │ │ [34mDEBUG[39m Searching for user configuration in: $SRC_DIR/.config/uv/uv.toml
+ │ │ [34mDEBUG[39m uv 0.13.5 (x86_64-unknown-linux-gnu)
+ │ │ [34mDEBUG[39m Marking explicit source tree for reinstall: /tmp/physical-data-EFplpi/repo
+ │ │ [35mTRACE[39m Checking lock for `/tmp/physical-data-EFplpi/pixi-cache/uv-cache` at `/tmp/physical-data-EFplpi/pixi-cache/uv-cache/.lock`
+ │ │ [35mTRACE[39m Acquired shared lock for `/tmp/physical-data-EFplpi/pixi-cache/uv-cache`
+ │ │ [34mDEBUG[39m Checking for Python interpreter at path `$PREFIX/bin/python`
+ │ │ [35mTRACE[39m Querying interpreter executable at `$PREFIX/bin/python`
+ │ │ [2mUsing Python 3.15.1 environment at: $PREFIX[0m
+ │ │ [35mTRACE[39m Checking lock for `$PREFIX` at `/tmp/uv-35e7e455cfa58a2f.lock`
+ │ │ [35mTRACE[39m Acquired exclusive lock for `$PREFIX`
+ │ │ [34mDEBUG[39m Using request connect timeout of 10s and read timeout of 30s
+ │ │ [34mDEBUG[39m Found PEP 621 metadata for `/tmp/physical-data-EFplpi/repo` in `pyproject.toml` (finch-tensor)
+ │ │ [34mDEBUG[39m Solving with installed Python version: 3.15.1
+ │ │ [34mDEBUG[39m Solving with target Python version: >=3.15.1
+ │ │ [35mTRACE[39m Assigned packages: 
+ │ │ [35mTRACE[39m Chose package for decision: root. remaining choices: 
+ │ │ [34mDEBUG[39m Adding direct dependency: finch-tensor*
+ │ │ [35mTRACE[39m Assigned packages: root==0a0.dev0
+ │ │ [35mTRACE[39m Chose package for decision: finch-tensor. remaining choices: 
+ │ │ [34mDEBUG[39m Searching for a compatible version of finch-tensor @ `file:///tmp/physical-data-EFplpi/repo` (*)
+ │ │ [34mDEBUG[39m Found static `pyproject.toml` for: finch-tensor @ file:///tmp/physical-data-EFplpi/repo
+ │ │ [35mTRACE[39m Received source distribution metadata for: finch-tensor @ file:///tmp/physical-data-EFplpi/repo
+ │ │ [35mTRACE[39m Assigned packages: root==0a0.dev0, finch-tensor==0.7.0
+ │ │ [34mDEBUG[39m Tried 1 versions: finch-tensor 1
+ │ │ [34mDEBUG[39m marker environment resolution took 0.001s
+ │ │ [35mTRACE[39m Resolution: ResolverEnvironment { kind: Specific { marker_env: ResolverMarkerEnvironment(MarkerEnvironment { inner: MarkerEnvironmentInner { implemen
+ │ │ tation_name: "cpython", implementation_version: StringVersion { string: "3.15.1", version: "3.15.1" }, os_name: "posix", platform_machine: "x86_64", platfo
+ │ │ rm_python_implementation: "CPython", platform_release: "5.14.0-687.64.1.el9_8.x86_64", platform_system: "Linux", platform_version: "#1 SMP PREEMPT_DYNAMIC 
+ │ │ Sat Oct 31 18:14:31 EDT 2026", python_full_version: StringVersion { string: "3.15.1", version: "3.15.1" }, python_version: StringVersion { string: "3.15", 
+ │ │ version: "3.15" }, sys_platform: "linux" } }) } }
+ │ │ [35mTRACE[39m Resolution edge: ROOT -> finch-tensor
+ │ │ [35mTRACE[39m Resolution edge:     0a0.dev0 -> 0.7.0
+ │ │ [2mResolved [1m1 package[0m [2min 2ms[0m[0m
+ │ │ [34mDEBUG[39m Must revalidate requirement: finch-tensor
+ │ │ [35mTRACE[39m Checking lock for `/tmp/physical-data-EFplpi/pixi-cache/uv-cache/sdists-v10/editable/cf969cdf7dc78d50` at `/tmp/physical-data-EFplpi/pixi-cache/uv-ca
+ │ │ che/sdists-v10/editable/cf969cdf7dc78d50/.lock`
+ │ │ [35mTRACE[39m Acquired exclusive lock for `/tmp/physical-data-EFplpi/pixi-cache/uv-cache/sdists-v10/editable/cf969cdf7dc78d50`
+ │ │ [34mDEBUG[39m Computed cache info: Timestamp(SystemTime { tv_sec: 1793986707, tv_nsec: 189289084 }), None, None, {}, {"src": Some(Timestamp(Timestamp(SystemTime { 
+ │ │ tv_sec: 1793986707, tv_nsec: 487291601 })))}. Most recently modified: /tmp/physical-data-EFplpi/repo/pyproject.toml
+ │ │    [36m[1mBuilding[0m[39m finch-tensor[2m @ file:///tmp/physical-data-EFplpi/repo[0m
+ │ │ [34mDEBUG[39m Building: finch-tensor @ file:///tmp/physical-data-EFplpi/repo
+ │ │ [34mDEBUG[39m Performing direct build for finch-tensor @ file:///tmp/physical-data-EFplpi/repo
+ │ │ [34mDEBUG[39m Wheel excludes: ["__pycache__", "*.pyc", "*.pyo"]
+ │ │ [34mDEBUG[39m Writing wheel at `/tmp/physical-data-EFplpi/pixi-cache/uv-cache/builds-v0/.tmpJ9aIad/finch_tensor-0.7.0-py3-none-any.whl`
+ │ │ [34mDEBUG[39m Adding pth file to `/tmp/physical-data-EFplpi/pixi-cache/uv-cache/builds-v0/.tmpJ9aIad/finch_tensor-0.7.0-py3-none-any.whl`
+ │ │ [34mDEBUG[39m Source root: /tmp/physical-data-EFplpi/repo/src
+ │ │ [34mDEBUG[39m Module path: finch
+ │ │ [35mTRACE[39m Adding `finch_tensor.pth`
+ │ │ [34mDEBUG[39m Adding metadata files to: /tmp/physical-data-EFplpi/pixi-cache/uv-cache/builds-v0/.tmpJ9aIad/finch_tensor-0.7.0-py3-none-any.whl
+ │ │ [34mDEBUG[39m Found PEP 639 license declarations, using METADATA 2.4
+ │ │ [35mTRACE[39m Not a license file match: .
+ │ │ [34mDEBUG[39m License files match: LICENSE
+ │ │ [35mTRACE[39m Adding directory `finch_tensor-0.7.0.dist-info`
+ │ │ [35mTRACE[39m Adding `finch_tensor-0.7.0.dist-info/WHEEL`
+ │ │ [35mTRACE[39m Adding `finch_tensor-0.7.0.dist-info/METADATA`
+ │ │ [35mTRACE[39m Adding `finch_tensor-0.7.0.dist-info/RECORD`
+ │ │ [35mTRACE[39m Adding central directory
+ │ │ [34mDEBUG[39m Built `finch-tensor @ file:///tmp/physical-data-EFplpi/repo` into `finch_tensor-0.7.0-py3-none-any.whl`
+ │ │       [32m[1mBuilt[0m[39m finch-tensor[2m @ file:///tmp/physical-data-EFplpi/repo[0m
+ │ │ [35mTRACE[39m Released lock at `/tmp/physical-data-EFplpi/pixi-cache/uv-cache/sdists-v10/editable/cf969cdf7dc78d50/.lock`
+ │ │ [35mTRACE[39m Checking lock for `/tmp/physical-data-EFplpi/pixi-cache/uv-cache/sdists-v10/editable/cf969cdf7dc78d50/FpatnwFKWcrSpWp_/0.7.0-py3-none-any.lock` at `/
+ │ │ tmp/physical-data-EFplpi/pixi-cache/uv-cache/sdists-v10/editable/cf969cdf7dc78d50/FpatnwFKWcrSpWp_/0.7.0-py3-none-any.lock`
+ │ │ [35mTRACE[39m Acquired exclusive lock for `/tmp/physical-data-EFplpi/pixi-cache/uv-cache/sdists-v10/editable/cf969cdf7dc78d50/FpatnwFKWcrSpWp_/0.7.0-py3-none-any.l
+ │ │ ock`
+ │ │ [35mTRACE[39m Released lock at `/tmp/physical-data-EFplpi/pixi-cache/uv-cache/sdists-v10/editable/cf969cdf7dc78d50/FpatnwFKWcrSpWp_/0.7.0-py3-none-any.lock`
+ │ │ [2mPrepared [1m1 package[0m [2min 14ms[0m[0m
+ │ │ [35mTRACE[39m Extracting wheel files name=PackageName("finch-tensor")
+ │ │ [35mTRACE[39m Extracted wheel files name=PackageName("finch-tensor")
+ │ │ [35mTRACE[39m No entrypoints name=PackageName("finch-tensor")
+ │ │ [35mTRACE[39m No data name=PackageName("finch-tensor")
+ │ │ [35mTRACE[39m Writing installer metadata name=PackageName("finch-tensor")
+ │ │ [35mTRACE[39m Writing record name=PackageName("finch-tensor")
+ │ │ [2mInstalled [1m1 package[0m [2min 0.82ms[0m[0m
+ │ │  [32m+[39m [1mfinch-tensor[0m[2m==0.7.0 (from file:///tmp/physical-data-EFplpi/repo)[0m
+ │ │ [35mTRACE[39m Released lock at `/tmp/uv-35e7e455cfa58a2f.lock`
+ │ │ [35mTRACE[39m Released lock at `/tmp/physical-data-EFplpi/pixi-cache/uv-cache/.lock`
+ │ │
+ │ ╰─────────────────── (took 0 seconds)
+ │
+ │ ╭─ Packaging new files
+ │ │ Copying done!
+ │ │ Post-processing done!
+ │ │ Writing test files
+ │ │ Writing metadata for package
+ │ │ Copying license files
+ │ │ Copying recipe files
+ │ │ Creating entry points
+ │ │ 
+ │ │ Files in package:
+ │ │   ├─ site-packages/finch_tensor-0.7.0.dist-info/INSTALLER (6 B)
+ │ │   ├─ site-packages/finch_tensor-0.7.0.dist-info/METADATA (2.12 KiB)
+ │ │   ├─ site-packages/finch_tensor-0.7.0.dist-info/RECORD (769 B)
+ │ │   ├─ site-packages/finch_tensor-0.7.0.dist-info/REQUESTED (0 B)
+ │ │   ├─ site-packages/finch_tensor-0.7.0.dist-info/WHEEL (80 B)
+ │ │   ├─ site-packages/finch_tensor-0.7.0.dist-info/direct_url.json (76 B)
+ │ │   ├─ site-packages/finch_tensor-0.7.0.dist-info/uv_build.json (2 B)
+ │ │   ├─ site-packages/finch_tensor-0.7.0.dist-info/uv_cache.json (194 B)
+ │ │   ├─ site-packages/finch_tensor.pth (34 B)
+ │ │   ├─ info/about.json (297 B)
+ │ │   ├─ info/hash_input.json (29 B)
+ │ │   ├─ info/index.json (376 B)
+ │ │   ├─ info/licenses/LICENSE (1.05 KiB)
+ │ │   ├─ info/link.json (75 B)
+ │ │   ├─ info/paths.json (2.00 KiB)
+ │ │   └─ info/tests/tests.yaml (3 B)
+ │ │ 
+ │ │ Package statistics: 16 files (9 content, 7 metadata), total size: 7.07 KiB
+ │ │ Largest files:
+ │ │   2.12 KiB - site-packages/finch_tensor-0.7.0.dist-info/METADATA
+ │ │   769 B - site-packages/finch_tensor-0.7.0.dist-info/RECORD
+ │ │   194 B - site-packages/finch_tensor-0.7.0.dist-info/uv_cache.json
+ │ │   80 B - site-packages/finch_tensor-0.7.0.dist-info/WHEEL
+ │ │   76 B - site-packages/finch_tensor-0.7.0.dist-info/direct_url.json
+ │ │ Creating target folder '/tmp/physical-data-EFplpi/repo/.pixi/bld/finch-tensor/eFwoVAGDAfc/output/noarch'
+ │ │ Creating empty build folder "/tmp/physical-data-EFplpi/repo/.pixi/bld/finch-tensor/eFwoVAGDAfc/output/linux-64"
+ │ │ Compressing archive...
+ │ │ Archive written to '/tmp/physical-data-EFplpi/repo/.pixi/bld/finch-tensor/eFwoVAGDAfc/output/noarch/finch-tensor-0.7.0-pyh4616a5c_0.conda'
+ │ │
+ │ ╰─────────────────── (took 0 seconds)
+ │ Checking for symlinks ...
+ │
+ ╰─────────────────── (took 0 seconds)
+✔ The fitting environment has been installed.
+installing Julia and its packages in /tmp/physical-data-EFplpi/depot
+  Installing known registries into `/tmp/physical-data-EFplpi/depot`
+       Added `General` registry to /tmp/physical-data-EFplpi/depot/registries
+    Updating registry at `/tmp/physical-data-EFplpi/depot/registries/General.toml`
+   Resolving package versions...
+   Installed MicroMamba ────────────────── v0.1.15
+   Installed libaec_jll ────────────────── v1.1.8+0
+   Installed dlfcn_win32_jll ───────────── v1.4.2+0
+   Installed MPIABI_jll ────────────────── v1.0.1+0
+   Installed MPICH_jll ─────────────────── v5.0.3+0
+   Installed IrrationalConstants ───────── v0.2.7
+   Installed Rmath ─────────────────────── v0.9.0
+   Installed Scratch ───────────────────── v1.3.0
+   Installed XML2_jll ──────────────────── v2.15.4+0
+   Installed HypergeometricFunctions ───── v0.3.31
+   Installed Xorg_libpciaccess_jll ─────── v0.19.0+0
+   Installed aws_c_auth_jll ────────────── v1.0.1+0
+   Installed aws_c_common_jll ──────────── v1.0.3+1
+   Installed Preferences ───────────────── v1.6.1
+   Installed JSON ──────────────────────── v1.13.4
+   Installed PythonCall ────────────────── v0.9.37
+   Installed StatsFuns ─────────────────── v2.2.1
+   Installed PtrArrays ─────────────────── v1.4.0
+   Installed NPZ ───────────────────────── v0.4.3
+   Installed Accessors ─────────────────── v0.1.46
+   Installed aws_c_compression_jll ─────── v1.0.0+1
+   Installed TableTraits ───────────────── v1.0.1
+   Installed Hwloc_jll ─────────────────── v2.15.0+0
+   Installed aws_c_http_jll ────────────── v1.0.0+0
+   Installed HashArrayMappedTries ──────── v0.2.0
+   Installed SpecialFunctions ──────────── v2.9.1
+   Installed PDMats ────────────────────── v0.11.41
+   Installed Parsers ───────────────────── v3.0.6
+   Installed Tables ────────────────────── v1.14.0
+   Installed DataAPI ───────────────────── v1.16.0
+   Installed MicrosoftMPI_jll ──────────── v10.1.5+0
+   Installed OpenMPI_jll ───────────────── v5.0.14+0
+   Installed SyntaxInterface ───────────── v0.2.1
+   Installed JLLWrappers ───────────────── v1.8.0
+   Installed micromamba_jll ────────────── v2.3.1+0
+   Installed aws_c_io_jll ──────────────── v1.0.0+0
+   Installed ZipFile ───────────────────── v0.10.1
+   Installed Roots ─────────────────────── v3.0.13
+   Installed IteratorInterfaceExtensions ─ v1.0.0
+   Installed ConstructionBase ──────────── v1.6.0
+   Installed DataValueInterfaces ───────── v1.0.0
+   Installed Libiconv_jll ──────────────── v1.18.0+0
+   Installed LLVMExtra_jll ─────────────── v0.0.56+0
+   Installed PrecompileTools ───────────── v1.3.4
+   Installed AbstractTrees ─────────────── v0.4.5
+   Installed OrderedCollections ────────── v2.0.3
+   Installed ScopedValues ──────────────── v1.6.2
+   Installed Finch ─────────────────────── v2.1.1
+   Installed aws_checksums_jll ─────────── v1.0.1+1
+   Installed CEnum ─────────────────────── v1.0.0
+   Installed RewriteTools ──────────────── v0.2.4
+   Installed FileIO ────────────────────── v1.20.0
+   Installed HDF5 ──────────────────────── v0.17.4
+   Installed MPIPreferences ────────────── v0.1.12
+   Installed mpif_jll ──────────────────── v1.0.1+0
+   Installed Reexport ──────────────────── v1.2.2
+   Installed FillArrays ────────────────── v1.18.2
+   Installed QuadGK ────────────────────── v2.11.3
+   Installed MPItrampoline_jll ─────────── v5.5.7+0
+   Installed TensorMarket ──────────────── v0.2.2
+   Installed Rmath_jll ─────────────────── v0.5.2+0
+   Installed Statistics ────────────────── v1.11.5
+   Installed LogExpFunctions ───────────── v1.0.3
+   Installed Requires ──────────────────── v1.3.1
+   Installed DataStructures ────────────── v0.19.6
+   Installed AliasTables ───────────────── v1.1.3
+   Installed Distributions ─────────────── v0.25.134
+   Installed StatsAPI ──────────────────── v1.8.0
+   Installed UnsafePointers ────────────── v1.0.0
+   Installed Gamma ─────────────────────── v1.2.0
+   Installed MacroTools ────────────────── v0.5.16
+   Installed aws_c_sdkutils_jll ────────── v1.0.0+0
+   Installed Compat ────────────────────── v4.18.1
+   Installed CompositionsBase ──────────── v0.1.2
+   Installed OpenSpecFun_jll ───────────── v0.5.6+0
+   Installed HDF5_jll ──────────────────── v2.2.4+0
+   Installed UnsafeAtomics ─────────────── v0.4.0
+   Installed InverseFunctions ──────────── v0.1.18
+   Installed CommonSolve ───────────────── v0.2.14
+   Installed CondaPkg ──────────────────── v0.2.38
+   Installed SortingAlgorithms ─────────── v1.2.3
+   Installed StatsBase ─────────────────── v0.34.13
+   Installed aws_c_cal_jll ─────────────── v1.0.0+0
+   Installed Missings ──────────────────── v1.2.1
+   Installed s2n_tls_jll ───────────────── v1.7.12+0
+   Installed aws_c_s3_jll ──────────────── v1.3.1+0
+   Installed LLVM ──────────────────────── v10.4.3
+   Installed StructUtils ───────────────── v2.12.0
+   Installed DocStringExtensions ───────── v0.10.2
+   Installed pixi_jll ──────────────────── v0.76.2+0
+  Installing 20 artifacts
+   Installed artifact aws_c_compression 13.5 KiB
+   Installed artifact libaec            51.0 KiB
+   Installed artifact Rmath             121.8 KiB
+   Installed artifact OpenSpecFun       194.9 KiB
+   Installed artifact aws_c_auth        131.6 KiB
+   Installed artifact aws_c_cal         1.2 MiB
+   Installed artifact aws_c_common      294.1 KiB
+   Installed artifact aws_checksums     87.0 KiB
+   Installed artifact aws_c_s3          167.8 KiB
+   Installed artifact Xorg_libpciaccess 26.2 KiB
+   Installed artifact aws_c_http        394.1 KiB
+   Installed artifact s2n_tls           1.9 MiB
+   Installed artifact aws_c_io          183.9 KiB
+   Installed artifact aws_c_sdkutils    64.4 KiB
+   Installed artifact XML2              2.2 MiB
+   Installed artifact HDF5              6.2 MiB
+   Installed artifact Hwloc             3.6 MiB
+   Installed artifact Libiconv          1.9 MiB
+   Installed artifact MPICH             8.8 MiB
+   Installed artifact LLVMExtra         5.1 MiB
+    Updating `/tmp/physical-data-EFplpi/repo/.pixi/envs/fitting/julia_env/Project.toml`
+  [9177782c] + Finch v2.1.1
+  [f67ccb44] + HDF5 v0.17.4
+  [15e1cf62] + NPZ v0.4.3
+  [6099a3de] + PythonCall v0.9.37
+  [8b7d4fe7] + TensorMarket v0.2.2
+  [458c3c95] ~ OpenSSL_jll ⇒ v3.5.6+0
+    Updating `/tmp/physical-data-EFplpi/repo/.pixi/envs/fitting/julia_env/Manifest.toml`
+  [1520ce14] + AbstractTrees v0.4.5
+  [7d9f7c33] + Accessors v0.1.46
+  [66dad0bd] + AliasTables v1.1.3
+  [fa961155] + CEnum v1.0.0
+  [38540f10] + CommonSolve v0.2.14
+  [34da2185] + Compat v4.18.1
+  [a33af91c] + CompositionsBase v0.1.2
+  [992eb4ea] + CondaPkg v0.2.38
+  [187b0558] + ConstructionBase v1.6.0
+  [9a962f9c] + DataAPI v1.16.0
+  [864edb3b] + DataStructures v0.19.6
+  [e2d170a0] + DataValueInterfaces v1.0.0
+  [31c24e10] + Distributions v0.25.134
+  [ffbed154] + DocStringExtensions v0.10.2
+  [5789e2e9] + FileIO v1.20.0
+  [1a297f60] + FillArrays v1.18.2
+  [9177782c] + Finch v2.1.1
+  [a0844989] + Gamma v1.2.0
+  [f67ccb44] + HDF5 v0.17.4
+  [076d061b] + HashArrayMappedTries v0.2.0
+  [34004b35] + HypergeometricFunctions v0.3.31
+  [3587e190] + InverseFunctions v0.1.18
+  [92d709cd] + IrrationalConstants v0.2.7
+  [82899510] + IteratorInterfaceExtensions v1.0.0
+  [692b3bcd] + JLLWrappers v1.8.0
+  [682c06a0] + JSON v1.13.4
+  [929cbde3] + LLVM v10.4.3
+  [2ab3a3ac] + LogExpFunctions v1.0.3
+  [3da0fdf6] + MPIPreferences v0.1.12
+  [1914dd2f] + MacroTools v0.5.16
+  [0b3b1443] + MicroMamba v0.1.15
+  [e1d29d7a] + Missings v1.2.1
+  [15e1cf62] + NPZ v0.4.3
+  [bac558e1] + OrderedCollections v2.0.3
+  [90014a1f] + PDMats v0.11.41
+  [69de0a69] + Parsers v3.0.6
+  [aea7be01] + PrecompileTools v1.3.4
+  [21216c6a] + Preferences v1.6.1
+  [43287f4e] + PtrArrays v1.4.0
+  [6099a3de] + PythonCall v0.9.37
+  [1fd47b50] + QuadGK v2.11.3
+  [189a3867] + Reexport v1.2.2
+  [ae029012] + Requires v1.3.1
+  [5969e224] + RewriteTools v0.2.4
+  [79098fc4] + Rmath v0.9.0
+  [f2b01f46] + Roots v3.0.13
+  [7e506255] + ScopedValues v1.6.2
+  [6c6a2e73] + Scratch v1.3.0
+  [a2af1166] + SortingAlgorithms v1.2.3
+  [276daf66] + SpecialFunctions v2.9.1
+  [10745b16] + Statistics v1.11.5
+  [82ae8749] + StatsAPI v1.8.0
+  [2913bbd2] + StatsBase v0.34.13
+  [4c63d2b9] + StatsFuns v2.2.1
+  [ec057cc2] + StructUtils v2.12.0
+  [b33eeca9] + SyntaxInterface v0.2.1
+  [3783bdb8] + TableTraits v1.0.1
+  [bd369af6] + Tables v1.14.0
+  [8b7d4fe7] + TensorMarket v0.2.2
+  [013be700] + UnsafeAtomics v0.4.0
+  [e17b2a0c] + UnsafePointers v1.0.0
+  [a5390f91] + ZipFile v0.10.1
+  [0234f1f7] + HDF5_jll v2.2.4+0
+  [e33a78d0] + Hwloc_jll v2.15.0+0
+  [dad2f222] + LLVMExtra_jll v0.0.56+0
+  [94ce4f54] + Libiconv_jll v1.18.0+0
+  [b5ada748] + MPIABI_jll v1.0.1+0
+  [7cb0a576] + MPICH_jll v5.0.3+0
+  [f1f71cc9] + MPItrampoline_jll v5.5.7+0
+  [9237b28f] + MicrosoftMPI_jll v10.1.5+0
+  [fe0851c0] + OpenMPI_jll v5.0.14+0
+  [efe28fd5] + OpenSpecFun_jll v0.5.6+0
+  [f50d1b31] + Rmath_jll v0.5.2+0
+  [02c8fc9c] + XML2_jll v2.15.4+0
+  [a65dc6b1] + Xorg_libpciaccess_jll v0.19.0+0
+  [2b3700d1] + aws_c_auth_jll v1.0.1+0
+  [70f11efc] + aws_c_cal_jll v1.0.0+0
+  [73048d1d] + aws_c_common_jll v1.0.3+1
+  [73a04cd5] + aws_c_compression_jll v1.0.0+1
+⌅ [3254fc65] + aws_c_http_jll v1.0.0+0
+⌅ [13c41daa] + aws_c_io_jll v1.0.0+0
+  [bd1f34fb] + aws_c_s3_jll v1.3.1+0
+  [1282aa60] + aws_c_sdkutils_jll v1.0.0+0
+  [b2a88e68] + aws_checksums_jll v1.0.1+1
+  [c4b69c83] + dlfcn_win32_jll v1.4.2+0
+  [477f73a3] + libaec_jll v1.1.8+0
+  [f8abcde7] + micromamba_jll v2.3.1+0
+  [9aeb927a] + mpif_jll v1.0.1+0
+  [4d7b5844] + pixi_jll v0.76.2+0
+  [cddc5d3d] + s2n_tls_jll v1.7.12+0
+  [0dad84c5] + ArgTools v1.1.2
+  [56f22d72] + Artifacts v1.11.0
+  [2a0f44e3] + Base64 v1.11.0
+  [ade2ca70] + Dates v1.11.0
+  [f43a241f] + Downloads v1.7.0
+  [7b1f6079] + FileWatching v1.11.0
+  [ac6e5ff7] + JuliaSyntaxHighlighting v1.12.0
+  [4af54fe1] + LazyArtifacts v1.11.0
+  [b27032c2] + LibCURL v0.6.4
+  [76f85450] + LibGit2 v1.11.0
+  [8f399da3] + Libdl v1.11.0
+  [37e2e46d] + LinearAlgebra v1.12.0
+  [56ddb016] + Logging v1.11.0
+  [d6f4376e] + Markdown v1.11.0
+  [a63ad114] + Mmap v1.11.0
+  [ca575930] + NetworkOptions v1.3.0
+  [44cfe95a] + Pkg v1.12.1
+  [de0858da] + Printf v1.11.0
+  [9a3f8284] + Random v1.11.0
+  [ea8e919c] + SHA v0.7.0
+  [9e88b42a] + Serialization v1.11.0
+  [2f01184e] + SparseArrays v1.12.0
+  [f489334b] + StyledStrings v1.11.0
+  [4607b0f0] + SuiteSparse
+  [fa267f1f] + TOML v1.0.3
+  [a4e569a6] + Tar v1.10.0
+  [cf7118a7] + UUIDs v1.11.0
+  [4ec0a83e] + Unicode v1.11.0
+  [e66e0078] + CompilerSupportLibraries_jll v1.3.1+2
+  [deac9b47] + LibCURL_jll v8.15.0+0
+  [e37daf67] + LibGit2_jll v1.9.0+0
+  [29816b5a] + LibSSH2_jll v1.11.3+1
+  [14a3606d] + MozillaCACerts_jll v2025.11.4
+  [4536629a] + OpenBLAS_jll v0.3.29+0
+  [05823500] + OpenLibm_jll v0.8.7+0
+  [458c3c95] ~ OpenSSL_jll ⇒ v3.5.6+0
+  [bea87d4a] + SuiteSparse_jll v7.8.3+2
+  [83775a58] + Zlib_jll v1.3.1+2
+  [8e850b90] + libblastrampoline_jll v5.15.0+0
+  [8e850ede] + nghttp2_jll v1.64.0+1
+  [3f19e933] + p7zip_jll v17.7.0+0
+        Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading. To see why use `status --outdated -m`
+Precompiling packages...
+    499.4 ms  ✓ DataValueInterfaces
+    489.3 ms  ✓ Reexport
+    595.9 ms  ✓ TensorMarket
+    488.4 ms  ✓ IteratorInterfaceExtensions
+    539.0 ms  ✓ StatsAPI
+    564.5 ms  ✓ UnsafePointers
+    543.1 ms  ✓ DataAPI
+    607.8 ms  ✓ InverseFunctions
+    706.1 ms  ✓ AbstractTrees
+    702.3 ms  ✓ Statistics
+    502.4 ms  ✓ SyntaxInterface
+    523.7 ms  ✓ CompositionsBase
+    519.3 ms  ✓ PtrArrays
+    563.9 ms  ✓ CEnum
+    562.2 ms  ✓ HashArrayMappedTries
+    571.4 ms  ✓ Scratch
+    725.9 ms  ✓ ZipFile
+   1337.3 ms  ✓ FillArrays
+   1465.6 ms  ✓ DocStringExtensions
+    486.4 ms  ✓ TableTraits
+    961.5 ms  ✓ Requires
+    519.4 ms  ✓ InverseFunctions → InverseFunctionsDatesExt
+    517.8 ms  ✓ CompositionsBase → CompositionsBaseInverseFunctionsExt
+    870.9 ms  ✓ Preferences
+    614.0 ms  ✓ AliasTables
+    561.4 ms  ✓ ScopedValues
+    560.2 ms  ✓ FillArrays → FillArraysStatisticsExt
+    829.1 ms  ✓ Statistics → SparseArraysExt
+   2114.3 ms  ✓ ConstructionBase
+   2529.3 ms  ✓ OrderedCollections
+   1497.1 ms  ✓ PDMats
+    886.7 ms  ✓ FillArrays → FillArraysSparseArraysExt
+    559.0 ms  ✓ PrecompileTools
+    801.2 ms  ✓ MPIPreferences
+    698.1 ms  ✓ JLLWrappers
+   2175.1 ms  ✓ Compat
+    860.6 ms  ✓ ConstructionBase → ConstructionBaseLinearAlgebraExt
+   2046.2 ms  ✓ Missings
+   3146.7 ms  ✓ IrrationalConstants
+    607.9 ms  ✓ CommonSolve
+    876.6 ms  ✓ FillArrays → FillArraysPDMatsExt
+   2109.3 ms  ✓ RewriteTools
+    690.9 ms  ✓ dlfcn_win32_jll
+   3031.0 ms  ✓ StructUtils
+    853.1 ms  ✓ Rmath_jll
+    960.9 ms  ✓ LLVMExtra_jll
+    854.0 ms  ✓ aws_c_common_jll
+    907.7 ms  ✓ Libiconv_jll
+   4097.8 ms  ✓ MacroTools
+   1413.9 ms  ✓ MicrosoftMPI_jll
+    868.8 ms  ✓ Xorg_libpciaccess_jll
+    552.1 ms  ✓ Compat → CompatLinearAlgebraExt
+    849.9 ms  ✓ OpenSpecFun_jll
+    857.2 ms  ✓ s2n_tls_jll
+    911.0 ms  ✓ libaec_jll
+   1414.3 ms  ✓ MPItrampoline_jll
+    735.6 ms  ✓ LogExpFunctions
+   1426.9 ms  ✓ micromamba_jll
+   2244.0 ms  ✓ DataStructures
+   1468.6 ms  ✓ pixi_jll
+    945.7 ms  ✓ Rmath
+    869.8 ms  ✓ aws_checksums_jll
+    513.4 ms  ✓ LogExpFunctions → LogExpFunctionsInverseFunctionsExt
+    866.1 ms  ✓ aws_c_cal_jll
+    868.7 ms  ✓ aws_c_sdkutils_jll
+    843.4 ms  ✓ aws_c_compression_jll
+    936.3 ms  ✓ XML2_jll
+   3013.6 ms  ✓ Tables
+    674.5 ms  ✓ SortingAlgorithms
+    973.2 ms  ✓ Gamma
+    883.5 ms  ✓ aws_c_io_jll
+    531.0 ms  ✓ StructUtils → StructUtilsTablesExt
+   4246.1 ms  ✓ FileIO
+    907.9 ms  ✓ Hwloc_jll
+   1355.0 ms  ✓ HypergeometricFunctions
+    939.1 ms  ✓ aws_c_http_jll
+   2530.6 ms  ✓ MicroMamba
+   1088.7 ms  ✓ MPICH_jll
+   2505.1 ms  ✓ QuadGK
+   1382.7 ms  ✓ MPIABI_jll
+   1380.3 ms  ✓ OpenMPI_jll
+    859.3 ms  ✓ aws_c_auth_jll
+   1872.1 ms  ✓ NPZ
+   3287.8 ms  ✓ SpecialFunctions
+   3789.9 ms  ✓ Accessors
+    766.5 ms  ✓ mpif_jll
+    907.9 ms  ✓ aws_c_s3_jll
+    592.8 ms  ✓ Accessors → LinearAlgebraExt
+   4184.7 ms  ✓ StatsBase
+   1719.7 ms  ✓ HDF5_jll
+   2603.0 ms  ✓ StatsFuns
+    884.6 ms  ✓ PDMats → StatsBaseExt
+    556.5 ms  ✓ StatsFuns → StatsFunsInverseFunctionsExt
+   4663.8 ms  ✓ Roots
+   8263.6 ms  ✓ HDF5
+   6120.8 ms  ✓ Distributions
+  18384.6 ms  ✓ Parsers
+  24666.9 ms  ✓ LLVM
+   3175.0 ms  ✓ UnsafeAtomics
+  14692.9 ms  ✓ JSON
+    609.6 ms  ✓ JSON → JSONSerializationExt
+   4658.8 ms  ✓ CondaPkg
+  18373.9 ms  ✓ Finch
+   1874.7 ms  ✓ Finch → TensorMarketExt
+   2010.1 ms  ✓ Finch → HDF5Ext
+   2108.0 ms  ✓ Finch → SparseArraysExt
+   2995.8 ms  ✓ Finch → NPZExt
+  21278.1 ms  ✓ PythonCall
+  108 dependencies successfully precompiled in 62 seconds. 33 already precompiled.
+  24 dependencies precompiled but different versions are currently loaded (ArgTools, Base64, Dates, Downloads, JuliaSyntaxHighlighting, LibCURL, LibCURL_jll, LibGit2, LibGit2_jll, LibSSH2_jll, Logging, Markdown, MozillaCACerts_jll, NetworkOptions, OpenSSL_jll, Pkg, Printf, StyledStrings, TOML, Tar, UUIDs, Zlib_jll, nghttp2_jll and p7zip_jll). Restart julia to access the new versions. Otherwise, 69 dependents of these packages may trigger further precompilation to work with the unexpected versions.
+  2 dependencies had output during precompilation:
+┌ CondaPkg
+│  Downloading artifact: pixi
+└  
+┌ MicroMamba
+│  Downloading artifact: micromamba
+└  
+     Project No packages added to or removed from `/tmp/physical-data-EFplpi/repo/.pixi/envs/fitting/julia_env/Project.toml`
+    Manifest No packages added to or removed from `/tmp/physical-data-EFplpi/repo/.pixi/envs/fitting/julia_env/Manifest.toml`
+[juliapkg] Found dependencies: /tmp/physical-data-EFplpi/repo/.pixi/envs/fitting/lib/python3.14/site-packages/juliapkg/juliapkg.json
+[juliapkg] Found dependencies: /tmp/physical-data-EFplpi/repo/src/finch/juliapkg.json
+[juliapkg] Found dependencies: /tmp/physical-data-EFplpi/repo/.pixi/envs/fitting/lib/python3.14/site-packages/juliacall/juliapkg.json
+[juliapkg] Locating Julia 1.10.3 - 1.12
+[juliapkg] Querying Julia versions from https://julialang-s3.julialang.org/bin/versions.json
+[juliapkg] WARNING: About to install Julia 1.12.7 to /tmp/physical-data-EFplpi/repo/.pixi/envs/fitting/julia_env/pyjuliapkg/install.
+[juliapkg]   If you use juliapkg in more than one environment, you are likely to
+[juliapkg]   have Julia installed in multiple locations. It is recommended to
+[juliapkg]   install JuliaUp (https://github.com/JuliaLang/juliaup) or Julia
+[juliapkg]   (https://julialang.org/downloads) yourself.
+[juliapkg] Downloading Julia from https://julialang-s3.julialang.org/bin/linux/x64/1.12/julia-1.12.7-linux-x86_64.tar.gz
+             download complete
+[juliapkg] Verifying download
+[juliapkg] Installing Julia 1.12.7 to /tmp/physical-data-EFplpi/repo/.pixi/envs/fitting/julia_env/pyjuliapkg/install
+[juliapkg] Using Julia 1.12.7 at /tmp/physical-data-EFplpi/repo/.pixi/envs/fitting/julia_env/pyjuliapkg/install/bin/julia
+[juliapkg] Finding libjulia and bindir:
+           | using Libdl
+           | print(abspath(Libdl.dlpath("libjulia")), '\0', Sys.BINDIR)
+[juliapkg] Using Julia project at /tmp/physical-data-EFplpi/repo/.pixi/envs/fitting/julia_env
+[juliapkg] Writing Project.toml:
+           | [deps]
+           | Finch = "9177782c-1635-4eb9-9bfb-d9dfa25e6bce"
+           | HDF5 = "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"
+           | NPZ = "15e1cf62-19b3-5cfa-8e77-841668bca605"
+           | TensorMarket = "8b7d4fe7-0b45-4d0d-9dd8-5cc9b23b4b77"
+           | PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
+           | OpenSSL_jll = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
+           | 
+           | [compat]
+           | Finch = "^2.1"
+           | HDF5 = "^0.17.2"
+           | NPZ = "^0.4.3"
+           | TensorMarket = "^0.2"
+           | PythonCall = "=0.9.37"
+           | OpenSSL_jll = "3.0.0 - 3.6"
+           | 
+           | [preferences]
+[juliapkg] Installing packages:
+           | import Pkg
+           | Pkg.Registry.update()
+           | Pkg.add([
+           |   Pkg.PackageSpec(name="Finch", uuid="9177782c-1635-4eb9-9bfb-d9dfa25e6bce"),
+           |   Pkg.PackageSpec(name="HDF5", uuid="f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f"),
+           |   Pkg.PackageSpec(name="NPZ", uuid="15e1cf62-19b3-5cfa-8e77-841668bca605"),
+           |   Pkg.PackageSpec(name="TensorMarket", uuid="8b7d4fe7-0b45-4d0d-9dd8-5cc9b23b4b77"),
+           |   Pkg.PackageSpec(name="PythonCall", uuid="6099a3de-0909-46bc-b1f4-468b9a2dfc0d"),
+           |   Pkg.PackageSpec(name="OpenSSL_jll", uuid="458c3c95-2e84-50aa-8efc-19380b2a3a95"),
+           | ])
+           | Pkg.resolve()
+           | Pkg.precompile()
+Traceback (most recent call last):
+  File "<frozen runpy>", line 203, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/tmp/physical-data-EFplpi/repo/scripts/fitting/time_physical_data.py", line 204, in <module>
+    main()
+    ~~~~^^
+  File "/tmp/physical-data-EFplpi/repo/scripts/fitting/time_physical_data.py", line 199, in main
+    args.directory, parse_models(args.model), args.chunk, args.repeat, args.hours
+                    ~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/tmp/physical-data-EFplpi/repo/scripts/fitting/physical_bases.py", line 109, in parse_models
+    models[name] = untrained.from_json(json.loads(Path(path).read_text()))
+                                                  ~~~~~~~~~~~~~~~~~~~~^^
+  File "/tmp/physical-data-EFplpi/repo/.pixi/envs/fitting/lib/python3.14/pathlib/__init__.py", line 787, in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors, newline=newline) as f:
+         ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/physical-data-EFplpi/repo/.pixi/envs/fitting/lib/python3.14/pathlib/__init__.py", line 771, in open
+    return io.open(self, mode, buffering, encoding, errors, newline)
+           ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/storage/home/hcoda1/7/wahrens6/scratch/finch-tensor/pace-models/format.model.json'
+---------------------------------------
+Begin Slurm Epilog: Nov-06-2026 12:40:33
+Job ID:        15228675
+Array Job ID:  15228660_2
+User ID:       wahrens6
+Account:       gts-wahrens6
+Job name:      time
+Resources:     cpu=24,mem=182808M,node=1
+Rsrc Used:     cput=00:54:00,vmem=0,walltime=00:02:15,mem=6918600K,energy_used=0
+Partition:     cpu-small
+QOS:           inferno
+Nodes:         atl1-1-02-007-16-1
+---------------------------------------
