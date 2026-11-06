@@ -147,15 +147,16 @@ def drop_internal_reorders(root: LogicStatement) -> LogicStatement:
 
 def with_copy_loop_orders(root: Plan) -> Plan:
     """
-    Set the loop order of each copy, which visits the fields of its left-hand
-    table in order and then the fields it reduces. A copy may read its argument
-    in another order, representing a transpose.
+    Set the loop order of each copy, which visits the fields of its argument in
+    the order it stores them, and then the fields only its left-hand table has.
+    A transposing copy reads its argument in order and scatters into its
+    left-hand table, rather than reading a sparse argument out of order.
     """
 
     def loop_ordered(stmt: LogicStatement) -> LogicStatement:
         match stmt:
             case Query(Table(_, lhs_idxs), Table(_, idxs)):
-                return fuse_loop_order(stmt, (*lhs_idxs, *setdiff(idxs, lhs_idxs)))
+                return fuse_loop_order(stmt, (*idxs, *setdiff(lhs_idxs, idxs)))
         return stmt
 
     return Plan(tuple(loop_ordered(body) for body in root.bodies))
