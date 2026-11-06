@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 from finch.algebra.tensor import TensorFType
 from finch.autoschedule.cost_models import (
@@ -111,6 +111,39 @@ def add_workspace(
     return prgm
 
 
+def stage_workspaces(
+    prgm: Plan,
+    bindings: Mapping[Alias, TensorFType],
+    keep: Callable[[Plan, Plan, int, int], bool],
+) -> Plan:
+    """
+    Redirect each query of prgm which scatters into an output of prgm into a
+    workspace fused over the fields it writes in loop order, as add_workspace
+    does, if the workspace stores fewer fields than the output, and keep, given
+    prgm, the program with the workspace, the fields the workspace is fused
+    over, and the fields of the output, keeps it. The inputs of bindings have
+    no workspaces.
+    """
+    prgm = flatten_plans(prgm)
+    spc = Namespace(prgm)
+    outputs: dict[HardAlias, int] = {}
+    for node in PostOrderDFS(prgm):
+        match node:
+            case Query(Table(HardAlias() as lhs, idxs), _) if lhs not in bindings:
+                outputs[lhs] = len(idxs)
+    for alias, rank in outputs.items():
+        depth = workspace_depth(prgm, alias)
+        if not depth:
+            continue
+        staged = add_workspace(
+            prgm, alias, depth, HardAlias(spc.freshen(alias.name, "ws"))
+        )
+        assert isinstance(staged, Plan)
+        if keep(prgm, staged, depth, rank):
+            prgm = staged
+    return prgm
+
+
 def add_workspaces(
     prgm: Plan,
     bindings: Mapping[Alias, TensorFType],
@@ -120,39 +153,32 @@ def add_workspaces(
     options: Sequence[LevelOption] = LEVEL_OPTIONS,
 ) -> Plan:
     """
-    Redirect each query of prgm which scatters into an output of prgm into a
-    workspace fused over the fields it writes in loop order, as add_workspace
-    does, if the workspace stores fewer fields than the output, and prgm costs
-    less with it than without it under cost_model, once the formats and
-    protocols of each are chosen, as program_cost prices them. The inputs of
-    bindings have no workspaces.
+    Stage the workspaces of prgm, as stage_workspaces does, which make prgm
+    cost less under cost_model, once the formats and protocols of each program
+    are chosen, as program_cost prices them.
     """
+    costs: dict[Plan, float] = {}
 
     def cost(stmt: Plan) -> float:
-        return program_cost(stmt, bindings, stats, stats_factory, cost_model, options)
+        if stmt not in costs:
+            costs[stmt] = program_cost(
+                stmt, bindings, stats, stats_factory, cost_model, options
+            )
+        return costs[stmt]
 
-    prgm = flatten_plans(prgm)
-    spc = Namespace(prgm)
-    outputs: dict[HardAlias, None] = {}
-    for node in PostOrderDFS(prgm):
-        match node:
-            case Query(Table(HardAlias() as lhs, _), _) if lhs not in bindings:
-                outputs[lhs] = None
-    best = None
-    for alias in outputs:
-        depth = workspace_depth(prgm, alias)
-        if not depth:
-            continue
-        staged = add_workspace(
-            prgm, alias, depth, HardAlias(spc.freshen(alias.name, "ws"))
-        )
-        assert isinstance(staged, Plan)
-        if best is None:
-            best = cost(prgm)
-        staged_cost = cost(staged)
-        if staged_cost < best:
-            prgm, best = staged, staged_cost
-    return prgm
+    return stage_workspaces(
+        prgm, bindings, lambda prgm, staged, _, __: cost(staged) < cost(prgm)
+    )
+
+
+def add_scatter_workspaces(prgm: Plan, bindings: Mapping[Alias, TensorFType]) -> Plan:
+    """
+    Stage the workspaces of prgm, as stage_workspaces does, which store one
+    field, the only one the query scatters into, without pricing them.
+    """
+    return stage_workspaces(
+        prgm, bindings, lambda _, __, depth, rank: rank - depth == 1
+    )
 
 
 class LogicWorkspacer(LoopOrderedForm, LogicLoader):
@@ -188,4 +214,27 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
         prgm = add_workspaces(
             prgm, bindings, stats, stats_factory, self.cost_model, self.options
         )
+        return self.ctx(prgm, bindings, stats, stats_factory)
+
+
+class DefaultLogicWorkspacer(LoopOrderedForm, LogicLoader):
+    """
+    Pass a program in LoopOrderedForm to ctx, after redirecting the queries
+    which scatter into one field of their outputs into workspaces, as
+    add_scatter_workspaces does, without statistics. A loop orderer wraps it,
+    so that the copies out of workspaces aren't propagated.
+    """
+
+    def __init__(self, ctx: LogicLoader):
+        self.ctx = ctx
+
+    def lower(
+        self,
+        prgm: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> tuple[AssemblyLibrary, dict[Alias, TensorFType]]:
+        assert isinstance(prgm, Plan)
+        prgm = add_scatter_workspaces(prgm, bindings)
         return self.ctx(prgm, bindings, stats, stats_factory)

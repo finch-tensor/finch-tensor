@@ -22,6 +22,7 @@ from finch.autoschedule.tensor_stats.uniform_stats import UniformStats
 from finch.autoschedule.util import fuse_loop_order
 from finch.autoschedule.workspacer import (
     LogicWorkspacer,
+    add_scatter_workspaces,
     add_workspace,
     add_workspaces,
     workspace_depth,
@@ -303,3 +304,24 @@ def test_only_small_workspaces_make_scattered_writes_cheap():
         "scatter_writes": True,
         "workspace_writes": False,
     }
+
+
+def test_scatter_workspaces_store_the_one_field_scattered_into():
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
+    a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
+    # Gustavson scatters into k alone, within each row of c.
+    plan, _ = _matmul(c, a, b, (i, j, k))
+    assert add_scatter_workspaces(plan, {}) == add_workspace(
+        plan, c, 1, HardAlias("c_ws")
+    )
+
+    # The j loop scatters into both k and m, so a workspace would store two.
+    rhs = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k, m)))),
+        (j,),
+    )
+    query = fuse_loop_order(Query(Table(c, (i, k, m)), rhs), (i, j, k, m))
+    plan = Plan((query, Produces((c,))))
+    assert add_scatter_workspaces(plan, {}) == plan

@@ -8,7 +8,7 @@ import numpy as np
 import finch as fl
 from finch import ffuncs
 from finch.autoschedule.cost_models import (
-    LOOP_COST_MODEL,
+    WORKSPACE_LOOP_COST_MODEL,
     Concat,
     CostModel,
     LoopBasis,
@@ -229,7 +229,7 @@ def test_loop_orderers_use_selected_model(search, orderer, inplace):
             assert (outer, inner) == (j, i)
         case _:
             pytest.fail("Expected an ordered query")
-    assert orderer().cost_model is LOOP_COST_MODEL
+    assert orderer().cost_model is WORKSPACE_LOOP_COST_MODEL
 
 
 @pytest.mark.parametrize(
