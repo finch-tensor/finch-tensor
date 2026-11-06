@@ -1479,9 +1479,18 @@ class _Same(FinchOperator):
             return len(a) == len(b) and all(
                 builtins.bool(self(x, y)) for x, y in zip(a, b, strict=True)
             )
+        # Like Julia's isequal, which Finch.jl compares fills with: NaNs are the
+        # same as each other, but -0.0 is not the same as 0.0. Equal values
+        # differ in sign only when they are zeros, so the signs (of both parts
+        # of a complex value) are compared alongside equality.
         try:
+            same_signs = np.logical_and(
+                np.equal(np.signbit(np.real(a)), np.signbit(np.real(b))),
+                np.equal(np.signbit(np.imag(a)), np.signbit(np.imag(b))),
+            )
             return np.logical_or(
-                np.equal(a, b), np.logical_and(np.isnan(a), np.isnan(b))
+                np.logical_and(np.equal(a, b), same_signs),
+                np.logical_and(np.isnan(a), np.isnan(b)),
             )
         except TypeError:
             return np.equal(a, b)
@@ -1518,8 +1527,9 @@ class _Canonical(FinchOperator):
     `hash(canonical(x))` is a hash consistent with `same`. NaNs hash by identity,
     so each kind of NaN is one object: one complex NaN for NumPy complex values,
     `cmath.nanj` for Python complex values, `np.nan` for NumPy floats and
-    `math.nan` for Python floats. -0.0 is 0.0, and other values keep their type.
-    Tuples are scalars, whose fields are made canonical. Override with
+    `math.nan` for Python floats. Other values are their own canonical value
+    (-0.0 is not `same` as 0.0, so it stays -0.0). Tuples are scalars, whose
+    fields are made canonical. Override with
     `__canonical__`, alongside `__same__`.
     """
 
@@ -1541,9 +1551,6 @@ class _Canonical(FinchOperator):
                 return np.nan
             case float() if math.isnan(a):
                 return math.nan
-            case float() | complex() | np.floating() | np.complexfloating():
-                # Adding zero turns -0.0 into 0.0 and leaves other values alone.
-                return a + type(a)(0)
             case _:
                 return a
 

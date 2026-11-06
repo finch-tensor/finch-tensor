@@ -122,8 +122,8 @@ def test_complex_fill_literal():
 
 
 def test_signed_zero_fills_are_different_ftypes():
-    # ccsd: 0.0 and -0.0 are equal, but Element{0.0} and Element{-0.0} are
-    # different Julia types, so a kernel cached for one rejected the other.
+    # ccsd: Element{0.0} and Element{-0.0} are different Julia types, but
+    # `same` equated 0.0 and -0.0, so a kernel cached for one rejected the other.
     from finch.algebra.fill import StaticFillFType
 
     assert StaticFillFType(np.float64(0.0)) != StaticFillFType(np.float64(-0.0))

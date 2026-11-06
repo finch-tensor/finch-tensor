@@ -18,8 +18,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar, overload
 
-import numpy as np
-
 from .ftypes import FType, FTyped, ftype
 
 if TYPE_CHECKING:
@@ -56,21 +54,6 @@ class AbstractFillFType(FType, ABC):
         ...
 
 
-def _zero_signs(value: Any) -> tuple:
-    """The signs of value's floating-point zeros. `same` (like `==`) equates
-    0.0 and -0.0, but a static fill is a type parameter of Julia's levels,
-    where Element{0.0} and Element{-0.0} are different types, so ftypes filled
-    with them must differ too, or one's kernel is cached for the other's.
-    """
-    if isinstance(value, tuple):
-        return tuple(_zero_signs(elt) for elt in value)
-    if isinstance(value, complex | np.complexfloating):
-        return (_zero_signs(value.real), _zero_signs(value.imag))
-    if isinstance(value, float | np.floating) and value == 0:
-        return bool(np.signbit(value))
-    return None
-
-
 class StaticFillFType(AbstractFillFType):
     """
     The fill of a format which kernels may specialize on, so its value is part
@@ -99,17 +82,18 @@ class StaticFillFType(AbstractFillFType):
         return fill
 
     def __eq__(self, other):
-        # Values are compared with `same` rather than `==` because of NaN.
-        # ftypes filled with NaN must compare equal or they get separate
-        # kernels and fail each other's type checks. Imported lazily: `ffuncs`
-        # depends on this module.
+        # Values are compared with `same` rather than `==` because of NaN and
+        # signed zeros. ftypes filled with NaN must compare equal or they get
+        # separate kernels and fail each other's type checks, and ftypes filled
+        # with 0.0 and -0.0 must differ, as Element{0.0} and Element{-0.0} are
+        # different Julia types. Imported lazily: `ffuncs` depends on this
+        # module.
         from .ffuncs import same
 
         return (
             isinstance(other, StaticFillFType)
             and self.element_type == other.element_type
             and bool(same(self._value, other._value))
-            and _zero_signs(self._value) == _zero_signs(other._value)
         )
 
     def __hash__(self):
