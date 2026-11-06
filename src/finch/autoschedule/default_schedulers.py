@@ -5,7 +5,7 @@ from finch.autoschedule.tensor_stats.bound_stats import DCStatsFactory
 from finch.autoschedule.tensor_stats.fd_stats import FDStatsFactory
 from finch.autoschedule.tensor_stats.memo_stats import MemoStatsFactory
 from finch.codegen import MLIRCompiler, NumbaCompiler
-from finch.compile import NotationCompiler
+from finch.compile import CompilerMode, NotationCompiler
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.compile_jl.julia import julia_available
 from finch.finch_assembly import (
@@ -59,7 +59,12 @@ INTERPRET_ASSEMBLY = LogicNormalizer(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(
                         CompilerFormLowerer(
-                            LogicCompiler(NotationCompiler(AssemblyInterpreter()))
+                            LogicCompiler(
+                                NotationCompiler(
+                                    AssemblyInterpreter(),
+                                    mode=CompilerMode(safe=True, debug=True),
+                                )
+                            )
                         )
                     )
                 )
