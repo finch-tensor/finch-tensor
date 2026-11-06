@@ -44,6 +44,7 @@ from .ftypes import (
 
 
 class NAryFinchOperatorFType(SingletonOperatorFType):
+    is_pure = True
     arity = math.inf
 
     def return_type(self, *args) -> FType:  # type: ignore[override]
@@ -56,6 +57,7 @@ class NAryFinchOperatorFType(SingletonOperatorFType):
 
 
 class BinaryFinchOperatorFType(SingletonOperatorFType):
+    is_pure = True
     arity = 2
 
     def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
@@ -64,6 +66,7 @@ class BinaryFinchOperatorFType(SingletonOperatorFType):
 
 
 class UnaryFinchOperatorFType(SingletonOperatorFType):
+    is_pure = True
     arity = 1
 
     def return_type(self, a: FType) -> FType:  # type: ignore[override]
@@ -72,6 +75,7 @@ class UnaryFinchOperatorFType(SingletonOperatorFType):
 
 
 class ComparisonFinchOperatorFType(SingletonOperatorFType):
+    is_pure = True
     arity = 2
 
     def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
@@ -1008,6 +1012,8 @@ max = _Max()
 
 
 class _MinByFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return minby
@@ -1056,6 +1062,8 @@ minby = _MinBy()
 
 
 class _MaxByFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return maxby
@@ -1364,6 +1372,8 @@ conj = _Conj()
 
 
 class _ClipFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return clip
@@ -1391,6 +1401,7 @@ clip = _Clip()
 
 @dataclass(unsafe_hash=True)
 class _CastFType(SingletonOperatorFType):
+    is_pure = True
     dtype: FType
 
     @property
@@ -1496,6 +1507,8 @@ same = _Same()
 
 
 class _CanonicalFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return canonical
@@ -1684,6 +1697,8 @@ class _GreaterEqual(FinchOperator):
 
 
 class _WhereFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return where
@@ -2301,6 +2316,7 @@ sign = _Sign()
 
 @dataclass(unsafe_hash=True)
 class _InitWriteFType(ImmutableStructFType, FinchOperatorFType):
+    is_pure = True
     fill_type: AbstractFillFType
 
     @property
@@ -2381,6 +2397,8 @@ def init_write(value):
 
 
 class _OverwriteFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return overwrite
@@ -2411,6 +2429,8 @@ overwrite = _Overwrite()
 
 
 class _FirstArgFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return first_arg
@@ -2442,6 +2462,7 @@ first_arg = _FirstArg()
 
 @dataclass(unsafe_hash=True)
 class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
+    is_pure = True
     fill_type: AbstractFillFType
 
     @property
@@ -2525,6 +2546,8 @@ def choose(fill_value):
 
 
 class _IdentityFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return identity
@@ -2557,6 +2580,8 @@ identity = _Identity()
 
 
 class _ConjugateFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return conjugate
@@ -2587,6 +2612,8 @@ conjugate = _Conjugate()
 
 
 class _MakeTupleFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return make_tuple
@@ -2617,6 +2644,8 @@ make_tuple = _MakeTuple()
 
 
 class _LastFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return last
@@ -2644,6 +2673,8 @@ last = _Last()
 
 
 class _ScaledSquareFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return scaled_square
@@ -2674,6 +2705,7 @@ scaled_square = _ScaledSquare()
 
 @dataclass(unsafe_hash=True)
 class _ScaledPowerFType(ImmutableStructFType, FinchOperatorFType):
+    is_pure = True
     exponent_type: FType
 
     @property
@@ -2722,6 +2754,7 @@ def scaled_power(exponent: float):
 
 @dataclass(unsafe_hash=True)
 class _AddScaledPowerFType(ImmutableStructFType, FinchOperatorFType):
+    is_pure = True
     exponent_type: FType
 
     @property
@@ -2796,6 +2829,8 @@ class _AddScaledPower(FinchOperator):
 
 
 class _AddScaledSquareFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return add_scaled_square
@@ -2859,6 +2894,7 @@ def add_scaled_power(exponent: float):
 
 @dataclass(unsafe_hash=True)
 class _ScaledNegativePowerFType(ImmutableStructFType, FinchOperatorFType):
+    is_pure = True
     exponent_type: FType
 
     @property
@@ -2911,6 +2947,7 @@ def scaled_negative_power(exponent: float):
 
 @dataclass(unsafe_hash=True)
 class _AddScaledNegativePowerFType(ImmutableStructFType, FinchOperatorFType):
+    is_pure = True
     exponent_type: FType
 
     @property
@@ -2995,6 +3032,7 @@ def add_scaled_negative_power(exponent: float):
 
 @dataclass(unsafe_hash=True)
 class _RootScaledPowerFType(ImmutableStructFType, FinchOperatorFType):
+    is_pure = True
     exponent_type: FType
 
     @property
@@ -3042,6 +3080,8 @@ class _RootScaledPower(FinchOperator):
 
 
 class _RootScaledSquareFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return root_scaled_square
@@ -3081,6 +3121,7 @@ def root_scaled_power(exponent: float):
 
 @dataclass(unsafe_hash=True)
 class _RootScaledNegativePowerFType(ImmutableStructFType, FinchOperatorFType):
+    is_pure = True
     exponent_type: FType
 
     @property
@@ -3139,6 +3180,8 @@ def root_scaled_negative_power(exponent: float):
 
 
 class _ResizeIfSmallerFType(SingletonOperatorFType):
+    is_pure = True
+
     @property
     def operator(self):
         return resize_if_smaller

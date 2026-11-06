@@ -3,6 +3,11 @@ from .cfg_builder import (
     AssemblyCFGBuilder,
     NumberedStatement,
 )
+from .constant_propagation import (
+    AssemblyConstantPropagation,
+    AssemblyConstantPropagationTransform,
+    assembly_constant_propagation,
+)
 from .dataflow import (
     AssemblyCopyPropagation,
     assembly_copy_propagation,
@@ -55,6 +60,8 @@ from .utils import get_vars_in_expr
 
 __all__ = [
     "AssemblyCFGBuilder",
+    "AssemblyConstantPropagation",
+    "AssemblyConstantPropagationTransform",
     "AssemblyCopyPropagation",
     "AssemblyExpression",
     "AssemblyInterpreter",
@@ -99,6 +106,7 @@ __all__ = [
     "Variable",
     "WhileLoop",
     "assembly_check_types",
+    "assembly_constant_propagation",
     "assembly_copy_propagation",
     "assembly_dataflow_analyze",
     "assembly_dataflow_run",
