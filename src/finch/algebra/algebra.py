@@ -52,9 +52,7 @@ class FinchOperatorFType(CallableFType, ABC):
         raise AttributeError(f"{self} has no init_value")
 
     def repeat_operator(self) -> Any:
-        if self.is_idempotent:
-            return None
-        raise AttributeError(f"{self} has no repeat_operator")
+        return None
 
 
 class SingletonOperatorFType(ImmutableStructFType, FinchOperatorFType):
@@ -200,15 +198,12 @@ def repeat_operator(op: FinchOperatorFType):
     """
     If there exists an operator g such that
     f(x, x, ..., x)  (n times)  is equal to g(x, n),
-    then return g.
+    then return g, and otherwise None. Idempotent operators (where g(x, n) is
+    x) have no repeat operator, so callers query `is_idempotent` separately.
     """
     return op.repeat_operator()
 
 
 def cansplitpush(op: FinchOperatorFType) -> bool:
     """Whether a reduction can split-push through the same operator expression."""
-    try:
-        repeat = repeat_operator(op)
-    except AttributeError:
-        return False
-    return repeat is not None and is_commutative(op) and is_associative(op)
+    return repeat_operator(op) is not None and is_commutative(op) and is_associative(op)

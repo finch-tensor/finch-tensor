@@ -7,7 +7,7 @@ import pytest
 import numpy as np
 
 import finch as ft
-from finch.algebra import cansplitpush, ffuncs
+from finch.algebra import cansplitpush, ffuncs, repeat_operator
 from finch.autoschedule import COMPILE_JULIA_GALLEY, with_default_scheduler
 from finch.compile_jl.julia import julia_available
 
@@ -54,7 +54,9 @@ def test_einsum_logical_not():
 
 def test_reduction_without_repeat_operator():
     # fastsv, gmres: choose (reshape) and add_scaled_square (vector_norm) have
-    # no repeat operator, which the Galley factorizer looked up unconditionally.
+    # no repeat operator, and looking one up raised instead of returning None.
+    assert repeat_operator(ffuncs.add_scaled_square.ftype) is None
+    assert repeat_operator(ffuncs.choose(1.0).ftype) is None
     assert not cansplitpush(ffuncs.add_scaled_square.ftype)
     x = ft.asarray(np.arange(6.0)) + 1.0
     y = ft.reshape(ft.reshape(x, (2, 3)), (3, 2))
