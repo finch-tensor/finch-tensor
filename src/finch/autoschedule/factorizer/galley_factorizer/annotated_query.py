@@ -667,6 +667,8 @@ class AnnotatedQuery(Generic[TS]):
         # applying the operator over |Dom(idx)| identical values is the repeat
         # operator, i.e. sum_i B = B * |Dom(i)|.
         kernel_order = query_expr.fields()
+        # Without a repeat operator (e.g. max's, a norm's or a choose's
+        # reduction), the absent indices are aggregated by iterating.
         repeat_op = repeat_operator(agg_op.ftype)
         repeated = (
             []

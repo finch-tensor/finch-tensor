@@ -1540,7 +1540,9 @@ def reshape(x, /, shape: tuple, *, copy=None):
     if isinstance(x, lazy.LazyTensor):
         return lazy.reshape(x, shape, copy=copy)
     if not hasattr(x, "reshape"):
-        raise NotImplementedError(f"Object of type {type(x)} does not support reshape")
+        # Tensors without a reshape of their own (FiberTensor, results Julia
+        # owns) reshape lazily, like the other eager operations.
+        return compute(lazy.reshape(x, shape, copy=copy))
     return x.reshape(shape, copy=copy)
 
 

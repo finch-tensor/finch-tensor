@@ -306,6 +306,15 @@ def test_same_ffunc():
     assert ffuncs.same(float("nan"), float("nan"))
     assert ffuncs.same(np.float32(np.nan), np.float64(np.nan))
     assert not ffuncs.same(float("nan"), 1.0)
+    assert not ffuncs.same(0.0, -0.0)
+    assert ffuncs.same(-0.0, np.float32(-0.0))
+    assert not ffuncs.same(complex(0.0, 0.0), complex(0.0, -0.0))
+    assert ffuncs.same(complex(np.nan, 0.0), complex(np.nan, 0.0))
+    np.testing.assert_array_equal(
+        ffuncs.same(np.array([0.0, -0.0, np.nan, 1.0]), -0.0),
+        [False, True, False, False],
+    )
+    assert ffuncs.same(True, True)
     assert ffuncs.same(None, None)
     assert not ffuncs.not_same(1, 1)
     assert ffuncs.not_same(1, 2)
@@ -351,10 +360,12 @@ def test_canonical():
     complex_nan = ffuncs.canonical(np.complex128(complex(0, np.nan)))
     assert isinstance(complex_nan, np.complex128)
     assert ffuncs.canonical(np.complex64(complex(np.nan, 0))) is complex_nan
-    assert np.signbit(ffuncs.canonical(np.float64(-0.0))) == np.False_
+    assert np.signbit(ffuncs.canonical(np.float64(-0.0))) == np.True_
     assert type(ffuncs.canonical(np.float32(1.5))) is np.float32
     assert ffuncs.canonical(1) == 1
-    assert ffuncs.canonical((nan64, np.float64(-0.0))) == (np.nan, 0.0)
+    canonical_tuple = ffuncs.canonical((nan64, np.float64(-0.0)))
+    assert canonical_tuple[0] is np.nan
+    assert np.signbit(canonical_tuple[1])
     assert ffuncs.canonical(Canonical()) == ("canonical", 1)
     assert ffuncs.canonical.ftype.return_type(finch.float32) == finch.float32
 

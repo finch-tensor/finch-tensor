@@ -61,14 +61,34 @@ from finch.autoschedule import get_default_scheduler
 from finch.finch_logic import (
     Field,
     HardAlias,
+    Literal,
     Plan,
     Produces,
     Query,
     Table,
 )
 from finch.symbolic import gensym
+from finch.tensor.patterns import PatternTensor
 
 from .lazy import LazyTensor, asarray, defer
+
+
+def _deferred_pattern(arg: LazyTensor) -> PatternTensor | None:
+    """The pattern tensor (e.g. `eye`'s) that arg only defers, if any.
+
+    Schedulers return such a tensor as is, since computing it is a query that
+    reads it, but compiled backends cannot return a pattern from a kernel (the
+    Julia backend fails with "don't know how to lower" it), so it is returned
+    without scheduling.
+    """
+    if arg.ctx.blobs:
+        return None
+    match arg.ctx.stmt:
+        case Query(Table(tns, _), Table(Literal(PatternTensor() as val), _)) if (
+            tns == arg.data
+        ):
+            return val
+    return None
 
 
 def compute(arg, ctx=None):
@@ -95,6 +115,8 @@ def compute(arg, ctx=None):
     for i, arg_i in enumerate(args):
         if not isinstance(arg_i, LazyTensor):
             outputs[i] = arg_i
+        elif (pattern := _deferred_pattern(arg_i)) is not None:
+            outputs[i] = pattern
         else:
             lazy_args.append(arg_i)
             lazy_arg_idxs.append(i)

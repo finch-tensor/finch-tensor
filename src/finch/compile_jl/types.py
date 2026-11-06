@@ -231,6 +231,11 @@ def _julia_literal(value: Any) -> str:
     if isinstance(value, tuple):
         elts = [_julia_literal(elt) for elt in value]
         return f"({', '.join(elts)}{',' if len(elts) == 1 else ''})"
+    if isinstance(value, complex | np.complexfloating):
+        # Python writes complex numbers as `1j`, which Julia reads as a name.
+        # complex() of two Float32s is a ComplexF32, as of two Float64s.
+        real, imag = _julia_literal(value.real), _julia_literal(value.imag)
+        return f"complex({real}, {imag})"
     literal = str(value)
     if isinstance(value, (float, np.floating)):
         if math.isinf(value):

@@ -82,10 +82,12 @@ class StaticFillFType(AbstractFillFType):
         return fill
 
     def __eq__(self, other):
-        # Values are compared with `same` rather than `==` because of NaN.
-        # ftypes filled with NaN must compare equal or they get separate
-        # kernels and fail each other's type checks. Imported lazily: `ffuncs`
-        # depends on this module.
+        # Values are compared with `same` rather than `==` because of NaN and
+        # signed zeros. ftypes filled with NaN must compare equal or they get
+        # separate kernels and fail each other's type checks, and ftypes filled
+        # with 0.0 and -0.0 must differ, as Element{0.0} and Element{-0.0} are
+        # different Julia types. Imported lazily: `ffuncs` depends on this
+        # module.
         from .ffuncs import same
 
         return (
