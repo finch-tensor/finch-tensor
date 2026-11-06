@@ -3,10 +3,14 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from finch.algebra.tensor import TensorFType
-from finch.autoschedule.cost_models import CostModel, LevelOption, ProtocolComponent
+from finch.autoschedule.cost_models import (
+    PROTOCOL_COST_MODEL,
+    CostModel,
+    LevelOption,
+    ProtocolChoice,
+)
 from finch.autoschedule.formatter.smart_formatter import (
     LEVEL_OPTIONS,
-    fitted_cost_model,
     program_cost,
 )
 from finch.autoschedule.stages import LoopOrderedForm
@@ -108,13 +112,13 @@ def add_workspace(
 
 
 def add_workspaces(
-    prgm: LogicStatement,
+    prgm: Plan,
     bindings: Mapping[Alias, TensorFType],
     stats: Mapping[Alias, TensorStats],
     stats_factory: StatsFactory,
-    cost_model: CostModel[ProtocolComponent],
+    cost_model: CostModel[ProtocolChoice],
     options: Sequence[LevelOption] = LEVEL_OPTIONS,
-) -> LogicStatement:
+) -> Plan:
     """
     Redirect each query of prgm which scatters into an output of prgm into a
     workspace fused over the fields it writes in loop order, as add_workspace
@@ -124,7 +128,7 @@ def add_workspaces(
     bindings have no workspaces.
     """
 
-    def cost(stmt: LogicStatement) -> float:
+    def cost(stmt: Plan) -> float:
         return program_cost(stmt, bindings, stats, stats_factory, cost_model, options)
 
     prgm = flatten_plans(prgm)
@@ -142,6 +146,7 @@ def add_workspaces(
         staged = add_workspace(
             prgm, alias, depth, HardAlias(spc.freshen(alias.name, "ws"))
         )
+        assert isinstance(staged, Plan)
         if best is None:
             best = cost(prgm)
         staged_cost = cost(staged)
@@ -154,7 +159,7 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
     """
     Pass a program in LoopOrderedForm to ctx, after redirecting the queries
     which scatter into their outputs into workspaces where they cost less
-    under cost_model, by default the fitted format model, as add_workspaces
+    under cost_model, by default PROTOCOL_COST_MODEL, as add_workspaces
     does. A loop orderer wraps it, so that the copies out of workspaces aren't
     propagated, and the formatter it wraps should price programs with the same
     model.
@@ -163,12 +168,12 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
     def __init__(
         self,
         ctx: LogicLoader,
-        cost_model: CostModel[ProtocolComponent] | None = None,
+        cost_model: CostModel[ProtocolChoice] | None = None,
         options: Sequence[LevelOption] = LEVEL_OPTIONS,
     ):
         self.ctx = ctx
         if cost_model is None:
-            cost_model = fitted_cost_model()
+            cost_model = PROTOCOL_COST_MODEL
         self.cost_model = cost_model
         self.options = options
 
@@ -179,6 +184,7 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ) -> tuple[AssemblyLibrary, dict[Alias, TensorFType]]:
+        assert isinstance(prgm, Plan)
         prgm = add_workspaces(
             prgm, bindings, stats, stats_factory, self.cost_model, self.options
         )

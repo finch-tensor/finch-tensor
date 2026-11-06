@@ -1,14 +1,16 @@
 """
-The protocol cost model prices the levels of the formatted tensors of a program
-and the accesses of them at the loops of each query, each kind of level
-differently, so that the protocol optimizer can choose the protocol of each
-read, and the formatter the kind of each level.
+The physical cost model prices the levels of the formatted tensors of a
+program, as StorageBasis does, and the accesses of them at the loops of each
+query, as ProtocolBasis does, each kind of level differently, so that the
+protocol optimizer can choose the protocol of each read, and the formatter the
+kind of each level.
 """
 
+import json
 from abc import ABC, abstractmethod
-from collections import OrderedDict
 from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Any, ClassVar
 
 import numpy as np
@@ -31,7 +33,6 @@ from finch.finch_logic import (
     LogicExpression,
     LogicStatement,
     Plan,
-    Produces,
     Protocol,
     Query,
     QueryInto,
@@ -49,8 +50,8 @@ from finch.tensor import (
     SparseListLevelFType,
 )
 
-from .cost_models import NS, Affine, Basis, CostModel
-from .loop_cost_models import LoopSpaces, Prefix, prefixes
+from .cost_models import NS, Affine, Basis, ByKind, Concat, CostModel
+from .loop_cost_models import LoopSpaces, Prefix, prefixes, restrict
 
 
 def nnz_after(stats: NS, stats_factory: StatsFactory[NS], depth: int, over: tuple = ()):
@@ -64,62 +65,6 @@ def nnz_after(stats: NS, stats_factory: StatsFactory[NS], depth: int, over: tupl
             ffuncs.or_, False, reduce_fields, stats_factory.support(stats)
         )
     return stats.estimate_non_fill_values(over=over)
-
-
-def alias_blocks(
-    alias: Alias, term: LogicStatement, machine: StatsMachine[NS]
-) -> list[tuple[NS, tuple[Field, ...]]]:
-    """
-    Return the stats and fused fields of each block of alias in term, in program
-    order. A block is a query which defines alias and the in-place updates which
-    follow it, and its stats are the union of the supports of its results, with
-    the fill of alias. An alias which term reads but never defines, such as an
-    input, is one block of its binding. Every block stores the same rank. term
-    is evaluated from the bindings of machine.
-    """
-    stats_factory = machine.stats_factory
-    stats_interpreter = StatsMachine(stats_factory, OrderedDict(machine.bindings))
-    blocks: list[tuple[NS, tuple[Field, ...]]] = []
-
-    def visit_stmt(stmt: LogicStatement):
-        match stmt:
-            case Plan(bodies):
-                for body in bodies:
-                    visit_stmt(body)
-            case Fuse(_, body):
-                visit_stmt(body)
-            case QueryInto(Table(Alias() as lhs, _), _, _) if (
-                lhs.unfused == alias.unfused and blocks
-            ):
-                stats_interpreter(stmt)
-                block, over = blocks[-1]
-                stats = stats_factory.relabel(stats_interpreter(lhs), block.index_order)
-                union = stats_factory.mapjoin(
-                    ffuncs.or_,
-                    stats_factory.support(block),
-                    stats_factory.support(stats),
-                )
-                union.fill_type = block.fill_type
-                blocks[-1] = (union, over)
-            case Query(Table(Alias() as lhs, idxs), _) | QueryInto(
-                Table(Alias() as lhs, idxs), _, _
-            ):
-                stats_interpreter(stmt)
-                if lhs.unfused == alias.unfused:
-                    # A fused alias stores one slice for each value of its
-                    # leading fields.
-                    blocks.append((stats_interpreter(lhs), idxs[: lhs.nfused]))
-            case Produces():
-                return
-            case _:
-                raise ValueError(f"Unsupported statement type: {stmt}")
-
-    visit_stmt(term)
-    if not blocks and alias in machine.bindings:
-        blocks.append((machine.bindings[alias], ()))
-    if len({len(stats.index_order) - len(over) for stats, over in blocks}) > 1:
-        raise ValueError(f"Cannot change the rank of allocated tensor {alias}.")
-    return blocks
 
 
 class LevelOption(ABC):
@@ -257,15 +202,8 @@ class ElementLevelOption(LevelOption):
 
     kind = "element"
     feature_names = ("values", "value_bytes")
-    protocols = (
-        DefaultProtocol(),
-        Walk(),
-        Gallop(),
-        Follow(),
-        Extrude(),
-        Laminate(),
-    )
-    # A value is looked up at the position of its parent.
+    # A value is looked up at the position of its parent, and written with it.
+    protocols = (Follow(), Extrude(), Laminate())
     default_protocol = Follow()
     # An element has no field, and a value at every position.
     filters = False
@@ -385,18 +323,6 @@ def write_protocols(alias: Alias, depth: int, term: LogicStatement) -> set[Proto
     return protocols
 
 
-def written_aliases(term: LogicStatement) -> set[Alias]:
-    """The unfused aliases of the tables which the queries of term write."""
-    written = set()
-    for node in PostOrderDFS(term):
-        match node:
-            case Query(Table(Alias() as lhs, _), _) | QueryInto(
-                Table(Alias() as lhs, _), _, _
-            ):
-                written.add(lhs.unfused)
-    return written
-
-
 def allowed_options(
     alias: Alias, depth: int, term: LogicStatement, options: Sequence[LevelOption]
 ) -> list[LevelOption]:
@@ -421,140 +347,22 @@ def followed(expr: LogicExpression, table: Table) -> LogicExpression:
     return Rewrite(PostWalk(read))(expr)
 
 
-@dataclass(frozen=True)
-class StorageChoice:
-    """
-    The level option at a zero-based depth of the levels alias stores, priced
-    over the blocks of alias in the program, as alias_blocks lists them, with
-    the positions entering the level in each.
-    """
-
-    alias: Alias
-    depth: int
-    option: LevelOption
-    num_pos: tuple[float, ...]
-    blocks: list[tuple[Any, tuple[Field, ...]]] = field(compare=False, hash=False)
-
-
 # bindings name no position type, so positions are intp.
 POS_SIZE = np_dtype(ftypes.intp).itemsize
 
-KINDS: tuple[LevelOption, ...] = (
+# The kinds of level which store a field, which a format chooses between, and
+# every kind the bases price, the element level among them.
+FIELD_KINDS: tuple[LevelOption, ...] = (
     DenseLevelOption(),
     SparseListLevelOption(),
     SparseHashLevelOption(),
     SparseByteMapLevelOption(),
 )
-STORAGE_KINDS: tuple[LevelOption, ...] = (*KINDS, ElementLevelOption())
-
-STORAGE_FEATURES = sum(len(option.feature_names) for option in STORAGE_KINDS)
-STORAGE_FEATURE_NAMES = tuple(
-    f"{option.kind}.{name}" for option in STORAGE_KINDS for name in option.feature_names
-)
+KINDS: tuple[LevelOption, ...] = (*FIELD_KINDS, ElementLevelOption())
 
 
-def storage_choices(
-    alias: Alias,
-    options: Sequence[LevelOption],
-    term: LogicStatement,
-    machine: StatsMachine[NS],
-) -> Iterator[StorageChoice]:
-    """
-    The levels alias stores in term, of options outermost first, each with
-    the positions entering it in each block of alias, from the stats of
-    machine, which is left where it is.
-    """
-    blocks = alias_blocks(alias, term, machine)
-    if not blocks:
-        return
-    num_pos = (1.0,) * len(blocks)
-    for depth, option in enumerate(options):
-        yield StorageChoice(alias, depth, option, num_pos, blocks)
-        num_pos = tuple(
-            option.next_num_pos(
-                stats, machine.stats_factory, len(over) + depth, n, over
-            )
-            for (stats, over), n in zip(blocks, num_pos, strict=True)
-        )
-
-
-def storage_features(
-    component: StorageChoice, machine: StatsMachine[NS], n_features: int
-) -> np.ndarray:
-    """
-    The storage features of component, one row for each block of its alias,
-    in the columns of its kind of the first STORAGE_FEATURES of n_features,
-    which STORAGE_FEATURE_NAMES names.
-    """
-    start = 0
-    for option in STORAGE_KINDS:
-        if option.kind == component.option.kind:
-            break
-        start += len(option.feature_names)
-    features = np.zeros((len(component.blocks), n_features))
-    for row, ((stats, over), num_pos) in enumerate(
-        zip(component.blocks, component.num_pos, strict=True)
-    ):
-        depth = len(over) + component.depth
-        shape_type = stats.shape_type
-        # The element level has no dimension, and a broadcast dimension is
-        # intp.
-        idx_size = 0
-        if depth < len(shape_type):
-            idx_size = np_dtype(shape_type[depth] or ftypes.intp).itemsize
-        storage = component.option.get_storage_features(
-            stats,
-            machine.stats_factory,
-            depth,
-            num_pos,
-            idx_size,
-            POS_SIZE,
-            np_dtype(stats.element_type).itemsize,
-            over,
-        )
-        features[row, start : start + len(storage)] = storage
-    return features
-
-
-class StorageBasis(Basis[StorageChoice], LoopOrderedForm):
-    """
-    A tensor-local basis where each level of each formatted alias is a
-    component, whose rows are the storage features of its option, one for
-    each block of the alias in the program, in the block of columns of its
-    kind. The levels depend on nothing but the stats of their alias, so this
-    basis prices the storage of a format on its own. bindings lists the
-    options of the levels an alias stores, as level_formats reads them.
-    """
-
-    def components(
-        self,
-        term: LogicStatement,
-        bindings: Mapping[Alias, Any],
-        machine: StatsMachine[NS],
-    ) -> Iterator[StorageChoice]:
-        for alias, options in level_formats(bindings).items():
-            yield from storage_choices(alias, options, term, machine)
-        # The levels are priced from the stats before term, so the machine is
-        # advanced past it only after every level.
-        machine(term)
-
-    @property
-    def n_features(self) -> int:
-        return STORAGE_FEATURES
-
-    @property
-    def feature_names(self) -> tuple[str, ...]:
-        return STORAGE_FEATURE_NAMES
-
-    def get_component_features(
-        self,
-        component: StorageChoice,
-        machine: StatsMachine[NS],
-    ) -> np.ndarray:
-        return storage_features(component, machine, self.n_features)
-
-
-STORAGE_BASIS = StorageBasis()
+def option_kind(component: "ProtocolChoice") -> str:
+    return component.option.kind
 
 
 # The protocols which a table can read a level with, in the order ties between
@@ -591,16 +399,21 @@ class ProtocolChoice:
     """
     An access of the level of a tensor at a zero-based stored depth by a query,
     at the last loop of prefix, which reaches the level: the last loop over a
-    field of the levels from the root to it. table is the read, in the
+    field of the levels from the root to it, or, for the element level at the
+    rank of the tensor, to the last of them. table is the read, in the
     expression of prefix, or, if write, the table of the output of the query,
-    and option is the kind of the level.
+    and options are the kinds of the levels of the tensor, outermost first.
     """
 
     prefix: Prefix
     table: Table
     depth: int
-    option: LevelOption
+    options: Sequence[LevelOption]
     write: bool = False
+
+    @property
+    def option(self) -> LevelOption:
+        return self.options[self.depth]
 
     @property
     def alias(self) -> Alias:
@@ -608,6 +421,11 @@ class ProtocolChoice:
             case Alias() as tns:
                 return tns
         raise ValueError(f"Expected a table of an alias, got {self.table}")
+
+    @property
+    def parent_fields(self) -> tuple[Field, ...]:
+        """The fields of the levels above the level."""
+        return self.table.idxs[: self.alias.nfused + self.depth]
 
     @property
     def fields(self) -> tuple[Field, ...]:
@@ -628,9 +446,6 @@ class ProtocolChoice:
         if proto is None or proto == DefaultProtocol():
             return self.option.default_protocol
         return proto
-
-
-ProtocolComponent = StorageChoice | ProtocolChoice
 
 
 def reached_depths(
@@ -670,7 +485,7 @@ def level_reads(
             case Table(Alias() as tns, idxs) if tns.unfused in formats:
                 options = formats[tns.unfused]
                 for depth in reached_depths(loops, idxs, tns.nfused):
-                    yield ProtocolChoice(prefix, table, depth, options[depth])
+                    yield ProtocolChoice(prefix, table, depth, options)
 
 
 def level_accesses(
@@ -678,7 +493,8 @@ def level_accesses(
 ) -> Iterator[ProtocolChoice]:
     """
     The reads of levels at the last loop of prefix, then the writes of the
-    levels of its output, if formats lists the options of its levels.
+    levels of its output, if formats lists the options of its levels, with the
+    write of its element level where the last of them is reached.
     """
     yield from level_reads(prefix, formats)
     loops, idxs = prefix.prefix, prefix.output_vars
@@ -686,106 +502,91 @@ def level_accesses(
         case Alias() as tns if loops and idxs is not None and tns.unfused in formats:
             options = formats[tns.unfused]
             table = Table(tns, idxs)
+            rank = len(idxs) - tns.nfused
             for depth in reached_depths(loops, idxs, tns.nfused):
-                yield ProtocolChoice(prefix, table, depth, options[depth], write=True)
+                yield ProtocolChoice(prefix, table, depth, options, write=True)
+                if depth == rank - 1 and len(options) > rank:
+                    yield ProtocolChoice(prefix, table, rank, options, write=True)
 
 
-FEATURES = (
-    "executions",
-    "iterations",
-    "seeks",
-    "parents",
-    "follow_visits",
-    "walk_visits",
-    "gallop_visits",
-    "dense_visits",
-    "distinct_reads",
-    "extrude_visits",
-    "laminate_visits",
-    "distinct_writes",
-)
+# The features of an access: the times its loop is entered, each a seek of a
+# fiber, the points the loop visits, the visits of its protocol, which are the
+# entries a walk steps through, the jumps of a gallop, or the lookups or
+# writes of the rest, and the distinct fibers entered and entries touched.
+FEATURES = ("executions", "iterations", "visits", "parents", "distinct")
 
 
-class ProtocolBasis(Basis[ProtocolComponent], LoopOrderedForm):
+def accesses(
+    term: LogicStatement, bindings: Mapping[Alias, Any], machine: StatsMachine[NS]
+) -> Iterator[ProtocolChoice]:
     """
-    A basis whose components are the levels of each formatted alias which term
-    writes, since the tensors it reads are already stored, and each access of
-    a level at the last loop of each loop prefix. A level has one row for each
-    block of its alias, in the storage columns of its kind, which come first.
-    An access has one row in the columns of the kind of its level, which count
-    FEATURES. The loops within a loop are entered where the formats say,
-    whatever the protocols at it, so the protocols at a loop only change its
-    own rows, and choose_protocols picks each loop on its own.
+    The accesses of the levels of the formatted tensors of bindings at the
+    last loop of each loop prefix of term, advancing machine past each query.
     """
+    formats = level_formats(bindings)
+    for prefix in prefixes(term, machine, formats=formats):
+        yield from level_accesses(prefix, formats)
+
+
+def parents(access: ProtocolChoice, spaces: LoopSpaces) -> float:
+    """
+    The fibers of the level an access enters: those at the positions the
+    enclosing loops reach, or, where a level above is reached at this loop,
+    those it visits.
+    """
+    above = access.parent_fields
+    entered = spaces.visited() if spaces.idx in above else spaces.exec_space
+    return spaces.located(entered, above)
+
+
+class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
+    """
+    A basis whose components are the accesses of the levels of the formatted
+    tensors at the last loop of each loop prefix, each a row of FEATURES. The
+    loops within a loop are entered where the formats say, whatever the
+    protocols at it, so the protocols at a loop only change its own rows, and
+    choose_protocols picks each loop on its own.
+    """
+
+    @property
+    def n_features(self) -> int:
+        return len(FEATURES)
+
+    @property
+    def feature_names(self) -> tuple[str, ...]:
+        return FEATURES
 
     def components(
         self,
         term: LogicStatement,
         bindings: Mapping[Alias, Any],
         machine: StatsMachine[NS],
-    ) -> Iterator[ProtocolComponent]:
-        formats = level_formats(bindings)
-        # The levels are priced from the stats before term, which listing
-        # them leaves in place, and then the accesses advance past each query.
-        written = written_aliases(term)
-        for alias, options in formats.items():
-            if alias.unfused in written:
-                yield from storage_choices(alias, options, term, machine)
-        for prefix in prefixes(term, machine, formats=formats):
-            yield from level_accesses(prefix, formats)
-
-    @property
-    def n_features(self) -> int:
-        return STORAGE_FEATURES + len(KINDS) * len(FEATURES)
-
-    @property
-    def feature_names(self) -> tuple[str, ...]:
-        return (
-            *STORAGE_FEATURE_NAMES,
-            *(f"{option.kind}.{name}" for option in KINDS for name in FEATURES),
-        )
+    ) -> Iterator[ProtocolChoice]:
+        return accesses(term, bindings, machine)
 
     def get_component_features(
         self,
-        component: ProtocolComponent,
+        component: ProtocolChoice,
         machine: StatsMachine[NS],
     ) -> np.ndarray:
-        match component:
-            case StorageChoice():
-                return storage_features(component, machine, self.n_features)
-            case ProtocolChoice(prefix=prefix, table=table):
-                pass
-        row = np.zeros((1, self.n_features))
+        prefix, table = component.prefix, component.table
         spaces = LoopSpaces(prefix, machine)
-        block = [option.kind for option in KINDS].index(component.option.kind)
-        features = dict.fromkeys(FEATURES, 0.0)
-        features["executions"] = spaces.executions()
-        features["iterations"] = spaces.iterations()
-        features["seeks"] = spaces.executions()
         visited = spaces.visited()
-        # The fibers entered are at the positions the enclosing loops reach,
-        # or, where a level above is reached at this loop, those it visits.
-        above = component.fields[:-1]
-        entered = visited if spaces.idx in above else spaces.exec_space
-        features["parents"] = spaces.located(entered, above)
+        visits = spaces.count(visited)
         if component.write:
-            match component.protocol:
-                case Extrude():
-                    features["extrude_visits"] = spaces.count(visited)
-                case Laminate():
-                    features["laminate_visits"] = spaces.count(visited)
-            features["distinct_writes"] = spaces.located(visited, component.fields)
+            distinct = spaces.located(visited, component.fields)
         else:
-            dense = LoopSpaces(
-                replace(prefix, expr=followed(prefix.expr, table)), machine
-            )
-            dense_visits = dense.count(dense.visited())
+            distinct = spaces.located(spaces.stepped(table), component.fields)
             match component.protocol:
-                case Follow():
-                    features["follow_visits"] = spaces.count(visited)
                 case Walk():
-                    features["walk_visits"] = spaces.walk(table)
+                    visits = spaces.walk(table)
                 case Gallop():
+                    # A gallop jumps at most once for each visit the loop would
+                    # make if the level were dense, and for each step of the
+                    # smallest walk among the gallops.
+                    dense = LoopSpaces(
+                        replace(prefix, expr=followed(prefix.expr, table)), machine
+                    )
                     galloped = []
                     for node in dict.fromkeys(PostOrderDFS(spaces.arg)):
                         match node:
@@ -794,51 +595,145 @@ class ProtocolBasis(Basis[ProtocolComponent], LoopOrderedForm):
                     smallest = min(
                         (spaces.walk(node) for node in galloped), default=0.0
                     )
-                    features["gallop_visits"] = min(dense_visits, smallest)
-            features["dense_visits"] = dense_visits
-            features["distinct_reads"] = spaces.located(
-                spaces.stepped(table), component.fields
+                    visits = min(dense.count(dense.visited()), smallest)
+        return np.array(
+            [
+                [
+                    spaces.executions(),
+                    spaces.iterations(),
+                    visits,
+                    parents(component, spaces),
+                    distinct,
+                ]
+            ]
+        )
+
+
+def protocol_name(protocol: Protocol) -> str:
+    return type(protocol).__name__.lower()
+
+
+def access_protocol(access: ProtocolChoice) -> str:
+    return protocol_name(access.protocol)
+
+
+def protocol_names(option: LevelOption) -> list[str]:
+    """The protocols a level of option is accessed with, once chosen."""
+    return [
+        protocol_name(proto) for proto in option.protocols if proto != DefaultProtocol()
+    ]
+
+
+class ProtocolBasis(ByKind[ProtocolChoice, str]):
+    """
+    The accesses of the levels of each formatted tensor, each under the basis
+    of the kind of its level and, within it, of its protocol, so that a
+    linear model prices each feature of an access by both.
+    """
+
+    def __init__(self):
+        super().__init__(
+            {
+                option.kind: ByKind(
+                    dict.fromkeys(protocol_names(option), AccessBasis()),
+                    access_protocol,
+                )
+                for option in KINDS
+            },
+            option_kind,
+        )
+
+
+class LevelBasis(Basis[ProtocolChoice], LoopOrderedForm):
+    """
+    A basis whose components are the accesses, as AccessBasis lists them, and
+    whose rows are the storage features of option at the accesses which write
+    a level of it: the level stores what the query writes, entered at the
+    fibers the access enters. The tensors a query reads are already stored, so
+    a read costs no storage.
+    """
+
+    def __init__(self, option: LevelOption):
+        self.option = option
+
+    @property
+    def n_features(self) -> int:
+        return len(self.option.feature_names)
+
+    @property
+    def feature_names(self) -> tuple[str, ...]:
+        return self.option.feature_names
+
+    def components(
+        self,
+        term: LogicStatement,
+        bindings: Mapping[Alias, Any],
+        machine: StatsMachine[NS],
+    ) -> Iterator[ProtocolChoice]:
+        return accesses(term, bindings, machine)
+
+    def get_component_features(
+        self,
+        component: ProtocolChoice,
+        machine: StatsMachine[NS],
+    ) -> np.ndarray:
+        if not component.write:
+            return np.zeros((1, self.n_features))
+        stats_factory = machine.stats_factory
+        idxs = component.table.idxs
+        stats = machine(component.prefix.expr)
+        if any(idx not in idxs for idx in stats.index_order):
+            stats = restrict(stats_factory, stats, idxs)
+        stats = stats_factory.reorder(stats, idxs)
+        nfused = component.alias.nfused
+        depth = nfused + component.depth
+        # A fused alias stores one slice at a time, described by its largest,
+        # and the positions entering a level are those its parent passes.
+        over = idxs[:nfused]
+        num_pos = 1.0
+        for k, option in enumerate(component.options[: component.depth]):
+            num_pos = option.next_num_pos(
+                stats, stats_factory, nfused + k, num_pos, over
             )
-        start = STORAGE_FEATURES + block * len(FEATURES)
-        row[0, start : start + len(FEATURES)] = list(features.values())
-        return row
+        # The element level has no dimension, and a broadcast dimension is
+        # intp.
+        idx_size = 0
+        if depth < len(stats.shape_type):
+            idx_size = np_dtype(stats.shape_type[depth] or ftypes.intp).itemsize
+        features = self.option.get_storage_features(
+            stats,
+            stats_factory,
+            depth,
+            num_pos,
+            idx_size,
+            POS_SIZE,
+            np_dtype(stats.element_type).itemsize,
+            over,
+        )
+        return np.asarray(features, dtype=float).reshape(1, self.n_features)
 
 
-# The basis of the physical optimizers adds a constant to the cost of each
-# component.
-PROTOCOL_BASIS = Affine(ProtocolBasis())
+class StorageBasis(ByKind[ProtocolChoice, str]):
+    """The storage of the levels each access writes, each under the basis of
+    the kind of its level."""
 
-# Until the model is fitted, each byte a level stores costs 1, a byte of flags
-# among them, and its positions and entries nothing more. Seeking a fiber
-# costs 1, and entering a loop or iterating it nothing more. A walk costs 1
-# for each entry it steps through, a gallop costs 4 for each jump, and a
-# follow costs a lookup for each visit: 1 in a dense level or a bytemap, 3 in
-# a hash table, and 4 in a list, which is searched. The fibers entered, the
-# visits a dense level would make, and the distinct entries read are free,
-# since the seeks and visits already count them. A write costs a lookup, a
-# lamination of a list costs a search like a follow, and each distinct entry
-# written costs 1 more to insert, except in a dense level, which has a slot
-# for each.
-_STORAGE_COSTS: dict[str, tuple[float, ...]] = {
-    "dense": (0, 0),
-    "sparse_list": (0, 0, 1, 1),
-    "sparse_hash": (0, 0, 1, 1),
-    "sparse_bytemap": (0, 1, 0, 1),
-    "element": (0, 1),
-}
-_PROTOCOL_COSTS: dict[str, tuple[float, ...]] = {
-    "dense": (0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, 0),
-    "sparse_list": (0, 0, 1, 0, 4, 1, 4, 0, 0, 1, 4, 1),
-    "sparse_hash": (0, 0, 1, 0, 3, 1, 0, 0, 0, 3, 3, 1),
-    "sparse_bytemap": (0, 0, 1, 0, 1, 1, 4, 0, 0, 1, 1, 1),
-}
+    def __init__(self):
+        super().__init__(
+            {option.kind: LevelBasis(option) for option in KINDS}, option_kind
+        )
+
+
+STORAGE_BASIS = StorageBasis()
+
+# The basis of the physical optimizers prices the storage and the accesses of
+# the levels together, with a constant for each access.
+PROTOCOL_BASIS = Affine(Concat(STORAGE_BASIS, ProtocolBasis()))
+
+# The coefficients are those scripts/fitting fitted to the timings of its
+# format stage, which fit_physical_data writes, so that a basis which changes
+# refuses them until it is fitted again.
 PROTOCOL_COST_MODEL = CostModel(
-    PROTOCOL_BASIS,
-    np.concatenate(
-        [
-            *(_STORAGE_COSTS[option.kind] for option in STORAGE_KINDS),
-            *(_PROTOCOL_COSTS[option.kind] for option in KINDS),
-            [0.0],
-        ]
-    ),
+    PROTOCOL_BASIS, np.zeros(PROTOCOL_BASIS.n_features)
+).from_json(
+    json.loads(Path(__file__).with_name("protocol_cost_model.json").read_text())
 )

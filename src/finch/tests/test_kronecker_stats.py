@@ -159,9 +159,11 @@ def elementwise_sum(protocols):
 @pytest.mark.parametrize(
     "program, fields, protocols",
     [
-        (matmul, ((i, k), (k, j)), ((Walk(), Gallop()), (Follow(), Walk()))),
-        (matmul, ((i, k), (k, j)), ((Walk(), Walk()), (Gallop(), Follow()))),
-        (elementwise_sum, ((i, j), (i, j)), ((Walk(), Walk()), (Walk(), Gallop()))),
+        # The root of a is dense, so it is followed, and the hash level of b
+        # is never galloped.
+        (matmul, ((i, k), (k, j)), ((Follow(), Gallop()), (Follow(), Walk()))),
+        (matmul, ((i, k), (k, j)), ((Follow(), Walk()), (Gallop(), Follow()))),
+        (elementwise_sum, ((i, j), (i, j)), ((Follow(), Walk()), (Walk(), Follow()))),
     ],
 )
 def test_features_match_exact_stats_of_the_tensors(rng, program, fields, protocols):

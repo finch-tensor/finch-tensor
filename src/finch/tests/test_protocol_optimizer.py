@@ -26,6 +26,7 @@ from finch.autoschedule.cost_models import (
     level_reads,
     read_options,
 )
+from finch.autoschedule.cost_models.protocol_cost_models import FEATURES
 from finch.autoschedule.formatter.smart_formatter import CostFormatter
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
@@ -155,22 +156,9 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
     }
     basis = ProtocolBasis()
     names = basis.feature_names
-    assert names[:2] == ("dense.positions", "dense.slots")
-    block = [name.removeprefix("sparse_list.") for name in names[28:40]]
-    assert block == [
-        "executions",
-        "iterations",
-        "seeks",
-        "parents",
-        "follow_visits",
-        "walk_visits",
-        "gallop_visits",
-        "dense_visits",
-        "distinct_reads",
-        "extrude_visits",
-        "laminate_visits",
-        "distinct_writes",
-    ]
+    # Each kind of level has a block for each of its protocols.
+    assert names[:5] == tuple(f"dense.follow.{name}" for name in FEATURES)
+    assert names[15:20] == tuple(f"sparse_list.walk.{name}" for name in FEATURES)
 
     def lists(protocols):
         plan = product_plan(x, y, c, i, [(proto,) for proto in protocols])
@@ -181,29 +169,39 @@ def test_protocol_basis_counts_the_reads_of_each_loop():
                 case ProtocolChoice():
                     accesses.append(basis.get_component_features(component, machine)[0])
         # The loop over i reads both lists, each an access which only fills
-        # the columns of its kind. c has no format, so it isn't written.
+        # the columns of its kind and protocol. c has no format, so it isn't
+        # written.
         assert len(accesses) == 2
         total = sum(accesses)
-        assert not total[:28].any() and not total[40:].any()
-        return total[30:37].tolist()
+        return {name: value for name, value in zip(names, total, strict=True) if value}
+
+    def block(protocol, executions, iterations, visits, parents, distinct):
+        values = (executions, iterations, visits, parents, distinct)
+        return dict(
+            zip((f"sparse_list.{protocol}.{n}" for n in FEATURES), values, strict=True)
+        )
 
     # Each list seeks one fiber. Walks step through the 5 entries of each,
-    # and either would visit the 5 of the other if it were dense. Each has 5
-    # distinct entries, whatever reads them.
-    assert lists((Walk(), Walk())) == [2, 2, 0, 10, 0, 10, 10]
+    # and the loop runs at the 3 they share. Each has 5 distinct entries,
+    # whatever reads them.
+    assert lists((Walk(), Walk())) == block("walk", 2, 6, 10, 2, 10)
     # Gallops jump to the entries they share, within the 5 of the smaller.
-    assert lists((Gallop(), Gallop())) == [2, 2, 0, 0, 10, 10, 10]
-    # A followed y is looked up at each of the 5 entries of x, and a dense x
-    # would visit all 10.
-    assert lists((Walk(), Follow())) == [2, 2, 5, 5, 0, 15, 10]
-    # A gallop of y alone jumps to each of the 5 entries x walks, and a dense
-    # x would visit the 5 entries y gallops to.
-    assert lists((Walk(), Gallop())) == [2, 2, 0, 5, 5, 10, 10]
+    assert lists((Gallop(), Gallop())) == block("gallop", 2, 6, 10, 2, 10)
+    # A followed y is looked up at each of the 5 entries x walks.
+    assert lists((Walk(), Follow())) == {
+        **block("walk", 1, 5, 5, 1, 5),
+        **block("follow", 1, 5, 5, 1, 5),
+    }
+    # A gallop of y alone jumps to each of the 5 entries x walks.
+    assert lists((Walk(), Gallop())) == {
+        **block("walk", 1, 3, 5, 1, 5),
+        **block("gallop", 1, 3, 5, 1, 5),
+    }
     plan = product_plan(x, y, c, i, ((Walk(),), (Follow(),)))
     # The reads of the lists, with the constant; the lists are already stored,
     # so their levels cost nothing.
     rows = PROTOCOL_BASIS.get_features(plan, formats, stats, sf)
-    assert rows.shape == (2, 65)
+    assert rows.shape == (2, 112)
     assert PROTOCOL_COST_MODEL.predict(rows) > 0
 
 
@@ -236,24 +234,40 @@ def test_protocol_basis_counts_writes_apart_from_their_locations():
                     accesses.append(component)
         # c has one level, written at one loop.
         (access,) = accesses
-        row = basis.get_component_features(access, machine)
-        return [
-            row[0, names.index(f"sparse_hash.{name}")]
-            for name in (
-                "seeks",
-                "parents",
-                "extrude_visits",
-                "laminate_visits",
-                "distinct_writes",
-            )
-        ]
+        row = basis.get_component_features(access, machine)[0]
+        return {name: value for name, value in zip(names, row, strict=True) if value}
+
+    def block(protocol, executions, iterations, visits, parents, distinct):
+        values = (executions, iterations, visits, parents, distinct)
+        return dict(
+            zip((f"sparse_hash.{protocol}.{n}" for n in FEATURES), values, strict=True)
+        )
 
     # Looping over j outside, c is reached at the loop over i, which runs in
     # the 3 rows of x, and laminated at each of the 5 entries of x, to 3
     # distinct entries. Looping over i outside, it is extruded once per row.
     # The level is the root of c, so it is one fiber.
-    assert writes((j, i)) == [3, 1, 0, 5, 3]
-    assert writes((i, j)) == [1, 1, 3, 0, 3]
+    assert writes((j, i)) == block("laminate", 3, 5, 5, 1, 3)
+    assert writes((i, j)) == block("extrude", 1, 3, 3, 1, 3)
+
+
+def weighted(**visits):
+    """A model which charges each visit of a protocol as visits says, by the
+    name of the protocol, whatever the level, and nothing else."""
+    costs = {f"{protocol}.visits": cost for protocol, cost in visits.items()}
+    return CostModel(
+        PROTOCOL_BASIS,
+        [
+            costs.get(name.partition(".")[2], 0.0)
+            for name in PROTOCOL_BASIS.feature_names
+        ],
+    )
+
+
+# A walk costs 1 for each entry it steps through, and a gallop 4 for each
+# jump, as does a follow for each lookup, which searches a list; of reads
+# which cost the same, the earliest of READ_PROTOCOLS is chosen.
+SIMPLE = weighted(walk=1.0, gallop=4.0, follow=4.0)
 
 
 def test_optimize_protocols_chooses_the_cheaper_read():
@@ -266,16 +280,16 @@ def test_optimize_protocols_chooses_the_cheaper_read():
     stats: dict[Alias, TensorStats] = {x: sf(sparse, (i,)), y: sf(full, (i,))}
     # Walking y steps through every entry for the one entry of x, so y is
     # galloped, or followed by a hash, which can't gallop.
-    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf)
+    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf, SIMPLE)
     assert read_protocols(out, x, y) == [(Walk(),), (Gallop(),)]
-    out = optimize_protocols(plan, {x: LIST, y: HASH}, stats, sf)
+    out = optimize_protocols(plan, {x: LIST, y: HASH}, stats, sf, SIMPLE)
     assert read_protocols(out, x, y) == [(Walk(),), (Follow(),)]
     # Tensors of the same density are walked together.
     stats = {x: sf(full, (i,)), y: sf(full, (i,))}
-    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf)
+    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf, SIMPLE)
     assert read_protocols(out, x, y) == [(Walk(),), (Walk(),)]
     # A tensor without level options keeps the protocols it is given.
-    out = optimize_protocols(plan, {x: LIST, y: full.ftype}, stats, sf)
+    out = optimize_protocols(plan, {x: LIST, y: full.ftype}, stats, sf, SIMPLE)
     assert read_protocols(out, x, y) == [(Walk(),), (Follow(),)]
 
 
@@ -288,11 +302,11 @@ def test_optimize_protocols_keeps_the_protocols_a_program_gives():
     stats: dict[Alias, TensorStats] = {x: sf(sparse, (i,)), y: sf(full, (i,))}
     # Galloping y would cost less, but the program follows x and walks y.
     plan = product_plan(x, y, c, i, ((Follow(),), (Walk(),)))
-    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf)
+    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf, SIMPLE)
     assert read_protocols(out, x, y) == [(Follow(),), (Walk(),)]
     # Only the read without a protocol is chosen.
     plan = product_plan(x, y, c, i, ((Walk(),), ()))
-    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf)
+    out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf, SIMPLE)
     assert read_protocols(out, x, y) == [(Walk(),), (Gallop(),)]
 
 
@@ -309,10 +323,10 @@ def test_optimize_protocols_only_follows_levels_read_out_of_order():
         Aggregate(Literal(ffuncs.add), Literal(0.0), Table(A, (i, j)), (i,)),
     )
     plan = Plan((fuse_loop_order(query, (j, i)), Produces((C,))))
-    out = optimize_protocols(plan, {A: fmt}, stats, sf)
+    out = optimize_protocols(plan, {A: fmt}, stats, sf, SIMPLE)
     assert read_protocols(out, A) == [(Walk(), Follow())]
     plan = Plan((fuse_loop_order(query, (i, j)), Produces((C,))))
-    out = optimize_protocols(plan, {A: fmt}, stats, sf)
+    out = optimize_protocols(plan, {A: fmt}, stats, sf, SIMPLE)
     assert read_protocols(out, A) == [(Walk(), Walk())]
 
 
@@ -365,8 +379,8 @@ def test_optimize_protocols_prices_a_follow_by_its_lookups():
                 case ProtocolChoice(prefix=Prefix(prefix=(_, _))):
                     total += basis.get_component_features(component, machine)[0]
         return [
-            total[names.index(f"sparse_list.{name}")]
-            for name in ("seeks", "walk_visits")
+            total[names.index(f"sparse_list.walk.{name}")]
+            for name in ("executions", "visits")
         ]
 
     # Whether the lists are walked or followed at i, the loop over j runs only
@@ -376,7 +390,7 @@ def test_optimize_protocols_prices_a_follow_by_its_lookups():
     assert inner(((Follow(), Walk()), (Follow(), Walk()))) == [40, 40]
 
     def model(lookup):
-        weights = {"follow_visits": lookup, "walk_visits": 1.0, "gallop_visits": 4.0}
+        weights = {"follow.visits": lookup, "walk.visits": 1.0, "gallop.visits": 4.0}
         return CostModel(
             PROTOCOL_BASIS,
             [
@@ -426,8 +440,8 @@ def test_a_dense_level_above_is_entered_at_every_slot():
                     ]
         return {
             tns: [
-                row[names.index(f"sparse_list.{name}")]
-                for name in ("seeks", "parents", "walk_visits")
+                row[names.index(f"sparse_list.walk.{name}")]
+                for name in ("executions", "parents", "visits")
             ]
             for tns, row in rows.items()
         }
@@ -467,10 +481,10 @@ def test_a_dense_tensor_never_filters_the_loops_within_it():
             match component:
                 case ProtocolChoice(prefix=Prefix(prefix=(_, _))) as access:
                     row = basis.get_component_features(access, machine)[0]
-                    kind = access.option.kind
+                    block = f"{access.option.kind}.{type(access.protocol).__name__}"
                     rows[access.alias] = [
-                        row[names.index(f"{kind}.{name}")]
-                        for name in ("iterations", "follow_visits", "walk_visits")
+                        row[names.index(f"{block.lower()}.{name}")]
+                        for name in ("iterations", "visits")
                     ]
         return rows
 
@@ -479,13 +493,13 @@ def test_a_dense_tensor_never_filters_the_loops_within_it():
     # has none, and the loop over j runs at each of them.
     assert inner(
         {x: [dense_, dense_], y: [lst, lst]}, ((Follow(), Follow()), (Walk(), Walk()))
-    ) == {x: [40, 40, 0], y: [40, 0, 40]}
+    ) == {x: [40, 40], y: [40, 40]}
     # A list below the dense level of x has entries only in the 4 rows of x,
     # so the merge steps through y only in the 2 rows both have, and runs at
     # the 3 entries of each they share.
     assert inner(
         {x: [dense_, lst], y: [lst, lst]}, ((Follow(), Walk()), (Walk(), Walk()))
-    ) == {x: [6, 0, 6], y: [6, 0, 10]}
+    ) == {x: [6, 6], y: [6, 10]}
 
 
 def test_cost_protocolizer_states_the_protocols_it_chooses():
@@ -502,7 +516,10 @@ def test_cost_protocolizer_states_the_protocols_it_chooses():
     stats = {x: sf(fl.asarray(data_x), (i,)), y: sf(fl.asarray(data_y), (i,))}
     plan = product_plan(x, y, c, i)
     capture = LogicCapture()
-    formatter = CostFormatter(CostProtocolizer(CompilerFormLowerer(capture)))
+    formatter = CostFormatter(
+        CostProtocolizer(CompilerFormLowerer(capture), cost_model=SIMPLE),
+        cost_model=SIMPLE,
+    )
     formatter(plan, {var: tns.ftype for var, tns in bindings.items()}, stats, sf)
     assert read_protocols(capture.last_prgm, x, y) == [(Walk(),), (Gallop(),)]
     program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)

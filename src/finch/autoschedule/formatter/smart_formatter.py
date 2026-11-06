@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import json
 import logging
 from abc import abstractmethod
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
-from functools import cache
 from itertools import product
-from pathlib import Path
 from typing import TypeVar
 
 from finch import finch_logic as lgc
@@ -22,14 +19,12 @@ from finch.autoschedule.cost_models import (
     PROTOCOL_COST_MODEL,
     CostModel,
     LevelOption,
-    ProtocolComponent,
+    ProtocolChoice,
     allowed_options,
-    level_formats,
     read_protocols,
-    storage_choices,
     write_protocols,
 )
-from finch.autoschedule.cost_models.protocol_cost_models import KINDS
+from finch.autoschedule.cost_models.protocol_cost_models import FIELD_KINDS
 from finch.autoschedule.protocolizer.protocolize import choose_protocols
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
@@ -54,7 +49,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 # The level options CostFormatter chooses from by default, and their builders.
 # Of options which cost the same, the earliest is chosen, so a list is chosen
 # over a hash wherever it can be written.
-LEVEL_OPTIONS = KINDS
+LEVEL_OPTIONS = FIELD_KINDS
 LEVEL_BUILDERS = {
     "dense": dense,
     "sparse_list": sparse_list,
@@ -80,7 +75,7 @@ def optimize_formats(
     stats_factory: StatsFactory,
     stored: Mapping[lgc.Alias, tuple[FType, ...]],
     fill_types: Mapping[lgc.Alias, AbstractFillFType],
-    cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
+    cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
     options: Sequence[LevelOption] = LEVEL_OPTIONS,
 ) -> dict[lgc.Alias, TensorFType]:
     """
@@ -122,22 +117,13 @@ def optimize_formats(
         for alias, levels in allowed.items()
     }
 
-    def storage_cost(alias, fmt):
-        machine = StatsMachine(stats_factory, OrderedDict(stats))
-        options = level_formats({alias: fmt})[alias]
-        return sum(
-            cost_model.predict_component_cost(choice, machine)
-            for choice in storage_choices(alias, options, prgm, machine)
-        )
-
     bindings = {**bindings, **formats}
-    storage = {alias: storage_cost(alias, fmt) for alias, fmt in formats.items()}
     _, costs = choose_protocols(prgm, bindings, stats, stats_factory, cost_model)
     # A second sweep lets each alias answer the formats chosen after it.
     for _ in range(2):
         changed = False
         for alias, levels in allowed.items():
-            best = (sum(costs) + storage[alias], bindings[alias], costs, storage[alias])
+            best_fmt, best_costs = bindings[alias], costs
             for kinds in product(*levels):
                 fmt = ftype_of(alias, kinds)
                 if fmt == bindings[alias]:
@@ -151,16 +137,10 @@ def optimize_formats(
                     only={alias},
                     costs=costs,
                 )
-                storage_2 = storage_cost(alias, fmt)
-                if sum(costs_2) + storage_2 < best[0]:
-                    best = (sum(costs_2) + storage_2, fmt, costs_2, storage_2)
-            _, best_fmt, best_costs, best_storage = best
+                if sum(costs_2) < sum(best_costs):
+                    best_fmt, best_costs = fmt, costs_2
             if best_fmt != bindings[alias]:
-                bindings[alias], costs, storage[alias] = (
-                    best_fmt,
-                    best_costs,
-                    best_storage,
-                )
+                bindings[alias], costs = best_fmt, best_costs
                 changed = True
         if not changed:
             break
@@ -220,14 +200,13 @@ def program_cost(
     bindings: Mapping[lgc.Alias, TensorFType],
     stats: Mapping[lgc.Alias, TensorStats],
     stats_factory: StatsFactory,
-    cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
+    cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
     options: Sequence[LevelOption] = LEVEL_OPTIONS,
 ) -> float:
     """
     The cost of prgm under cost_model, once each alias it defines is formatted
     as optimize_formats chooses and its tables read with the protocols
-    choose_protocols chooses: the storage of the formatted aliases and the
-    accesses of every query, as optimize_formats sums them.
+    choose_protocols chooses, as optimize_formats sums the costs of its queries.
     """
     stored = stored_shape_types(
         prgm, bindings, StatsMachine(stats_factory, OrderedDict(stats))
@@ -241,15 +220,7 @@ def program_cost(
     _, costs = choose_protocols(
         prgm, {**bindings, **formats}, stats, stats_factory, cost_model
     )
-    # The levels are priced from the stats before prgm, which listing them
-    # leaves in place.
-    machine = StatsMachine(stats_factory, OrderedDict(stats))
-    storage = sum(
-        cost_model.predict_component_cost(choice, machine)
-        for alias, levels in level_formats(formats).items()
-        for choice in storage_choices(alias, levels, prgm, machine)
-    )
-    return sum(costs) + storage
+    return sum(costs)
 
 
 TS = TypeVar("TS", bound=TensorStats)
@@ -385,7 +356,7 @@ class CostFormatter(LogicFormatter):
     def __init__(
         self,
         loader: LogicLoader | None = None,
-        cost_model: CostModel[ProtocolComponent] = PROTOCOL_COST_MODEL,
+        cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
         options: Sequence[LevelOption] = LEVEL_OPTIONS,
     ):
         super().__init__()
@@ -439,25 +410,3 @@ class CostFormatter(LogicFormatter):
         logger.debug(prgm)
 
         return self.ctx(prgm, bindings, machine.bindings, stats_factory)
-
-
-# The models of PROTOCOL_BASIS fitted to the timings of the physical
-# optimizers, at the root of the repository.
-FITTED_MODELS = Path(__file__).resolve().parents[4] / "pace-models"
-
-
-@cache
-def fitted_cost_model(name: str = "format") -> CostModel[ProtocolComponent]:
-    """The model of PROTOCOL_BASIS fitted in FITTED_MODELS/{name}.model.json."""
-    with open(FITTED_MODELS / f"{name}.model.json") as f:
-        return PROTOCOL_COST_MODEL.from_json(json.load(f))
-
-
-class WorkspaceCostFormatter(CostFormatter):
-    """
-    Choose each format, including the format of each workspace, under the
-    fitted format model, as fitted_cost_model loads it.
-    """
-
-    def __init__(self, loader: LogicLoader | None = None):
-        super().__init__(loader, fitted_cost_model())

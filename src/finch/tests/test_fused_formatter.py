@@ -161,11 +161,10 @@ def test_cost_formatters_format_the_largest_fused_slice(monkeypatch, formatter_c
         )
     )
     formatter_cls(capture).lower(plan, {a: tensor.ftype}, {a: stats}, factory)
-    # The slice is stored, as one level over i. a is stored densely, so every
-    # slot of each slice is written, which a dense level has ready.
+    # The slice is stored, as one level over i, of whichever kind the model
+    # prices lowest.
     fmt = capture.last_bindings[scratch]
     assert isinstance(fmt, ft.FiberTensorFType)
-    assert isinstance(fmt.lvl_t, ft.DenseLevelFType)
     assert isinstance(fmt.lvl_t.lvl_t, ft.ElementLevelFType)
 
 

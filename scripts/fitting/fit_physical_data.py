@@ -15,7 +15,9 @@ variant it predicts to be fastest over that of the fastest, for each example.
 To show how the fit improves with data, a held-out tenth of the examples
 scores models fitted to growing subsets of the rest, and the relative R^2 and
 the median regret of each are printed and plotted next to EXAMPLES, to
-NAME.learning_curve.png.
+NAME.learning_curve.png. The model of the format stage is the one the physical
+optimizers use, read from src/finch/autoschedule/cost_models/
+protocol_cost_model.json, so a fit which should ship is written there.
 
     pixi run -e fitting python -m scripts.fitting.fit_physical_data \\
         EXAMPLES [--basis NAME] [--model NAME=PATH]... [--seed S] [model.json]

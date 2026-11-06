@@ -8,11 +8,8 @@ from finch import ffuncs
 from finch.algebra import StaticFillFType, TensorFType, ftype
 from finch.autoschedule import CompilerFormLowerer, NotationGenerator
 from finch.autoschedule.capture import LogicCapture
-from finch.autoschedule.cost_models import Prefix, WriteBasis
-from finch.autoschedule.formatter.smart_formatter import (
-    WorkspaceCostFormatter,
-    fitted_cost_model,
-)
+from finch.autoschedule.cost_models import PROTOCOL_COST_MODEL, Prefix, WriteBasis
+from finch.autoschedule.formatter.smart_formatter import CostFormatter
 from finch.autoschedule.loop_orderer import BFSLoopOrderer
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.tensor_stats import (
@@ -160,7 +157,7 @@ def _order(tensor_a, tensor_b, workspaces):
     }
     capture = LogicCapture()
     plan, _ = _matmul(c, a, b)
-    formatter = WorkspaceCostFormatter(CompilerFormLowerer(capture))
+    formatter = CostFormatter(CompilerFormLowerer(capture))
     BFSLoopOrderer(LogicWorkspacer(formatter) if workspaces else formatter)(
         plan, {a: tensor_a.ftype, b: tensor_b.ftype}, stats, sf
     )
@@ -235,7 +232,7 @@ def test_workspacer_needs_a_field_written_in_order():
     }
     # The loops scatter into i, so a workspace would store all of c.
     plan, _ = _matmul(c, a, b, (k, i, j))
-    assert add_workspaces(plan, {}, stats, sf, fitted_cost_model()) == plan
+    assert add_workspaces(plan, {}, stats, sf, PROTOCOL_COST_MODEL) == plan
 
 
 @pytest.mark.parametrize(
