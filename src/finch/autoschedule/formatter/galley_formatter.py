@@ -24,6 +24,7 @@ from finch.algebra import (
     ftype,
     ftypes,
 )
+from finch.autoschedule.cost_models.loop_cost_models import WORKSPACE_LIMIT
 from finch.autoschedule.stages import LogicFormatter
 from finch.autoschedule.tensor_stats import StatsInterpreter
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
@@ -108,16 +109,31 @@ def select_output_format(
     stats_factory: StatsFactory[NS],
     loop_order: tuple[Field, ...],
     output_indices: tuple[Field, ...],
+    nfused: int = 0,
 ) -> tuple[LevelFormat, ...]:
     """
-    Choose a level format for each of `output_indices`, outermost level first.
+    Choose a level format for each of `output_indices` after the first
+    `nfused`, outermost level first.
 
     `loop_order` is the loop order the output is built under, also outermost
     first.  Levels which cannot be filled in loop order need random writes and
     so fall back to a hash level rather than a sparse list.
+
+    The first `nfused` indices are those a workspace is fused over: it stores
+    one slice of the rest at a time, so the density of each stored level is
+    estimated within the average slice, and a dense level takes the memory of
+    one slice. A workspace of one level of at most WORKSPACE_LIMIT slots, such
+    as a row of a sparse product, which is written out of order is a byte map
+    rather than a hash, as the loop cost model prices a workspace which can be
+    reset and copied out cheaply.
     """
+    slices = 1.0
+    if nfused:
+        slices = max(estimate_nnz(stats, stats_factory, output_indices[:nfused]), 1.0)
     formats: list[LevelFormat] = []
     for level, idx in enumerate(output_indices):
+        if level < nfused:
+            continue
         prefix = output_indices[: level + 1]
         needs_random_writes = not fully_compat_with_loop_prefix(prefix, loop_order)
         # Division is used rather than conditional indices because a lower
@@ -128,7 +144,8 @@ def select_output_format(
         approx_nnz_per = new_nnz / prev_nnz
         # Scale the sparsity down a bit so that formats stay conservative.
         approx_sparsity = approx_nnz_per / dim_size if dim_size else float("inf")
-        dense_memory_footprint = prev_nnz * dim_size
+        dense_memory_footprint = prev_nnz / slices * dim_size
+        bytemap_allowed = not formats or formats[-1] is not LevelFormat.BYTEMAP
 
         if (
             approx_sparsity > DENSE_SPARSITY_THRESHOLD
@@ -139,7 +156,15 @@ def select_output_format(
             approx_sparsity > BYTEMAP_SPARSITY_THRESHOLD
             and dense_memory_footprint < MAX_DENSE_MEMORY_FOOTPRINT
             # TODO: Check out finch double bytemap bug
-            and (not formats or formats[-1] is not LevelFormat.BYTEMAP)
+            and bytemap_allowed
+        ):
+            fmt = LevelFormat.BYTEMAP
+        elif (
+            nfused
+            and len(output_indices) - nfused == 1
+            and needs_random_writes
+            and dense_memory_footprint <= WORKSPACE_LIMIT
+            and bytemap_allowed
         ):
             fmt = LevelFormat.BYTEMAP
         elif needs_random_writes:
@@ -171,19 +196,27 @@ class GalleyFormatter(LogicFormatter):
         stats: NumericStats,
         stats_factory: StatsFactory,
         loop_order: tuple[Field, ...],
+        nfused: int = 0,
     ) -> FiberTensorFType:
+        """
+        The format of a tensor with stats, built under loop_order, which stores
+        the fields of stats after the first nfused, those a workspace is fused
+        over.
+        """
         output_indices = stats.index_order
-        if len(shape_type) != len(output_indices):
+        if len(shape_type) != len(output_indices) - nfused:
             raise ValueError(
                 f"Got {len(shape_type)} shape dimensions for "
-                f"{len(output_indices)} stats dimensions."
+                f"{len(output_indices) - nfused} stored stats dimensions."
             )
 
-        formats = select_output_format(stats, stats_factory, loop_order, output_indices)
-        logger.debug("Galley formats for %s: %s", output_indices, formats)
+        formats = select_output_format(
+            stats, stats_factory, loop_order, output_indices, nfused
+        )
+        logger.debug("Galley formats for %s: %s", output_indices[nfused:], formats)
 
         lvl = element(fill_type, fill_type.element_type)
-        for level in reversed(range(len(output_indices))):
+        for level in reversed(range(len(formats))):
             lvl = formats[level].build(lvl, shape_type[level])
         return fiber_tensor(lvl)
 
@@ -228,18 +261,9 @@ class GalleyFormatter(LogicFormatter):
 
                     alias, nfused = lhs.unfused, lhs.nfused
                     if alias not in bindings:
+                        # A workspace's formats are chosen per slice, from the
+                        # stats over every field, not the union of its slices.
                         format_stats = stats_bindings[lhs]
-                        if nfused:
-                            fused_indices = format_stats.index_order[:nfused]
-                            format_stats = stats_factory.aggregate(
-                                ffuncs.or_,
-                                False,
-                                fused_indices,
-                                stats_factory.support(format_stats),
-                            )
-                            loop_order = tuple(
-                                idx for idx in loop_order if idx not in fused_indices
-                            )
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftypes.intp
                             for dim in shape_types[alias][nfused:]
@@ -250,6 +274,7 @@ class GalleyFormatter(LogicFormatter):
                             format_stats,
                             stats_factory,
                             loop_order,
+                            nfused,
                         )
 
                     return node
