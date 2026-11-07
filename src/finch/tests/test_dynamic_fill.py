@@ -27,6 +27,7 @@ from finch.algebra import (
     StaticFill,
     StaticFillFType,
     apply_fill,
+    apply_fill_type,
     as_fill,
     ffuncs,
     ftype,
@@ -121,6 +122,19 @@ def test_apply_fill_known_folds():
     assert folded.value == 3.0
     assert is_dynamic(folded)
     assert np.isnan(apply_fill(ffuncs.add, StaticFill(float("nan")), two).value)
+
+
+def test_where_with_equal_branches_keeps_their_fill():
+    # where(c, x, x) is x whatever c is, so a dynamic condition need not make
+    # the fill dynamic.
+    cond = DynamicFill(np.True_)
+    zero, one = StaticFill(0.0), StaticFill(1.0)
+    assert apply_fill(ffuncs.where, cond, zero, zero) == zero
+    assert apply_fill_type(ffuncs.where, cond.ftype, zero.ftype, zero.ftype) == (
+        zero.ftype
+    )
+    assert is_dynamic(apply_fill(ffuncs.where, cond, zero, one))
+    assert is_dynamic(apply_fill_type(ffuncs.where, cond.ftype, zero.ftype, one.ftype))
 
 
 def test_fill_ftypes():
