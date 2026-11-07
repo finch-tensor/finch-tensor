@@ -88,7 +88,7 @@ def program(rng):
     to skewed_fractions of the most they may, under LG_MAX_SPACE and
     LG_MAX_DIM.
     """
-    idxs = [idx for idx in "ijklmpq" if rng.random() < FIELD_PROBABILITY]
+    idxs = [idx for idx in "jklmpq" if rng.random() < FIELD_PROBABILITY]
     lg_space = round(
         skewed_fractions(rng, SKEW) * min(LG_MAX_SPACE, LG_MAX_DIM * len(idxs))
     )
@@ -106,7 +106,7 @@ def program(rng):
     # be out of order.
     A_idxs = tuple(Field(idx) for idx in with_subsequence(order, "jlpq"))
     B_idxs = tuple(Field(idx) for idx in with_subsequence(order, "kmpq"))
-    C_idxs = tuple(Field(idx) for idx in with_subsequence(order, "ilmq"))
+    C_idxs = tuple(Field(idx) for idx in with_subsequence(order, "lmq"))
     if rng.random() < 0.1:
         C_idxs = shuffled(rng, C_idxs)
     r_idxs = tuple(Field(idx) for idx in with_subsequence(order, "jkp"))
