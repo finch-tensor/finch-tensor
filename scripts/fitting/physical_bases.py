@@ -59,7 +59,7 @@ from finch.autoschedule.formatter.smart_formatter import (
     optimize_formats,
 )
 from finch.autoschedule.util import fuse_loop_order
-from finch.autoschedule.workspacer import add_workspaces
+from finch.autoschedule.workspacer import add_cost_effective_workspaces
 from finch.finch_logic import (
     Alias,
     Field,
@@ -231,7 +231,7 @@ def choose_formats(
     for tns, idxs in input_fields(plan).items():
         if tns.unfused not in bindings:
             stored.setdefault(tns.unfused, (ftypes.intp,) * (len(idxs) - tns.nfused))
-    ftypes_2 = optimize_formats(
+    ftypes_2, _ = optimize_formats(
         plan,
         bindings,
         stats,
@@ -279,7 +279,7 @@ def resolve(
         bindings = {
             tns: input_ftype(formats[tns], tensor) for tns, tensor in inputs.items()
         }
-        plan = add_workspaces(
+        plan = add_cost_effective_workspaces(
             plan,
             bindings,
             input_stats(plan, inputs, stats_factory),

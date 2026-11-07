@@ -5,12 +5,8 @@ from itertools import product
 
 from finch import finch_logic as lgc
 from finch.algebra import TensorFType
-from finch.finch_assembly import AssemblyLibrary
-from finch.finch_logic import LogicLoader, StatsFactory, TensorStats
-from finch.symbolic import PostOrderDFS, PostWalk, PreWalk, Rewrite
-
-from .compiler import lower_protocol
-from .cost_models import (
+from finch.autoschedule.compiler import lower_protocol
+from finch.autoschedule.cost_models import (
     PROTOCOL_COST_MODEL,
     CostModel,
     Prefix,
@@ -20,8 +16,11 @@ from .cost_models import (
     level_reads,
     read_options,
 )
-from .stages import FormattedForm
-from .tensor_stats.stats_interpreter import StatsMachine
+from finch.autoschedule.stages import FormattedForm
+from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
+from finch.finch_assembly import AssemblyLibrary
+from finch.finch_logic import LogicLoader, StatsFactory, TensorStats
+from finch.symbolic import PostOrderDFS, PostWalk, PreWalk, Rewrite
 
 _PROTOCOLS = (lgc.DefaultProtocol(), lgc.Walk(), lgc.Gallop(), lgc.Follow())
 

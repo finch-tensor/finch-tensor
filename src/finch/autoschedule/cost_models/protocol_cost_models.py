@@ -51,7 +51,7 @@ from finch.tensor import (
 )
 
 from .cost_models import NS, Affine, Basis, ByKind, Concat, CostModel
-from .loop_cost_models import LoopSpaces, Prefix, prefixes, restrict
+from .loop_cost_models import LoopSpaces, Prefix, loop_spaces, prefixes, restrict
 
 
 def nnz_after(stats: NS, stats_factory: StatsFactory[NS], depth: int, over: tuple = ()):
@@ -570,7 +570,7 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
         machine: StatsMachine[NS],
     ) -> np.ndarray:
         prefix, table = component.prefix, component.table
-        spaces = LoopSpaces(prefix, machine)
+        spaces = loop_spaces(prefix, machine)
         visited = spaces.visited()
         visits = spaces.count(visited)
         if component.write:

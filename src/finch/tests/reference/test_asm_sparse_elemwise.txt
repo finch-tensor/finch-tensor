@@ -129,19 +129,13 @@ def main(#A_9#1: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLe
         i_start: finch.int64 = 0
         while lt(i_start, min(#A_10_dim_1#9, add(1, i_last), add(1, i_last_2))):
             i_end: finch.int64 = min(add(1, min(i_stop, i_stop_2)), #A_10_dim_1#9, add(1, i_last), add(1, i_last_2))
-            #i_8#16__pos_2: finch.int64 = q_2
-            #i_8#16__pos_4: finch.int64 = q
-            #i_8#16__pos_6: finch.int64 = q
-            #i_8#16__pos_7: finch.int64 = q_2
-            for #i_8#16 in range(i_start, min(i_end, i_stop, i_stop_2)):
-                #i_8#16__pos: finch.int64 = add(#i_7#15__pos, mul(#_A_4#10_strides_element_1, #i_8#16))
-            for #i_8#16 in range(max(i_start, i_stop_2), min(i_end, i_stop)):
-                #i_8#16__pos_3: finch.int64 = add(#i_7#15__pos, mul(#_A_4#10_strides_element_1, #i_8#16))
-            for #i_8#16 in range(max(i_start, i_stop), min(i_end, i_stop_2)):
-                #i_8#16__pos_5: finch.int64 = add(#i_7#15__pos, mul(#_A_4#10_strides_element_1, #i_8#16))
+            #i_8#16__pos: finch.int64 = q_2
+            #i_8#16__pos_2: finch.int64 = q
+            #i_8#16__pos_3: finch.int64 = q
+            #i_8#16__pos_4: finch.int64 = q_2
             for #i_8#16 in range(max(i_start, i_stop, i_stop_2), i_end):
-                #i_8#16__pos_8: finch.int64 = add(#i_7#15__pos, mul(#_A_4#10_strides_element_1, #i_8#16))
-                store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#16__pos_8, _initwrite(load(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#16__pos_8), mul(load(slot(#_A_9#4_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_8#16__pos_6), load(slot(#_A_10#7_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_8#16__pos_7))))
+                #i_8#16__pos_5: finch.int64 = add(#i_7#15__pos, mul(#_A_4#10_strides_element_1, #i_8#16))
+                store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#16__pos_5, _initwrite(load(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#16__pos_5), mul(load(slot(#_A_9#4_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_8#16__pos_3), load(slot(#_A_10#7_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_8#16__pos_4))))
             if eq(add(1, i_stop), i_end):
                 q: finch.int64 = add(1, q)
                 if lt(q, q_stop):
@@ -155,12 +149,6 @@ def main(#A_9#1: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLe
                 else:
                     i_stop_2: finch.int64 = #_A_10#7_lvl_lvl_dimension
             i_start: finch.int64 = i_end
-        for #i_8#16 in range(max(0, add(1, i_last_2)), min(#A_10_dim_1#9, add(1, i_last))):
-            #i_8#16__pos_9: finch.int64 = add(#i_7#15__pos, mul(#_A_4#10_strides_element_1, #i_8#16))
-        for #i_8#16 in range(max(0, add(1, i_last)), min(#A_10_dim_1#9, add(1, i_last_2))):
-            #i_8#16__pos_10: finch.int64 = add(#i_7#15__pos, mul(#_A_4#10_strides_element_1, #i_8#16))
-        for #i_8#16 in range(max(0, add(1, i_last), add(1, i_last_2)), #A_10_dim_1#9):
-            #i_8#16__pos_11: finch.int64 = add(#i_7#15__pos, mul(#_A_4#10_strides_element_1, #i_8#16))
     repack(#_A_9#4_lvl_lvl_lvl_val_slot)
     repack(#_A_9#4_lvl_lvl_ptr_slot)
     repack(#_A_9#4_lvl_lvl_idx_slot)

@@ -68,6 +68,11 @@ class ElementLevelFType(LevelFType, MutableStructFType):
         val_size = np_dtype(self.element_type).itemsize
         return num_pos * val_size
 
+    @property
+    def supports_reassembly(self) -> bool:
+        # A dynamic fill may change with each declare, which rewrites every value.
+        return is_static(self.fill_type)
+
     def __post_init__(self):
         # Ensure element_type is an FType
         if self.element_type is None:
