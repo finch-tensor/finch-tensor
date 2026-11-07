@@ -27,7 +27,7 @@ from finch.finch_logic import (
     StatsFactory,
     Table,
 )
-from finch.symbolic import PostOrderDFS, Term
+from finch.symbolic import PostOrderDFS, PostWalk, Rewrite, Term
 
 from .cost_models import NS, Basis, Concat, CostModel
 
@@ -111,47 +111,156 @@ class LoopBasis(Basis[Prefix]):
         return prefixes(term, machine, formats=bindings)
 
 
-class LoopSpaces(Generic[NS]):
+def loop_arg(expr: LogicExpression) -> LogicExpression:
+    """The expression the loops of a query merge: its aggregate's argument."""
+    match expr:
+        case Aggregate(arg=arg):
+            return arg
+    return expr
+
+
+def unprotocoled(expr: LogicExpression) -> LogicExpression:
+    """expr, with every table reading its fields without protocols."""
+
+    def strip(node):
+        match node:
+            case Table(tns, idxs, (_, *_)):
+                return Table(tns, idxs)
+        return None
+
+    return Rewrite(PostWalk(strip))(expr)
+
+
+class LoopNest(Generic[NS]):
     """
-    The spaces of the last loop of a nonempty loop prefix: where it is
-    entered, what it visits, and where its walks step, from the stats of the
-    tables it merges, restricted as their formats and protocols allow, as
-    unrestricted says. A table whose formats the prefix doesn't list is taken
-    to be sparse, and a table without protocols walks the field of the loop.
+    Where the loops of a loop prefix of arg, an expression without protocols,
+    are entered, as the formats of its tables allow, whatever protocols read
+    them. The merge of a nest is where every fiber merged has positions at the
+    fields of the prefix, so the loop over the next field is entered there,
+    and the loop over the last field is entered where the merge of its parent,
+    the nest of the prefix without it, has positions. The root, the nest of the
+    empty prefix, keeps the stats of the inputs of arg, the extent of each
+    field, and the field of each level of each table and whether it doesn't
+    filter, outermost first, where the formats list level options. The spaces
+    of the last loop under each set of followed tables are kept in spaces.
     """
 
-    def __init__(self, component: Prefix, machine: StatsMachine[NS]):
-        self.machine = machine
+    def __init__(
+        self,
+        arg: LogicExpression,
+        loops: tuple[Field, ...],
+        formats: Mapping[Alias, Any],
+        machine: StatsMachine[NS],
+        parent: "LoopNest[NS] | None" = None,
+    ):
+        self.arg = arg
+        self.loops = loops
+        self.parent = parent
         self.stats_factory = machine.stats_factory
-        self.parent = set(component.prefix[:-1])
-        self.idx = component.prefix[-1]
-        match component.expr:
-            case Aggregate(arg=arg):
-                self.arg = arg
-            case expr:
-                self.arg = expr
-        # The extent of each field, from the tables which read it, and the
-        # field of each level of each and whether it doesn't filter, outermost
-        # first, where the formats list level options.
-        self.dims: dict[Field, float] = {}
-        self.levels: dict[Table, list[tuple[Field, bool]]] = {}
-        formats = component.formats or {}
-        for node in PostOrderDFS(self.arg):
-            match node:
-                case Table(Alias() as tns, idxs) if idxs:
-                    self.dims.update(self.machine(node).dim_sizes)
-                    match formats.get(tns.unfused):
-                        case [*options]:
-                            self.levels[node] = [
-                                (idxs[tns.nfused + depth], not option.filters)
-                                for depth, option in enumerate(options)
-                                if tns.nfused + depth < len(idxs)
-                            ]
-        # The loop is entered wherever the formats let the enclosing loops go,
-        # and its merge steps only where every fiber it merges has positions
-        # at idx.
-        self.exec_space = self.stats_factory.support(self.merged(self.arg))
-        self.merge_space = self.project(self.merged(self.arg, (self.idx,)))
+        self.spaces: dict[frozenset[Table], LoopSpaces[NS]] = {}
+        if parent is not None:
+            self.stats, self.dims, self.levels = (
+                parent.stats,
+                parent.dims,
+                parent.levels,
+            )
+        else:
+            self.stats: dict[LogicExpression, NS] = {}
+            self.dims: dict[Field, float] = {}
+            self.levels: dict[Table, list[tuple[Field, bool]]] = {}
+
+            def read(node):
+                match node:
+                    case MapJoin(Literal(), args):
+                        for child in args:
+                            read(child)
+                    case _:
+                        self.stats[node] = machine(node)
+
+            read(arg)
+            for node in PostOrderDFS(arg):
+                match node:
+                    case Table(Alias() as tns, idxs) if idxs:
+                        stat = self.stats.setdefault(node, machine(node))
+                        self.dims.update(stat.dim_sizes)
+                        match formats.get(tns.unfused):
+                            case [*options]:
+                                self.levels[node] = [
+                                    (idxs[tns.nfused + depth], not option.filters)
+                                    for depth, option in enumerate(options)
+                                    if tns.nfused + depth < len(idxs)
+                                ]
+        self.merge = self.merged(arg)
+        if parent is not None:
+            self.exec_space = self.stats_factory.support(parent.merge)
+
+    def unrestricted(self, table: Table, follows: bool) -> set[Field]:
+        """
+        The fields of the prefix which table doesn't restrict: the last, where
+        table follows it, since it is looked up wherever the others go, and
+        those of the dense levels down to the deepest level of the rest, from
+        the sparse level above them, which have a fiber at every slot of it,
+        so the positions of the level are the entries of the sparse one, at
+        every slot of the dense ones.
+        """
+        unrestricted = {self.loops[-1]} if follows else set()
+        fields = set(self.loops)
+        run: set[Field] = set()
+        trailing: set[Field] = set()
+        for idx, dense in self.levels.get(table, ()):
+            run = run | {idx} if dense else set()
+            if idx in fields and idx not in unrestricted:
+                trailing = run
+        return unrestricted | trailing
+
+    def merged(
+        self, node: LogicExpression, followed: frozenset[Table] = frozenset()
+    ) -> NS:
+        """
+        Where a merge of the inputs of node visits the fields of the prefix:
+        where every fiber it merges has positions, as the formats give them,
+        and the tables of followed span the last field wholly.
+        """
+        # A merge coiterates the projections of the inputs, so it visits more
+        # of the prefix than the projection of their result.
+        match node:
+            case MapJoin(Literal(op), args):
+                return self.stats_factory.mapjoin(
+                    op, *(self.merged(arg, followed) for arg in args)
+                )
+        unrestricted: set[Field] = set()
+        match node:
+            case Table():
+                unrestricted = self.unrestricted(node, node in followed)
+        stat = self.stats[node]
+        projected = restrict(self.stats_factory, stat, set(self.loops) - unrestricted)
+        # The fill decides whether a mapjoin joins or unions it.
+        projected.fill_type = stat.fill_type
+        return projected
+
+
+class LoopSpaces(Generic[NS]):
+    """
+    The spaces of the last loop of a nonempty loop nest: where it is entered,
+    what it visits, and where its walks step, where the tables of followed
+    span the field of the loop wholly, as they are looked up wherever the
+    others go. A table whose formats the nest doesn't list is taken to be
+    sparse.
+    """
+
+    def __init__(self, nest: LoopNest[NS], followed: frozenset[Table]):
+        self.nest = nest
+        self.stats_factory = nest.stats_factory
+        self.parent = set(nest.loops[:-1])
+        self.idx = nest.loops[-1]
+        self.dims = nest.dims
+        self.exec_space = nest.exec_space
+        # The merge steps only where every fiber it merges has positions at idx.
+        self._merged_at_idx = (
+            nest.merged(nest.arg, followed) if followed else nest.merge
+        )
+        self.merge_space = self.project(self._merged_at_idx)
+        self._visited: NS | None = None
 
     def project(self, stat: NS, fields=(), followed=()) -> NS:
         """
@@ -166,47 +275,6 @@ class LoopSpaces(Generic[NS]):
             case Table(_, idxs, (_, *_) as protocols) if self.idx in idxs:
                 return protocols[idxs.index(self.idx)]
         return DefaultProtocol()
-
-    def unrestricted(self, table: Table, fields) -> set[Field]:
-        """
-        The fields of fields which table doesn't restrict: the field of the
-        loop where table follows it, since it is looked up wherever the others
-        go, and those of the dense levels down to the deepest level of the
-        rest, from the sparse level above them, which have a fiber at every
-        slot of it, so the positions of the level are the entries of the
-        sparse one, at every slot of the dense ones.
-        """
-        unrestricted = set()
-        if self.idx in fields and self.protocol(table) == Follow():
-            unrestricted.add(self.idx)
-        run: set[Field] = set()
-        trailing: set[Field] = set()
-        for idx, dense in self.levels.get(table, ()):
-            run = run | {idx} if dense else set()
-            if idx in fields and idx not in unrestricted:
-                trailing = run
-        return unrestricted | trailing
-
-    def merged(self, node: LogicExpression, fields=()) -> NS:
-        """
-        Where a merge of the inputs of node visits parent and fields: where
-        every fiber it merges has positions, as the formats give them.
-        """
-        # A merge coiterates the projections of the inputs, so it visits more
-        # of parent than the projection of their result.
-        followed: set[Field] = set()
-        match node:
-            case MapJoin(Literal(op), args):
-                return self.stats_factory.mapjoin(
-                    op, *(self.merged(arg, fields) for arg in args)
-                )
-            case Table():
-                followed = self.unrestricted(node, {*self.parent, *fields})
-        stat = self.machine(node)
-        projected = self.project(stat, fields, followed)
-        # The fill decides whether a mapjoin joins or unions it.
-        projected.fill_type = stat.fill_type
-        return projected
 
     def extent(self, stat: NS, fields) -> float:
         """The points of stat over fields, spanning all of those it lacks."""
@@ -227,11 +295,13 @@ class LoopSpaces(Generic[NS]):
 
     def visited(self) -> NS:
         """Where the loop visits idx, which its walks and gallops restrict."""
-        return self.stats_factory.mapjoin(
-            ffuncs.and_,
-            self.exec_space,
-            self.stats_factory.support(self.merged(self.arg, (self.idx,))),
-        )
+        if self._visited is None:
+            self._visited = self.stats_factory.mapjoin(
+                ffuncs.and_,
+                self.exec_space,
+                self.stats_factory.support(self._merged_at_idx),
+            )
+        return self._visited
 
     def located(self, stat: NS, fields) -> float:
         """
@@ -248,14 +318,54 @@ class LoopSpaces(Generic[NS]):
         where the merge steps, since it steps through nothing where another
         fiber it merges has no positions.
         """
+        stat = self.nest.stats[Table(table.tns, table.idxs)]
         return self.stats_factory.mapjoin(
-            ffuncs.and_,
-            self.merge_space,
-            self.project(self.machine(table), (self.idx,)),
+            ffuncs.and_, self.merge_space, self.project(stat, (self.idx,))
         )
 
     def walk(self, table: Table) -> float:
         return self.count(self.stepped(table))
+
+
+def loop_spaces(component: Prefix, machine: StatsMachine[NS]) -> LoopSpaces[NS]:
+    """
+    The LoopSpaces of the last loop of component, a nonempty prefix, on the
+    nest of its loops, which extends the nests of their prefixes. The cache of
+    machine keeps the nests by the expression they merge, the density of its
+    levels and the stats it binds, and then by loop prefix, so the prefixes
+    of a search share them however their tables read their fields, as do
+    formats which agree on which levels are dense.
+    """
+    arg = loop_arg(component.expr)
+    bare = unprotocoled(arg)
+    formats = component.formats or {}
+    density = []
+    bound = []
+    idx = component.prefix[-1]
+    followed = set()
+    for node in dict.fromkeys(PostOrderDFS(arg)):
+        match node:
+            case Table(Alias() as tns, idxs, protocols):
+                bound.append(machine.bindings.get(tns))
+                match formats.get(tns.unfused):
+                    case [*options]:
+                        density.append(
+                            (tns, idxs, tuple(not opt.filters for opt in options))
+                        )
+                if idx in idxs and protocols and protocols[idxs.index(idx)] == Follow():
+                    followed.add(Table(tns, idxs))
+    by_loops = machine.cache.setdefault((bare, tuple(density), tuple(bound)), {})
+    nest = None
+    for n in range(len(component.prefix) + 1):
+        loops = component.prefix[:n]
+        if loops not in by_loops:
+            by_loops[loops] = LoopNest(bare, loops, formats, machine, nest)
+        nest = by_loops[loops]
+    assert nest is not None
+    key = frozenset(followed)
+    if key not in nest.spaces:
+        nest.spaces[key] = LoopSpaces(nest, key)
+    return nest.spaces[key]
 
 
 class PigeonBasis(LoopBasis, LoopOrderedForm):
@@ -298,11 +408,11 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
             return np.array(
                 [[0.0, 0.0, out_space.estimate_non_fill_values(), 0.0, 0.0]]
             )
-        spaces = LoopSpaces(component, machine)
+        spaces = loop_spaces(component, machine)
         idx = spaces.idx
         exec_space = spaces.exec_space
         inputs, walks, lookups = [], [], 0
-        for node in PostOrderDFS(spaces.arg):
+        for node in PostOrderDFS(loop_arg(expr)):
             match node:
                 case Table(_, idxs) if idx in idxs:
                     stat = machine(node)
@@ -442,7 +552,7 @@ class WriteBasis(LoopBasis, LoopOrderedForm):
             if not set(order) <= set(prefix) or prefix[-1] not in order:
                 continue
             if visits is None:
-                spaces = LoopSpaces(component, machine)
+                spaces = loop_spaces(component, machine)
                 visits = spaces.count(spaces.visited())
             if prefix == order:
                 features[0, 0] += visits

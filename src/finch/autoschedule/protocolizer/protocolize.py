@@ -128,6 +128,7 @@ def choose_protocols(
     cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
     only: set[lgc.Alias] | None = None,
     costs: Sequence[float] | None = None,
+    cache: dict | None = None,
 ) -> tuple[lgc.LogicStatement, list[float]]:
     """
     Read each level of each formatted tensor of bindings with the protocol
@@ -138,7 +139,8 @@ def choose_protocols(
     change where the loops within it are entered. A read which gives its
     protocol keeps it. With only, the queries which touch none of its aliases
     keep their protocols and take their costs from costs, those of every
-    query in order.
+    query in order. The calls of one search may share the cache of their
+    stats machines.
     """
     formats = level_formats(bindings)
     given = set()
@@ -151,7 +153,7 @@ def choose_protocols(
                     if proto != lgc.DefaultProtocol()
                 )
     prgm = protocolize(prgm, bindings)
-    machine = StatsMachine(stats_factory, OrderedDict(stats))
+    machine = StatsMachine(stats_factory, OrderedDict(stats), cache)
     found: list[float] = []
 
     def choose(stmt: lgc.Query | lgc.QueryInto, loop_order: tuple[lgc.Field, ...]):

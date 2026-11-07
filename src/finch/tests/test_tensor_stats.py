@@ -1,6 +1,6 @@
 import gc
-import weakref
 import math
+import weakref
 from collections import OrderedDict
 
 import pytest

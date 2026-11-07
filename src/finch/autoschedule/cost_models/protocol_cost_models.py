@@ -51,7 +51,14 @@ from finch.tensor import (
 )
 
 from .cost_models import NS, Affine, Basis, ByKind, Concat, CostModel
-from .loop_cost_models import LoopSpaces, Prefix, prefixes, restrict
+from .loop_cost_models import (
+    LoopSpaces,
+    Prefix,
+    loop_arg,
+    loop_spaces,
+    prefixes,
+    restrict,
+)
 
 
 def nnz_after(stats: NS, stats_factory: StatsFactory[NS], depth: int, over: tuple = ()):
@@ -570,7 +577,7 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
         machine: StatsMachine[NS],
     ) -> np.ndarray:
         prefix, table = component.prefix, component.table
-        spaces = LoopSpaces(prefix, machine)
+        spaces = loop_spaces(prefix, machine)
         visited = spaces.visited()
         visits = spaces.count(visited)
         if component.write:
@@ -584,11 +591,11 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
                     # A gallop jumps at most once for each visit the loop would
                     # make if the level were dense, and for each step of the
                     # smallest walk among the gallops.
-                    dense = LoopSpaces(
+                    dense = loop_spaces(
                         replace(prefix, expr=followed(prefix.expr, table)), machine
                     )
                     galloped = []
-                    for node in dict.fromkeys(PostOrderDFS(spaces.arg)):
+                    for node in dict.fromkeys(PostOrderDFS(loop_arg(prefix.expr))):
                         match node:
                             case Table() if spaces.protocol(node) == Gallop():
                                 galloped.append(node)

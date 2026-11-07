@@ -119,7 +119,11 @@ def optimize_formats(
     }
 
     bindings = {**bindings, **formats}
-    _, costs = choose_protocols(prgm, bindings, stats, stats_factory, cost_model)
+    # Every format prices the same loops over the same stats.
+    cache: dict = {}
+    _, costs = choose_protocols(
+        prgm, bindings, stats, stats_factory, cost_model, cache=cache
+    )
     # A second sweep lets each alias answer the formats chosen after it.
     for _ in range(2):
         changed = False
@@ -137,6 +141,7 @@ def optimize_formats(
                     cost_model,
                     only={alias},
                     costs=costs,
+                    cache=cache,
                 )
                 if sum(costs_2) < sum(best_costs):
                     best_fmt, best_costs = fmt, costs_2
