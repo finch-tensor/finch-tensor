@@ -543,6 +543,42 @@ def test_aggregate_over_no_indices_keeps_init(op, init, expected):
     assert np.allclose(result.to_numpy(), expected(data))
 
 
+@pytest.mark.parametrize(
+    "op, init, dtype, reduce",
+    [
+        (ffuncs.add, 0.0, np.float64, np.sum),
+        (ffuncs.max, -np.inf, np.float64, np.max),
+        (ffuncs.or_, False, np.bool_, np.any),
+    ],
+)
+def test_split_push_over_two_indices(op, init, dtype, reduce):
+    # op_{i,j} op(a[i,j], b[i,j]) splits each index across a and b. The fields
+    # are normalized to `i` and `i_2`, and the split copies of `i` were named
+    # `i_1` and `i_2`, so the copy over b replaced `i_2` and `i` was not reduced.
+    i, j = Field("i"), Field("j")
+    A, B, Y = HardAlias("A"), HardAlias("B"), HardAlias("Y")
+    plan = Plan(
+        (
+            Query(
+                Table(Y, ()),
+                Aggregate(
+                    Literal(op),
+                    Literal(init),
+                    MapJoin(Literal(op), (Table(A, (i, j)), Table(B, (i, j)))),
+                    (i, j),
+                ),
+            ),
+            Produces((Y,)),
+        )
+    )
+    a = (np.arange(12).reshape(4, 3) % 5 == 1).astype(dtype)
+    b = (np.arange(12).reshape(4, 3) % 7 == 2).astype(dtype)
+    (y,) = INTERPRET_NOTATION_GALLEY(
+        plan, {A: BufferizedNDArray.from_numpy(a), B: BufferizedNDArray.from_numpy(b)}
+    )
+    assert y.to_numpy() == reduce(np.vectorize(op)(a, b))
+
+
 def _cached_galley():
     # A Galley pipeline which, like the compiled ones, reuses a kernel across
     # calls whose tensors have the same formats but different sizes.

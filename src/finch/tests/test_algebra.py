@@ -167,7 +167,8 @@ def test_algebra_selected():
     assert repeat_operator(ffuncs.mul.ftype) is ffuncs.pow
     assert repeat_operator(ffuncs.and_.ftype) is None
     assert cansplitpush(ffuncs.add.ftype) is True
-    assert cansplitpush(ffuncs.and_.ftype) is False
+    assert cansplitpush(ffuncs.and_.ftype) is True
+    assert cansplitpush(ffuncs.add_scaled_square.ftype) is False
     assert ffuncs.choose(0)(0, 2, 3) == 2
     assert ffuncs.choose(0)(0, 0) == 0
     assert ffuncs.choose(np.nan)(np.nan, 4.0) == 4.0

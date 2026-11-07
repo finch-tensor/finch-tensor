@@ -178,10 +178,9 @@ class AnnotatedQuery(Generic[TS]):
                 idx_lowest_path[idx] = lowest_paths[0]
                 reduce_idxs.append(idx)
             else:
-                new_idxs = [
-                    Field(f"{idx.name}_{i}")
-                    for i, _ in enumerate(lowest_paths, start=1)
-                ]
+                # The normalizer names fields `i`, `i_2`, ..., so the names of
+                # the split copies must be fresh.
+                new_idxs = [Field(gensym(idx.name)) for _ in lowest_paths]
                 for i, path in enumerate(lowest_paths):
                     new_idx = new_idxs[i]
                     idx_op[new_idx] = agg_op
