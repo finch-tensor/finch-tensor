@@ -8,10 +8,11 @@ by Finch.jl with its formats of C and of any workspace, and reads its inputs
 after they are materialized as COO from their blocks and copied into their
 formats. The variants of the examples of a program compile to the same
 kernels, which are compiled once and kept for as long as this runs. The
-runtime of each variant is written to DIR/data as JSON after it is measured,
-by its index, and the variants already timed are skipped. With --hours H, no
-variant is timed after H hours, so a job measures for about as long as it is
-given, whatever its programs cost.
+runtime of each variant, and the formats of every tensor it ran with, are
+written to DIR/data as JSON after it is measured, by its index, so that
+fit_physical_data needn't choose the formats again, and the variants already
+timed are skipped. With --hours H, no variant is timed after H hours, so a
+job measures for about as long as it is given, whatever its programs cost.
 
     pixi run -e fitting python -m scripts.fitting.time_physical_data DIR [options]
 """
@@ -39,7 +40,12 @@ from scripts.fitting.generate_physical_data import (
     path,
     record_inputs,
 )
-from scripts.fitting.physical_bases import input_perms, parse_models, resolve
+from scripts.fitting.physical_bases import (
+    format_kinds,
+    input_perms,
+    parse_models,
+    resolve,
+)
 
 
 class FixedFormatter(CostFormatter):
@@ -109,8 +115,7 @@ class Timer:
         self.executors: dict[str, LogicExecutor] = {}
 
     def measure(self, plan, formats, bindings) -> float:
-        kinds = {tns.name: [opt.kind for opt in opts] for tns, opts in formats.items()}
-        key = json.dumps([str(plan), kinds], sort_keys=True)
+        key = json.dumps([str(plan), format_kinds(formats)], sort_keys=True)
         if key not in self.executors:
             formatter = FixedFormatter(julia_loader(), formats)
             self.executors[key] = LogicExecutor(
@@ -127,14 +132,18 @@ class Timer:
     def time_example(self, directory: Path, example, deadline) -> dict[str, float]:
         """
         Time each variant of example which hasn't been timed, and write their
-        runtimes to its timing.json after each, until the time of
-        time.monotonic passes deadline.
+        runtimes and the formats they ran with to its timing.json after each,
+        until the time of time.monotonic passes deadline.
         """
         record = json.loads(path(directory, example, "program.json").read_text())
         timing_path = path(directory, example, "timing.json")
         runtimes: dict[str, float] = {}
+        kinds: dict[str, dict[str, list[str]]] = {}
         if timing_path.exists():
-            runtimes = json.loads(timing_path.read_text())["runtimes"]
+            timing = json.loads(timing_path.read_text())
+            runtimes = timing["runtimes"]
+            # Timings written before formats were saved have none.
+            kinds = timing.get("formats", {})
         if len(runtimes) == len(record["variants"]):
             return runtimes
         inputs = record_inputs(record)
@@ -154,7 +163,8 @@ class Timer:
                 if tns in perms
             }
             runtimes[str(index)] = self.measure(plan, formats, bindings)
-            write_json(timing_path, {"runtimes": runtimes})
+            kinds[str(index)] = format_kinds(formats)
+            write_json(timing_path, {"runtimes": runtimes, "formats": kinds})
         return runtimes
 
 

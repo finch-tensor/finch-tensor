@@ -301,6 +301,13 @@ def resolve(
     return plan, formats
 
 
+def format_kinds(formats: Mapping[Alias, list[LevelOption]]) -> dict[str, list[str]]:
+    return {
+        tns.name: [option.kind for option in options]
+        for tns, options in formats.items()
+    }
+
+
 def features(
     basis: Basis, plan, formats, inputs, stats_factory, protocols=True
 ) -> np.ndarray:
@@ -330,8 +337,10 @@ def featurize_record(
 ) -> list[np.ndarray]:
     """
     The features of the basis name of each variant of the example of record,
-    whose inputs are inputs, as it was timed: the stages below make their
-    choices with models, as time_physical_data makes them, so nothing is
+    whose inputs are inputs, as it was timed: with the formats it ran with,
+    where record saves them by the index of the variant, as
+    coalesce_physical_data does, and otherwise with the choices the stages
+    below make with models, as time_physical_data makes them, so nothing is
     compiled or run. The loop stage orders loops before the workspacer and
     the formatter run, so its features are those of the program as ordered,
     reading its inputs as their formats read them by default, as the loop
@@ -339,8 +348,12 @@ def featurize_record(
     """
     stage = record["stage"]
     stats_factory = KroneckerStatsFactory(record["block_bits"])
+    saved = record.get("formats", {})
     rows = []
-    for variant in record["variants"]:
+    for index, variant in enumerate(record["variants"]):
+        # A variant which gives its formats isn't formatted again.
+        if str(index) in saved:
+            variant = {**variant, "formats": saved[str(index)]}
         plan, formats = resolve(record, variant, inputs, models)
         if stage == "loop":
             # The loop orderer prices the concordant program before the

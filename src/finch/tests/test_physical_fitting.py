@@ -31,6 +31,7 @@ from finch.finch_logic import (
     Table,
 )
 from finch.symbolic import PostOrderDFS
+from scripts.fitting import physical_bases
 from scripts.fitting.generate_physical_data import (
     BLOCK_BITS,
     input_record,
@@ -44,6 +45,7 @@ from scripts.fitting.physical_bases import (
     B,
     C,
     featurize_record,
+    format_kinds,
     input_perms,
     parse_models,
     resolve,
@@ -139,6 +141,25 @@ def test_loop_features_charge_writes_before_the_workspacer_runs():
     assert (totals[("i", "j", "k")]["lookups"] > 0) == dense_levels
 
 
+def test_featurizing_reuses_the_formats_saved_when_timing(monkeypatch):
+    record = gustavson_record(np.random.default_rng(0), lg=8)
+    inputs = record_inputs(record)
+    models = parse_models(None)
+    saved = {
+        str(index): format_kinds(resolve(record, variant, inputs, models)[1])
+        for index, variant in enumerate(record["variants"])
+    }
+    chosen = featurize_record(record, inputs, "loop", models)
+
+    def choose_formats(*args, **kwargs):
+        raise AssertionError("Featurizing chose formats which were saved")
+
+    monkeypatch.setattr(physical_bases, "choose_formats", choose_formats)
+    rows = featurize_record({**record, "formats": saved}, inputs, "loop", models)
+    for row, row_2 in zip(rows, chosen, strict=True):
+        np.testing.assert_array_equal(row, row_2)
+
+
 @pytest.mark.skipif(not julia_available(), reason="Finch.jl is not installed")
 def test_timing_runs_the_resolved_programs(tmp_path):
     from scripts.fitting.time_physical_data import (
@@ -168,6 +189,9 @@ def test_timing_runs_the_resolved_programs(tmp_path):
     materialized = {tns: materialize(tensor) for tns, tensor in inputs.items()}
     plan, formats = resolve(record, record["variants"][0], inputs, parse_models(None))
     assert workspaces(plan)
+    # The timing saves the formats of every tensor each variant ran with.
+    assert set(timing["formats"]) == {"0", "1"}
+    assert timing["formats"]["0"] == format_kinds(formats)
     perms = input_perms(record, plan)
     bindings = {
         tns: reformat(tensor, formats[tns], perms[tns])
