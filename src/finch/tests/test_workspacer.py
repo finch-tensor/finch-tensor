@@ -24,11 +24,14 @@ from finch.autoschedule.tensor_stats.bound_stats import DC
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.tensor_stats.uniform_stats import UniformStats
 from finch.autoschedule.util import fuse_loop_order
+from finch.autoschedule import default_schedulers
+from finch.autoschedule.formatter.galley_formatter import GalleyFormatter
 from finch.autoschedule.workspacer import (
     LogicWorkspacer,
     add_1d_workspaces,
     add_cost_effective_workspaces,
     add_workspace,
+    galley_format_cost,
     workspace_depth,
 )
 from finch.codegen import NumbaCompiler, NumpyBuffer
@@ -43,6 +46,7 @@ from finch.finch_logic import (
     HardAlias,
     Literal,
     MapJoin,
+    MockLogicLoader,
     Plan,
     Produces,
     Query,
@@ -363,3 +367,51 @@ def test_scatter_workspaces_store_the_one_field_scattered_into():
     query = fuse_loop_order(Query(Table(c, (i, k, m)), rhs), (i, j, k, m))
     plan = Plan((query, Produces((c,))))
     assert add_1d_workspaces(plan, {}) == plan
+
+
+def test_galley_format_cost_prices_the_formats_a_galley_formatter_chooses():
+    # C[t, i] = sum_j A[t, j] B[j, i], row by row through a workspace fused
+    # over t: the formats galley_format_cost prices are those a GalleyFormatter
+    # gives the same program.
+    t, j, i = fields = (Field("t"), Field("j"), Field("i"))
+    rng = np.random.default_rng(0)
+    n = 30
+    a_data, b_data = np.zeros((n, n)), np.zeros((n, n))
+    a_data[np.arange(n), rng.integers(0, n, n)] = 1.0
+    b_data[np.arange(n), rng.integers(0, n, n)] = 1.0
+    a, b, c, ws = (HardAlias(name) for name in ("a", "b", "c", "ws"))
+    sf = DCStatsFactory()
+    stats: dict[Alias, TensorStats] = {
+        a: sf(fl.asarray(a_data), (t, j)),
+        b: sf(fl.asarray(b_data), (j, i)),
+    }
+    bindings: dict[Alias, TensorFType] = {
+        a: fl.asarray(a_data).ftype,
+        b: fl.asarray(b_data).ftype,
+    }
+    rhs = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(ffuncs.mul), (Table(a, (t, j)), Table(b, (j, i)))),
+        (j,),
+    )
+    plan = Plan(
+        (
+            fuse_loop_order(Query(Table(c, (t, i)), rhs), fields),
+            Produces((c,)),
+        )
+    )
+    staged = add_workspace(plan, c, 1, ws)
+    formats, cost = galley_format_cost(staged, bindings, stats, sf, PROTOCOL_COST_MODEL)
+    _, formatted = GalleyFormatter(MockLogicLoader()).lower(
+        staged, dict(bindings), dict(stats), sf
+    )
+    assert formats == {alias: formatted[alias] for alias in (c, ws)}
+    assert cost > 0
+
+
+def test_compile_julia_galley_prices_workspaces_with_galley_formats():
+    stage = default_schedulers.COMPILE_JULIA_GALLEY
+    while not isinstance(stage, LogicWorkspacer):
+        stage = stage.ctx
+    assert stage.format_cost is galley_format_cost

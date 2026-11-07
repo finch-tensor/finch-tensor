@@ -12,10 +12,12 @@ from finch.autoschedule.cost_models import (
     LevelOption,
     ProtocolChoice,
 )
+from finch.autoschedule.formatter.galley_formatter import GalleyFormatter
 from finch.autoschedule.formatter.smart_formatter import (
     LEVEL_OPTIONS,
     optimize_formats,
 )
+from finch.autoschedule.protocolizer.protocolize import choose_protocols
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
@@ -29,6 +31,7 @@ from finch.finch_logic import (
     HardAlias,
     LogicLoader,
     LogicStatement,
+    MockLogicLoader,
     Plan,
     Query,
     QueryInto,
@@ -186,6 +189,32 @@ def format_cost(
     )
 
 
+def galley_format_cost(
+    prgm: LogicStatement,
+    bindings: Mapping[Alias, TensorFType],
+    stats: Mapping[Alias, TensorStats],
+    stats_factory: StatsFactory,
+    cost_model: CostModel[ProtocolChoice],
+    options: Sequence[LevelOption] = LEVEL_OPTIONS,
+) -> tuple[dict[Alias, TensorFType], float]:
+    """
+    format_cost with the formats GalleyFormatter chooses from the stats of each
+    alias, rather than those optimize_formats searches for. The program is
+    priced once, so a workspace costs one choice of protocols rather than a
+    search over formats; the formats are those a GalleyFormatter downstream
+    gives the program. options is unused.
+    """
+    _, formatted = GalleyFormatter(MockLogicLoader()).lower(
+        prgm, dict(bindings), dict(stats), stats_factory
+    )
+    _, costs = choose_protocols(prgm, formatted, stats, stats_factory, cost_model)
+    formats = {alias: fmt for alias, fmt in formatted.items() if alias not in bindings}
+    return formats, sum(costs)
+
+
+FormatCost = Callable[..., tuple[dict[Alias, TensorFType], float]]
+
+
 def is_dense(stats: TensorStats) -> bool:
     assert isinstance(stats, NumericStats)
     return stats.estimate_non_fill_values() >= 0.5 * math.prod(stats.dim_sizes.values())
@@ -198,6 +227,7 @@ def add_cost_effective_workspaces(
     stats_factory: StatsFactory,
     cost_model: CostModel[ProtocolChoice],
     options: Sequence[LevelOption] = LEVEL_OPTIONS,
+    format_cost: FormatCost = format_cost,
 ) -> Plan:
     """
     Add workspaces that improve cost, as defined by the format_cost function.
@@ -238,7 +268,9 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
     under cost_model, by default PROTOCOL_COST_MODEL, as add_cost_effective_workspaces
     does. A loop orderer wraps it, so that the copies out of workspaces aren't
     propagated, and the formatter it wraps should price programs with the same
-    model.
+    model. format_cost prices a program with the formats its formatter would
+    choose: format_cost searches them as a CostFormatter does, and
+    galley_format_cost takes those of a GalleyFormatter, far more cheaply.
     """
 
     def __init__(
@@ -246,12 +278,14 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
         ctx: LogicLoader,
         cost_model: CostModel[ProtocolChoice] | None = None,
         options: Sequence[LevelOption] = LEVEL_OPTIONS,
+        format_cost: FormatCost = format_cost,
     ):
         self.ctx = ctx
         if cost_model is None:
             cost_model = PROTOCOL_COST_MODEL
         self.cost_model = cost_model
         self.options = options
+        self.format_cost = format_cost
 
     def lower(
         self,
@@ -262,7 +296,13 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
     ) -> tuple[AssemblyLibrary, dict[Alias, TensorFType]]:
         assert isinstance(prgm, Plan)
         prgm = add_cost_effective_workspaces(
-            prgm, bindings, stats, stats_factory, self.cost_model, self.options
+            prgm,
+            bindings,
+            stats,
+            stats_factory,
+            self.cost_model,
+            self.options,
+            self.format_cost,
         )
         return self.ctx(prgm, bindings, stats, stats_factory)
 
