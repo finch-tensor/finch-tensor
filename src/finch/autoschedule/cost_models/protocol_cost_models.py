@@ -577,7 +577,31 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
             distinct = spaces.located(visited, component.fields)
         else:
             distinct = spaces.located(spaces.stepped(table), component.fields)
+            galloped = []
+            for node in dict.fromkeys(PostOrderDFS(spaces.arg)):
+                match node:
+                    case Table() if spaces.protocol(node) == Gallop():
+                        galloped.append(node)
             match component.protocol:
+                case Walk() if not galloped:
+                    # With no gallop to lead it, the loop merges its walks,
+                    # skipping a fiber only where they have no entries as the
+                    # expression combines them, and otherwise stepping through
+                    # every entry of each, not only those the others share.
+                    stats_factory = machine.stats_factory
+                    walked = spaces.walked(spaces.arg)
+                    entered = spaces.exec_space
+                    if walked is not None:
+                        entered = stats_factory.mapjoin(
+                            ffuncs.and_, entered, stats_factory.support(walked)
+                        )
+                    visits = spaces.count(
+                        stats_factory.mapjoin(
+                            ffuncs.and_,
+                            entered,
+                            spaces.project(machine(table), (spaces.idx,)),
+                        )
+                    )
                 case Walk():
                     visits = spaces.walk(table)
                 case Gallop():
@@ -587,11 +611,6 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
                     dense = LoopSpaces(
                         replace(prefix, expr=followed(prefix.expr, table)), machine
                     )
-                    galloped = []
-                    for node in dict.fromkeys(PostOrderDFS(spaces.arg)):
-                        match node:
-                            case Table() if spaces.protocol(node) == Gallop():
-                                galloped.append(node)
                     smallest = min(
                         (spaces.walk(node) for node in galloped), default=0.0
                     )
