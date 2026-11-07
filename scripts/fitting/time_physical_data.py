@@ -21,7 +21,6 @@ import argparse
 import json
 import math
 import time
-import timeit
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -109,9 +108,10 @@ class Timer:
     which runs it again.
     """
 
-    def __init__(self, models: Mapping[str, CostModel], repeat=5):
+    def __init__(self, models: Mapping[str, CostModel], repeat=10, seconds=5.0):
         self.models = models
         self.repeat = repeat
+        self.seconds = seconds
         self.executors: dict[str, LogicExecutor] = {}
 
     def measure(self, plan, formats, bindings) -> float:
@@ -122,11 +122,14 @@ class Timer:
                 formatter, stats_factory=DCStatsFactory(), cache=True
             )
         executor = self.executors[key]
-        # The first run compiles the kernel, which the others reuse.
+        # The first run compiles the kernel, which the others reuse. The others
+        # stop after repeat runs or seconds of runs, so a slow variant runs once.
         executor(plan, bindings)
-        runs = timeit.repeat(
-            lambda: executor(plan, bindings), number=1, repeat=self.repeat
-        )
+        runs: list[float] = []
+        while len(runs) < self.repeat and sum(runs) < self.seconds:
+            start = time.perf_counter()
+            executor(plan, bindings)
+            runs.append(time.perf_counter() - start)
         return min(runs)
 
     def time_example(self, directory: Path, example, deadline) -> dict[str, float]:
@@ -168,8 +171,8 @@ class Timer:
         return runtimes
 
 
-def time_programs(directory: Path, models, chunk, repeat, hours) -> None:
-    timer = Timer(models, repeat)
+def time_programs(directory: Path, models, chunk, repeat, seconds, hours) -> None:
+    timer = Timer(models, repeat, seconds)
     names = examples(directory, chunk)
     deadline = time.monotonic() + 3600 * hours
     for i, example in enumerate(names, 1):
@@ -197,7 +200,15 @@ def main() -> None:
         help="a fitted model of a stage below, which may be repeated",
     )
     parser.add_argument("--chunk", type=int, help="the only chunk to time")
-    parser.add_argument("--repeat", type=int, default=5)
+    parser.add_argument(
+        "--repeat", type=int, default=10, help="the most timed runs of a variant"
+    )
+    parser.add_argument(
+        "--seconds",
+        type=float,
+        default=5.0,
+        help="the seconds of timed runs after which a variant runs no more",
+    )
     parser.add_argument(
         "--hours",
         type=float,
@@ -206,7 +217,12 @@ def main() -> None:
     )
     args = parser.parse_args()
     time_programs(
-        args.directory, parse_models(args.model), args.chunk, args.repeat, args.hours
+        args.directory,
+        parse_models(args.model),
+        args.chunk,
+        args.repeat,
+        args.seconds,
+        args.hours,
     )
 
 
