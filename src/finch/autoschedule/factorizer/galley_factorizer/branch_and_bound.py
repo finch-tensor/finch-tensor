@@ -13,6 +13,11 @@ from .annotated_query import AnnotatedQuery
 
 GalleyOptimizer = Literal["greedy", "bfs", "dfs"]
 
+# A component of this many indices or more takes the greedy order rather than
+# an exact search, whose cost grows exponentially with it, as Galley.jl's
+# pruned optimizer does.
+GREEDY_COMPONENT_SIZE = 10
+
 
 def branch_and_bound(
     input_aq: AnnotatedQuery,
@@ -212,12 +217,13 @@ def pruned_query_to_plan(
     use_components: bool = True,
     *,
     optimizer: GalleyOptimizer = "dfs",
+    greedy_component_size: int = GREEDY_COMPONENT_SIZE,
 ) -> tuple[list[Query], float]:
     """
     Pruned Galley optimizer.
 
-    * ``"greedy"`` — ``k=1` (also used
-      automatically when ``len(component) > 12``).
+    * ``"greedy"`` — ``k=1`` (also used automatically for a component of at
+      least ``greedy_component_size`` indices).
     * ``"bfs"`` — greedy ``k=1`` for bounds, then BFS BnB.
     * ``"dfs"`` — DFS BnB.
 
@@ -239,7 +245,7 @@ def pruned_query_to_plan(
                 set().union(*(set(c) for c in cur_aq.connected_components))
             )
 
-        if (len(component) > 12) or optimizer == "greedy":
+        if len(component) >= greedy_component_size or optimizer == "greedy":
             (
                 (greedy_order, _, _, greedy_cost),
                 _,
