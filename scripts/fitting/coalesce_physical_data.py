@@ -1,5 +1,5 @@
 """
-Collect the programs which generate_physical_data wrote to DIR/data and the
+Collect the programs which a generator wrote to DIR/data and the
 timings which time_physical_data wrote there, or those of one chunk, into one
 JSON file, DIR/examples.json by default: the record of each timed example,
 under its name, with the runtime of each of its variants which was timed, and
@@ -15,7 +15,7 @@ import argparse
 import json
 from pathlib import Path
 
-from scripts.fitting.generate_physical_data import examples, path
+from scripts.fitting.generation import examples, path
 
 
 def coalesce(directory: Path, chunk, output: Path | None) -> None:

@@ -1,5 +1,5 @@
 """
-Time the variants of the programs which generate_physical_data wrote to DIR,
+Time the variants of the programs which a generator wrote to DIR,
 or those of one chunk. The stages below that of DIR, the workspacer, the
 formatter and the protocol optimizer, make their choices with the models of
 --model, or the built-in ones, from the exact stats of the Kronecker blocks of
@@ -34,7 +34,7 @@ from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.autoschedule.util import fuse_loop_order
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.finch_logic import Alias, Field, HardAlias, Plan, Produces, Query, Table
-from scripts.fitting.generate_physical_data import (
+from scripts.fitting.generation import (
     examples,
     materialize,
     path,

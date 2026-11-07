@@ -24,7 +24,7 @@ module=$1
 shift
 args=()
 # Each submission of the generator draws new programs, unless ARGS give a seed.
-if [[ $module == generate_physical_data ]]; then
+if [[ $module == generate_*_data ]]; then
   args+=(--seed "${SLURM_ARRAY_JOB_ID:-0}")
 fi
 args+=("$@")

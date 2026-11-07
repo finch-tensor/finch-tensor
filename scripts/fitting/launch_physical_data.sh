@@ -12,11 +12,12 @@
 # IDs to DIR/jobs.txt, for status_physical_data.sh. With --resume, DIR's
 # programs are kept rather than generated, and the jobs are added to
 # DIR/jobs.txt. Options before DIR are this script's; those after it are
-# generate_physical_data's.
+# those of the generator of the stage, generate_loop_data for the loop
+# stage and generate_format_data for the others.
 set -euo pipefail
 
 usage="usage: $0 [--account A] [--stage STAGE] [--model NAME=PATH]... \
-[--chunks N] [--hours H] [--resume] DIR [generate_physical_data options]"
+[--chunks N] [--hours H] [--resume] DIR [generator options]"
 account=
 stage=protocol
 models=()
@@ -96,10 +97,15 @@ array=--array=0-$((chunks - 1))
 logs=$directory/logs
 generate=
 step=scripts/fitting/step.slurm
+# The loop stage draws larger programs, from a generator of its own.
+generator=generate_format_data
+if [[ $stage == loop ]]; then
+  generator=generate_loop_data
+fi
 if [[ ! $resume ]]; then
   generate=$(submit "$array" --job-name=generate --cpus-per-task=8 --mem=64G \
     --time=02:00:00 --output="$logs/generate-%A_%a.log" \
-    "$step" generate_physical_data "$directory" --stage "$stage" "$@")
+    "$step" "$generator" "$directory" --stage "$stage" "$@")
   record generate "$generate"
 fi
 # Each timing task takes a whole node, with all of its memory, so other jobs

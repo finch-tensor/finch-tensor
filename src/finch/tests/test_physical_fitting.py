@@ -39,7 +39,7 @@ from finch.finch_logic import (
 )
 from finch.symbolic import PostOrderDFS
 from scripts.fitting import physical_bases
-from scripts.fitting.generate_physical_data import (
+from scripts.fitting.generation import (
     BLOCK_BITS,
     input_record,
     materialize,

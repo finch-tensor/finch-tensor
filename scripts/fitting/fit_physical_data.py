@@ -38,7 +38,7 @@ import numpy as np
 from scipy.optimize import differential_evolution
 
 from finch.autoschedule.cost_models import CostModel, WriteClasses, write_class
-from scripts.fitting.generate_physical_data import record_inputs
+from scripts.fitting.generation import record_inputs
 from scripts.fitting.physical_bases import (
     BASES,
     TUNING_BASIS,
@@ -158,38 +158,49 @@ def featurize(records, name, models, basis=None):
 CUTOFF_BOUNDS = [(1.0, 9.0), (-9.0, 0.0), (-9.0, 0.0)]
 
 
-def tune_cutoffs(raw, runtimes, examples, seed, folds=5, maxiter=40) -> WriteClasses:
+def cross_validated_regret(basis, sums, runtimes, examples, seed, folds=5) -> float:
     """
-    The cutoffs of WriteClasses under which models of the loop basis, fitted
-    to raw, the rows of TUNING_BASIS of each variant, have the least mean log
-    regret over folds of the examples, each held out in turn, as differential
-    evolution finds them in the log10 of each cutoff. The regret is piecewise
-    constant in the cutoffs, so the search isn't polished by a gradient.
+    The mean log regret of models of basis over folds of the examples, each
+    held out in turn and priced by a model fitted to the rest, where sums are
+    the summed rows of each variant and runtimes its runtime, as numpy arrays.
+    The folds are drawn with seed, so models compared on them see the same.
     """
     groups = by_example(examples)
     names = list(np.random.default_rng(seed).permutation(list(groups)))
-    held = [set(names[k::folds]) for k in range(folds)]
+    logs = []
+    for k in range(folds):
+        test = set(names[k::folds])
+        train = [i for name in names if name not in test for i in groups[name]]
+        model = CostModel(basis, np.zeros(basis.n_features)).fit(
+            sums[train][:, None, :], runtimes[train]
+        )
+        predicted = sums @ model.coefficients
+        for name in test:
+            indices = groups[name]
+            if len(indices) > 1:
+                chosen = indices[int(np.argmin(predicted[indices]))]
+                logs.append(np.log(runtimes[chosen] / runtimes[indices].min()))
+    return float(np.mean(logs)) if logs else 0.0
+
+
+def tune_cutoffs(raw, runtimes, examples, seed, maxiter=40) -> WriteClasses:
+    """
+    The cutoffs of WriteClasses under which models of the loop basis, fitted
+    to raw, the rows of TUNING_BASIS of each variant, have the least
+    cross_validated_regret, as differential evolution finds them in the log10
+    of each cutoff. The regret is piecewise constant in the cutoffs, so the
+    search isn't polished by a gradient.
+    """
     runtimes = np.asarray(runtimes)
     stacked = np.concatenate(raw)
     starts = np.cumsum([0, *(len(rows) for rows in raw[:-1])])
 
     def score(x) -> float:
         classes = WriteClasses(*(10.0 ** np.asarray(x)))
-        basis = loop_basis(classes)
         sums = np.add.reduceat(stratified(stacked, classes), starts, axis=0)
-        logs = []
-        for test in held:
-            train = [i for name in names if name not in test for i in groups[name]]
-            model = CostModel(basis, np.zeros(basis.n_features)).fit(
-                sums[train][:, None, :], runtimes[train]
-            )
-            predicted = sums @ model.coefficients
-            for name in test:
-                indices = groups[name]
-                if len(indices) > 1:
-                    chosen = indices[int(np.argmin(predicted[indices]))]
-                    logs.append(np.log(runtimes[chosen] / runtimes[indices].min()))
-        return float(np.mean(logs)) if logs else 0.0
+        return cross_validated_regret(
+            loop_basis(classes), sums, runtimes, examples, seed
+        )
 
     default = np.log10(list(asdict(write_class).values()))
     print(f"mean log regret at the default cutoffs {score(default):.4f}", flush=True)
@@ -210,6 +221,32 @@ def tune_cutoffs(raw, runtimes, examples, seed, folds=5, maxiter=40) -> WriteCla
         callback=progress,
     )
     return WriteClasses(*(10.0**result.x))
+
+
+def importances(basis, model, features, runtimes, examples, seed):
+    """
+    For each feature of basis which some variant has, its mean share of the
+    runtime model predicts for each variant, and how much its
+    cross_validated_regret grows when the feature is left out and the models
+    are fitted again, most first.
+    """
+    sums = np.array([rows.sum(axis=0) for rows in features])
+    runtimes = np.asarray(runtimes)
+    predicted = sums @ model.coefficients
+    shares = np.mean(
+        sums * model.coefficients / np.maximum(predicted, 1e-300)[:, None], axis=0
+    )
+    base = cross_validated_regret(basis, sums, runtimes, examples, seed)
+    table = []
+    for feature, name in enumerate(basis.feature_names):
+        if not sums[:, feature].any():
+            continue
+        dropped = sums.copy()
+        dropped[:, feature] = 0.0
+        loss = cross_validated_regret(basis, dropped, runtimes, examples, seed)
+        table.append((name, shares[feature], loss - base))
+    table.sort(key=lambda row: -row[2])
+    return base, table
 
 
 def fit(data: Path, name, models, output: Path | None, seed, tune=False) -> None:
@@ -252,6 +289,13 @@ def fit(data: Path, name, models, output: Path | None, seed, tune=False) -> None
                 f"90th percentile {np.percentile(regret, 90):.2f}, "
                 f"best chosen in {np.mean(regret == 1):.0%}"
             )
+        base, table = importances(basis, model, features, runtimes, examples, seed)
+        print(
+            f"feature importance: the mean share of the predicted runtime, and the "
+            f"growth of the cross-validated mean log regret {base:.4f} without it"
+        )
+        for feature, share, loss in table:
+            print(f"{feature:{width}} {share:8.1%} {loss:+9.4f}")
     if len(groups) < 3:
         print("too few examples for a learning curve")
     else:
