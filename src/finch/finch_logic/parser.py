@@ -188,6 +188,10 @@ class _LogicReader:
                 return lgc.Relabel(self.expression(arg), self.fields(idxs))
             case Tree("call", [Tree("name", ["FillTable"]), Tree("args", [tns])]):
                 return lgc.FillTable(self.alias(tns))
+            case Tree(
+                "call", [Tree("name", ["DimensionTable"]), Tree("args", [tns, r])]
+            ):
+                return lgc.DimensionTable(self.alias(tns), lgc.Literal(self.value(r)))
             case _:
                 return lgc.Literal(self.value(t))
 

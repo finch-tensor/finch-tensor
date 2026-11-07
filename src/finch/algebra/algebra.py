@@ -207,4 +207,8 @@ def repeat_operator(op: FinchOperatorFType):
 
 def cansplitpush(op: FinchOperatorFType) -> bool:
     """Whether a reduction can split-push through the same operator expression."""
-    return repeat_operator(op) is not None and is_commutative(op) and is_associative(op)
+    return (
+        (repeat_operator(op) is not None or is_idempotent(op))
+        and is_commutative(op)
+        and is_associative(op)
+    )

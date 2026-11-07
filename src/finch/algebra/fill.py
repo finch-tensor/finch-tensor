@@ -349,6 +349,9 @@ def apply_fill(op: FinchOperator, *fills: AbstractFill) -> AbstractFill:
         if is_specializable_value(result):
             return StaticFill(result)
         return DynamicFill(result)
+    if (same_branch := _where_same_branch(op, fills)) is not None:
+        result_type = op.ftype.return_type(*(g.element_type for g in fills))
+        return same_branch.astype(result_type)
     for f in fills:
         if not is_dynamic(f) and op.ftype.is_annihilator(f.value):
             result_type = op.ftype.return_type(*(g.element_type for g in fills))
@@ -373,7 +376,23 @@ def apply_fill_type(
             return StaticFillFType(result)
         return DynamicFillFType(ftype(result))
     element_type = op.ftype.return_type(*(f.element_type for f in fill_types))
+    if (same_branch := _where_same_branch(op, fill_types)) is not None:
+        return same_branch.astype(element_type)
     for f in statics:
         if op.ftype.is_annihilator(f.value):
             return f.astype(element_type)
     return DynamicFillFType(element_type)
+
+
+def _where_same_branch(op: FinchOperator, fills: tuple) -> Any:
+    """The branch of `where(c, x, y)` when both branches are the same static
+    fill, since then the result does not depend on `c`."""
+    # Imported lazily: `ffuncs` depends on this module.
+    from .ffuncs import where
+
+    match fills:
+        case (_, StaticFill() | StaticFillFType() as x, y) if (
+            op.ftype == where.ftype and x == y
+        ):
+            return x
+    return None
