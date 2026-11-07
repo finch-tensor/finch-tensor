@@ -1,3 +1,5 @@
+import pytest
+
 import numpy as np
 
 import finch as fl
@@ -500,6 +502,52 @@ def test_a_dense_tensor_never_filters_the_loops_within_it():
     assert inner(
         {x: [dense_, lst], y: [lst, lst]}, ((Follow(), Walk()), (Walk(), Walk()))
     ) == {x: [6, 6], y: [6, 10]}
+
+
+@pytest.mark.parametrize(
+    "op, expected",
+    [
+        # A sum enters every row either has entries in, and steps through
+        # every entry of each there: all 12 of x and all 40 of y.
+        (ffuncs.add, {"x": 12, "y": 40}),
+        # A product skips a row where either has none, so enters the 2 rows
+        # both have, but steps through every entry of each there, though
+        # their columns never meet: 6 of x and 10 of y, not none.
+        (ffuncs.mul, {"x": 6, "y": 10}),
+    ],
+)
+def test_a_merge_of_walks_steps_through_every_entry_it_enters(op, expected):
+    sf = ExactStatsFactory()
+    i, j = Field("i"), Field("j")
+    x, y, c = HardAlias("x"), HardAlias("y"), HardAlias("c")
+    # x has 3 entries in each of rows 0-3, and y 5 in each of rows 2-9, in
+    # columns x has none in.
+    n = 10
+    xd, yd = np.zeros((n, n)), np.zeros((n, n))
+    xd[:4, :3] = 1.0
+    yd[2:, 5:] = 1.0
+    stats: dict[Alias, TensorStats] = {
+        x: sf(fl.asarray(xd), (i, j)),
+        y: sf(fl.asarray(yd), (i, j)),
+    }
+    expr = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(op), (Table(x, (i, j)), Table(y, (i, j)))),
+        (j,),
+    )
+    plan = Plan((fuse_loop_order(Query(Table(c, (i,)), expr), (i, j)), Produces((c,))))
+    lst = SparseListLevelOption()
+    basis = ProtocolBasis()
+    names = basis.feature_names
+    machine = StatsMachine(sf, dict(stats))
+    visits = {}
+    for component in basis.components(plan, {x: [lst, lst], y: [lst, lst]}, machine):
+        match component:
+            case ProtocolChoice(prefix=Prefix(prefix=(_, _))) as access:
+                row = basis.get_component_features(access, machine)[0]
+                visits[access.alias.name] = row[names.index("sparse_list.walk.visits")]
+    assert visits == expected
 
 
 def test_cost_protocolizer_states_the_protocols_it_chooses():

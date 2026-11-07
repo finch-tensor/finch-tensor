@@ -279,6 +279,27 @@ class LoopSpaces(Generic[NS]):
                 return protocols[idxs.index(self.idx)]
         return DefaultProtocol()
 
+    def walked(self, node: LogicExpression) -> NS | None:
+        """
+        Where the walks of node at the loop have fibers with entries, over
+        parent, combined as node combines them, or None where it walks
+        nothing. A merge of walks skips a fiber only where this is empty:
+        under a product, wherever one walked fiber is; under a sum, only where
+        all are.
+        """
+        match node:
+            case MapJoin(Literal(op), args):
+                parts = [part for arg in args if (part := self.walked(arg)) is not None]
+                return self.stats_factory.mapjoin(op, *parts) if parts else None
+            case Table(Alias() as tns, idxs) if self.idx in idxs[
+                tns.nfused :
+            ] and self.protocol(node) not in (Follow(), Gallop()):
+                stat = self.nest.stats[Table(tns, idxs)]
+                projected = self.project(stat)
+                projected.fill_type = stat.fill_type
+                return projected
+        return None
+
     def extent(self, stat: NS, fields) -> float:
         """The points of stat over fields, spanning all of those it lacks."""
         count = stat.estimate_non_fill_values()
