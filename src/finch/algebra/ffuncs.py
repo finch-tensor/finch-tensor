@@ -2472,6 +2472,11 @@ class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
     arity = math.inf
 
     is_associative = True
+    # Choose may return any of its non-fill arguments, so reordering them is
+    # allowed, even though the Python implementation returns the first one.
+    is_commutative = True
+
+    is_idempotent = True
 
     def return_type(self, *args: FType) -> FType:
         if not args:
