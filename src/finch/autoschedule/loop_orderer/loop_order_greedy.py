@@ -33,10 +33,8 @@ def greedy_loop_order(
     output_vars: tuple[Field, ...] | None = None,
     *,
     cost_model: CostModel[Prefix] | None = None,
-    ordering: bool = False,
 ) -> tuple[Field, ...]:
-    """Build a loop order by appending the cheapest candidate prefix. ordering
-    prices the prefixes as a loop orderer does, as Prefix says."""
+    """Build a loop order by appending the cheapest candidate prefix."""
     if cost_model is None:
         cost_model = WORKSPACE_LOOP_COST_MODEL
     machine = StatsMachine(stats_factory, dict(stats_bindings))
@@ -51,7 +49,7 @@ def greedy_loop_order(
 
     def candidate_cost(field: Field) -> float:
         return cost_model.predict_component_cost(
-            Prefix((*prefix, field), expr, output_vars, ordering=ordering), machine
+            Prefix((*prefix, field), expr, output_vars, ordering=True), machine
         )
 
     while remaining:
@@ -67,7 +65,6 @@ def set_greedy_loop_order(
     stats_factory: StatsFactory[NS],
     stats: dict[Alias, NS],
     cost_model: CostModel[Prefix] | None = None,
-    ordering: bool = False,
 ) -> Plan:
     stats_bindings = dict(stats)
     new_queries = []
@@ -82,12 +79,7 @@ def set_greedy_loop_order(
                     case QueryInto():
                         arg = query.as_query().rhs
                 idxs_2 = greedy_loop_order(
-                    arg,
-                    stats_factory,
-                    stats_bindings,
-                    out_idxs,
-                    cost_model=cost_model,
-                    ordering=ordering,
+                    arg, stats_factory, stats_bindings, out_idxs, cost_model=cost_model
                 )
                 new_queries.append(with_loop_order(query, idxs_2))
             case Query(_, Table(Alias(), _)) as q:
@@ -118,6 +110,4 @@ class GreedyLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         stats: dict[Alias, NS],
         stats_factory: StatsFactory[NS],
     ) -> Plan:
-        return set_greedy_loop_order(
-            prgm, stats_factory, stats, self.cost_model, ordering=True
-        )
+        return set_greedy_loop_order(prgm, stats_factory, stats, self.cost_model)

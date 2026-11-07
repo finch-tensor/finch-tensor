@@ -217,13 +217,12 @@ def pruned_query_to_plan(
     use_components: bool = True,
     *,
     optimizer: GalleyOptimizer = "dfs",
-    greedy_component_size: int = GREEDY_COMPONENT_SIZE,
 ) -> tuple[list[Query], float]:
     """
     Pruned Galley optimizer.
 
     * ``"greedy"`` — ``k=1`` (also used automatically for a component of at
-      least ``greedy_component_size`` indices).
+      least ``GREEDY_COMPONENT_SIZE`` indices).
     * ``"bfs"`` — greedy ``k=1`` for bounds, then BFS BnB.
     * ``"dfs"`` — DFS BnB.
 
@@ -245,7 +244,7 @@ def pruned_query_to_plan(
                 set().union(*(set(c) for c in cur_aq.connected_components))
             )
 
-        if len(component) >= greedy_component_size or optimizer == "greedy":
+        if len(component) >= GREEDY_COMPONENT_SIZE or optimizer == "greedy":
             (
                 (greedy_order, _, _, greedy_cost),
                 _,

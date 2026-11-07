@@ -363,7 +363,7 @@ def test_loop_orderers_read_a_csr_out_of_order_through_its_copy(search):
         MapJoin(Literal(ffuncs.mul), (Table(a, (i, j), csr), Table(b, (k, j), csr))),
         (j,),
     )
-    assert search(expr, sf, stats, (i, k), ordering=True) == (i, j, k)
+    assert search(expr, sf, stats, (i, k)) == (i, j, k)
 
 
 @pytest.mark.parametrize("order", ["ij", "ji"])

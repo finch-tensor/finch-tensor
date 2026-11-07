@@ -145,7 +145,6 @@ def select_output_format(
         # Scale the sparsity down a bit so that formats stay conservative.
         approx_sparsity = approx_nnz_per / dim_size if dim_size else float("inf")
         dense_memory_footprint = prev_nnz / slices * dim_size
-        bytemap_allowed = not formats or formats[-1] is not LevelFormat.BYTEMAP
 
         if (
             approx_sparsity > DENSE_SPARSITY_THRESHOLD
@@ -156,15 +155,11 @@ def select_output_format(
             approx_sparsity > BYTEMAP_SPARSITY_THRESHOLD
             and dense_memory_footprint < MAX_DENSE_MEMORY_FOOTPRINT
             # TODO: Check out finch double bytemap bug
-            and bytemap_allowed
-        ):
-            fmt = LevelFormat.BYTEMAP
-        elif (
-            nfused
-            and len(output_indices) - nfused == 1
+            and (not formats or formats[-1] is not LevelFormat.BYTEMAP)
+        ) or (
+            0 < nfused == len(output_indices) - 1
             and needs_random_writes
             and dense_memory_footprint <= WORKSPACE_LIMIT
-            and bytemap_allowed
         ):
             fmt = LevelFormat.BYTEMAP
         elif needs_random_writes:

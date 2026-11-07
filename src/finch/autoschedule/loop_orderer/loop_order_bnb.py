@@ -38,7 +38,6 @@ def loop_order_bfs(
     *,
     k: int | None = None,
     cost_model: CostModel[Prefix] | None = None,
-    ordering: bool = False,
 ) -> tuple[Field, ...]:
     """Search prefixes with nonnegative incremental model costs as lower bounds."""
     if cost_model is None:
@@ -55,16 +54,11 @@ def loop_order_bfs(
         return ()
 
     best_order = greedy_loop_order(
-        expr,
-        stats_factory,
-        stats_bindings,
-        output_vars,
-        cost_model=cost_model,
-        ordering=ordering,
+        expr, stats_factory, stats_bindings, output_vars, cost_model=cost_model
     )
     best_cost = sum(
         cost_model.predict_component_cost(
-            Prefix(best_order[:n], expr, output_vars, ordering=ordering), machine
+            Prefix(best_order[:n], expr, output_vars, ordering=True), machine
         )
         for n in range(len(best_order) + 1)
     )
@@ -85,7 +79,7 @@ def loop_order_bfs(
             for field in remaining:
                 new_prefix = prefix + (field,)
                 new_cost = prefix_cost + cost_model.predict_component_cost(
-                    Prefix(new_prefix, expr, output_vars, ordering=ordering), machine
+                    Prefix(new_prefix, expr, output_vars, ordering=True), machine
                 )
                 if new_cost >= best_cost:
                     continue
@@ -108,7 +102,6 @@ def loop_order_dfs(
     output_vars: tuple[Field, ...] | None = None,
     *,
     cost_model: CostModel[Prefix] | None = None,
-    ordering: bool = False,
 ) -> tuple[Field, ...]:
     """Search prefixes with nonnegative incremental model costs as lower bounds."""
     if cost_model is None:
@@ -125,16 +118,11 @@ def loop_order_dfs(
         return ()
 
     best_order = greedy_loop_order(
-        expr,
-        stats_factory,
-        stats_bindings,
-        output_vars,
-        cost_model=cost_model,
-        ordering=ordering,
+        expr, stats_factory, stats_bindings, output_vars, cost_model=cost_model
     )
     best_cost = sum(
         cost_model.predict_component_cost(
-            Prefix(best_order[:n], expr, output_vars, ordering=ordering), machine
+            Prefix(best_order[:n], expr, output_vars, ordering=True), machine
         )
         for n in range(len(best_order) + 1)
     )
@@ -154,7 +142,7 @@ def loop_order_dfs(
         for field in remaining:
             new_prefix = prefix + (field,)
             new_cost = prefix_cost + cost_model.predict_component_cost(
-                Prefix(new_prefix, expr, output_vars, ordering=ordering), machine
+                Prefix(new_prefix, expr, output_vars, ordering=True), machine
             )
             if new_cost >= best_cost:
                 continue
@@ -176,7 +164,6 @@ def loop_order_brute_force(
     output_vars: tuple[Field, ...] | None = None,
     *,
     cost_model: CostModel[Prefix] | None = None,
-    ordering: bool = False,
 ) -> tuple[Field, ...]:
     """Pick the loop order with the lowest model cost over all permutations.
 
@@ -198,7 +185,7 @@ def loop_order_brute_force(
     for order in itertools.permutations(all_vars):
         cost = sum(
             cost_model.predict_component_cost(
-                Prefix(order[:n], expr, output_vars, ordering=ordering), machine
+                Prefix(order[:n], expr, output_vars, ordering=True), machine
             )
             for n in range(len(order) + 1)
         )
@@ -247,7 +234,6 @@ class BFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
                         out_idxs,
                         k=self.k,
                         cost_model=self.cost_model,
-                        ordering=True,
                     )
                     new_queries.append(with_loop_order(query, idxs_2))
                 case Query(_, Table(Alias(), _)) as q:
@@ -297,7 +283,6 @@ class DFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
                         stats_bindings,
                         out_idxs,
                         cost_model=self.cost_model,
-                        ordering=True,
                     )
                     new_queries.append(with_loop_order(query, idxs_2))
                 case Query(_, Table(Alias(), _)) as q:
@@ -347,7 +332,6 @@ class BruteForceLoopOrderer(AbstractLoopOrderer, Generic[NS]):
                         stats_bindings,
                         out_idxs,
                         cost_model=self.cost_model,
-                        ordering=True,
                     )
                     new_queries.append(with_loop_order(query, idxs_2))
                 case Query(_, Table(Alias(), _)) as q:

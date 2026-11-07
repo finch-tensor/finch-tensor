@@ -32,7 +32,6 @@ from .annotated_query import (
     AnnotatedQuery,
 )
 from .branch_and_bound import (
-    GREEDY_COMPONENT_SIZE,
     GalleyOptimizer,
     pruned_query_to_plan,
 )
@@ -52,7 +51,6 @@ def optimize_query(
     *,
     optimizer: GalleyOptimizer = "dfs",
     cost_model: CostModel | None = None,
-    greedy_component_size: int = GREEDY_COMPONENT_SIZE,
 ):
     """Rewrite a single logical Query using ``optimizer``:
     greedy, bfs, or dfs."""
@@ -61,7 +59,6 @@ def optimize_query(
         annotated_query,
         use_components=use_components,
         optimizer=optimizer,
-        greedy_component_size=greedy_component_size,
     )
     return new_queries
 
@@ -74,7 +71,6 @@ def optimize_plan(
     *,
     optimizer: GalleyOptimizer = "greedy",
     cost_model: CostModel | None = None,
-    greedy_component_size: int = GREEDY_COMPONENT_SIZE,
 ):
     """
     Optimize a full Plan: run the Galley optimizer on each Query body,
@@ -91,7 +87,6 @@ def optimize_plan(
                 use_components=use_components,
                 optimizer=optimizer,
                 cost_model=cost_model,
-                greedy_component_size=greedy_component_size,
             )
             for new_query in new_queries:
                 StatsInterpreter(stats_factory)(new_query, stats_bindings)
@@ -110,9 +105,7 @@ class GalleyLogicFactorizer(LogicFactorizer):
     Default ``optimizer="bfs"`` is exact layered branch-and-bound; ``"dfs"`` uses the
     DFS kernel. Greedy ``k=1`` bounds are used only on the layered exact path, not
     inside ``branch_and_bound_dfs``. ``cost_model`` estimates the cost of each
-    reduction, and defaults to ``FLOPS_COST_MODEL``. A component of at least
-    ``greedy_component_size`` indices takes the greedy order instead of the
-    exact search, whose time grows exponentially with it.
+    reduction, and defaults to ``FLOPS_COST_MODEL``.
     """
 
     def __init__(
@@ -122,13 +115,11 @@ class GalleyLogicFactorizer(LogicFactorizer):
         *,
         optimizer: GalleyOptimizer = "bfs",
         cost_model: CostModel | None = None,
-        greedy_component_size: int = GREEDY_COMPONENT_SIZE,
     ):
         self.ctx = ctx
         self.use_components = use_components
         self.optimizer = optimizer
         self.cost_model = cost_model
-        self.greedy_component_size = greedy_component_size
 
     def lower(
         self,
@@ -149,7 +140,6 @@ class GalleyLogicFactorizer(LogicFactorizer):
                 use_components=self.use_components,
                 optimizer=self.optimizer,
                 cost_model=self.cost_model,
-                greedy_component_size=self.greedy_component_size,
             )
             return prgm, bindings
 
