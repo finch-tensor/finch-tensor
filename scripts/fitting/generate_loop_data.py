@@ -27,6 +27,7 @@ from typing import Any
 import numpy as np
 
 from finch import ffuncs
+from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
     Aggregate,
     Field,
@@ -37,24 +38,31 @@ from finch.finch_logic import (
     Produces,
     Query,
     Table,
+    parse_logic,
 )
 from scripts.fitting.generation import (
     BLOCK_BITS,
     choose,
     input_record,
     main,
+    record_inputs,
     seed_lg_densities,
     shuffled,
     skewed_fractions,
     spread,
     variants,
 )
-from scripts.fitting.physical_bases import C, with_subsequence
+from scripts.fitting.physical_bases import (
+    C,
+    input_fields,
+    record_stats_factory,
+    with_subsequence,
+)
 
 STAGES = ("loop",)
 # log2 of the most entries all the fields of a program may address, of the
-# most values of any one field, and of the most nonzeros of any input, which
-# bounds the memory of each step.
+# most values of any one field, and of the most nonzeros of any input or
+# output, which bounds the memory of each step.
 LG_MAX_SPACE = 34
 LG_MAX_DIM = 18
 LG_MAX_NNZ = 27
@@ -141,11 +149,39 @@ def choose_seed(rng, idxs, lg_dims):
 def variant_space(loop_order) -> tuple[list[list[Any]], Any]:
     """The loop orders of a program, which make up its variants, and a function
     of one of them which makes the variant."""
-    orders = [[idx.name for idx in order] for order in itertools.permutations(loop_order)]
+    orders = [
+        [idx.name for idx in order] for order in itertools.permutations(loop_order)
+    ]
     return [orders], lambda choices: {"loop_order": choices[0]}
 
 
+def output_nonzeros(record) -> float:
+    """The nonzeros of the output of the example of record, counted exactly
+    from the blocks of its inputs."""
+    prgm = parse_logic(record["query"])
+    query, _ = prgm.bodies
+    fields = input_fields(prgm)
+    stats_factory = record_stats_factory(record)
+    stats = {
+        tns: stats_factory(tensor, fields[tns])
+        for tns, tensor in record_inputs(record).items()
+    }
+    return StatsMachine(stats_factory, stats)(query.rhs).estimate_non_fill_values()
+
+
 def program_inputs(rng, stage):
+    """
+    The records of the examples of a drawn program, as draw_program_inputs
+    draws them, drawn again until no example has more than 2 ** LG_MAX_NNZ
+    nonzeros in its output, which nothing else bounds.
+    """
+    while True:
+        records = draw_program_inputs(rng, stage)
+        if all(output_nonzeros(record) <= 2**LG_MAX_NNZ for record in records):
+            return records
+
+
+def draw_program_inputs(rng, stage):
     """
     The records of the examples of a drawn program, each with its query, its
     loop order, its variants, and the seeds of its inputs, which are KEEP of

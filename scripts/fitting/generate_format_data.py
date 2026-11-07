@@ -53,7 +53,6 @@ from scripts.fitting.generation import (
 from scripts.fitting.physical_bases import (
     OPTIONS,
     A,
-    B,
     C,
     fused_plan,
     with_subsequence,
