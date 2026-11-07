@@ -3,19 +3,17 @@ Fit a CostModel to the examples which coalesce_physical_data collected
 into EXAMPLES, with the basis of physical_bases named by --basis, or that of
 the stage of the examples, and write it to model.json if given. A model of
 the same basis reads model.json back with from_json. Each example is
-featurized as it was timed: with the formats each variant ran with, where
-time_physical_data saved them, and otherwise with the choices the stages below
-make with the models of --model, as time_physical_data made them, so no
-example is compiled or run, and the stats are counted exactly from the
-Kronecker blocks of its inputs, so none is materialized. The formats of a
-variant enter only through the bases, as in the optimizers, which see the
-supports of their inputs. The
+featurized as it was timed: the stages below make their choices with the
+models of --model, as time_physical_data made them, so no example is compiled
+or run, and the stats are counted exactly from the Kronecker blocks of its
+inputs, so none is materialized. The formats of a variant enter only through
+the bases, as in the optimizers, which see the supports of their inputs. The
 loop stage orders loops before the workspacer, the formatter and the protocol
-optimizer run, so it reads its inputs as their formats read them by default,
-as the loop orderer prices them, and its outputs without protocols. The
-variants of each example are every option of one
-decision, so the model is also scored by its regret: the runtime of the
-variant it predicts to be fastest over that of the fastest, for each example.
+optimizer run, so its features come from the stats of its inputs alone,
+whatever their formats, as the loop orderer prices them, and it chooses
+nothing. The variants of each example are every option of one decision, so
+the model is also scored by its regret: the runtime of the variant it
+predicts to be fastest over that of the fastest, for each example.
 To show how the fit improves with data, a held-out tenth of the examples
 scores models fitted to growing subsets of the rest, and the relative R^2 and
 the median regret of each are printed and plotted next to EXAMPLES, to

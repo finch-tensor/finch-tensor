@@ -36,7 +36,7 @@ from finch.finch_logic import (
     Table,
     TensorStats,
 )
-from finch.symbolic import Namespace, PostOrderDFS
+from finch.symbolic import Namespace, PostOrderDFS, PostWalk, Rewrite
 
 
 def workspace_depth(prgm: LogicStatement, alias: Alias) -> int | None:
@@ -231,14 +231,104 @@ def add_cost_effective_workspaces(
     return stage_workspaces(prgm, bindings, keep)
 
 
+def add_reformat(
+    prgm: Plan, alias: HardAlias, idxs: tuple[Field, ...], copy: HardAlias
+) -> Plan:
+    """
+    Copy alias into copy before prgm, looping over idxs, the fields of a table
+    which reads alias, in the order alias stores them, and read copy wherever
+    prgm reads alias, so that the formatter may store copy in any format.
+    """
+
+    def read(node):
+        match node:
+            case Table(tns, idxs_2, protocols) if tns == alias:
+                return Table(copy, idxs_2, protocols)
+        return None
+
+    reformat = fuse_loop_order(Query(Table(copy, idxs), Table(alias, idxs)), idxs)
+    reads = Rewrite(PostWalk(read))(prgm)
+    assert isinstance(reads, Plan)
+    return Plan((reformat, *reads.bodies))
+
+
+def stage_reformats(
+    prgm: Plan,
+    bindings: Mapping[Alias, TensorFType],
+    keep: Callable[[Plan, Plan, HardAlias, HardAlias], bool],
+) -> Plan:
+    """
+    Copy each input of bindings which prgm reads, and doesn't write, into a
+    new alias before prgm, as add_reformat does, if keep, given prgm, the
+    program with the copy, the input, and the copy, keeps it. A scalar has no
+    levels to store otherwise.
+    """
+    prgm = flatten_plans(prgm)
+    spc = Namespace(prgm)
+    reads: dict[HardAlias, tuple[Field, ...]] = {}
+    written: set[Alias] = set()
+    for node in PostOrderDFS(prgm):
+        match node:
+            case Query(Table(Alias() as lhs, _), _) | QueryInto(
+                Table(Alias() as lhs, _), _, _
+            ):
+                written.add(lhs.unfused)
+            case Table(HardAlias() as tns, idxs) if tns in bindings and idxs:
+                reads.setdefault(tns, idxs)
+    for alias, idxs in reads.items():
+        if alias in written:
+            continue
+        copy = HardAlias(spc.freshen(alias.name, "copy"))
+        staged = add_reformat(prgm, alias, idxs, copy)
+        if keep(prgm, staged, alias, copy):
+            prgm = staged
+    return prgm
+
+
+def add_cost_effective_reformats(
+    prgm: Plan,
+    bindings: Mapping[Alias, TensorFType],
+    stats: Mapping[Alias, TensorStats],
+    stats_factory: StatsFactory,
+    cost_model: CostModel[ProtocolChoice],
+    options: Sequence[LevelOption] = LEVEL_OPTIONS,
+) -> Plan:
+    """
+    Copy the inputs of prgm into new formats, as stage_reformats does, where
+    the program costs less with the copy under cost_model, once format_cost
+    formats the copy, keeping the formats of the other aliases prgm defines.
+    """
+    # The formats and cost of the program so far, found when a copy is first
+    # priced, and updated with each copy kept.
+    formats: dict[Alias, TensorFType] | None = None
+    cost = math.inf
+
+    def keep(prgm, staged, alias, copy) -> bool:
+        nonlocal formats, cost
+        if formats is None:
+            formats, cost = format_cost(
+                prgm, bindings, stats, stats_factory, cost_model, options
+            )
+        staged_formats, staged_cost = format_cost(
+            staged, {**bindings, **formats}, stats, stats_factory, cost_model, options
+        )
+        if staged_cost < cost:
+            formats, cost = {**formats, **staged_formats}, staged_cost
+            return True
+        return False
+
+    return stage_reformats(prgm, bindings, keep)
+
+
 class LogicWorkspacer(LoopOrderedForm, LogicLoader):
     """
     Pass a program in LoopOrderedForm to ctx, after redirecting the queries
     which scatter into their outputs into workspaces where they cost less
-    under cost_model, by default PROTOCOL_COST_MODEL, as add_cost_effective_workspaces
-    does. A loop orderer wraps it, so that the copies out of workspaces aren't
-    propagated, and the formatter it wraps should price programs with the same
-    model.
+    under cost_model, by default PROTOCOL_COST_MODEL, as
+    add_cost_effective_workspaces does, and then copying its inputs into new
+    formats where that costs less, as add_cost_effective_reformats does. A
+    loop orderer wraps it, so that the copies aren't propagated, and the
+    formatter it wraps should price programs with the same model.
     """
 
     def __init__(
@@ -262,6 +352,9 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
     ) -> tuple[AssemblyLibrary, dict[Alias, TensorFType]]:
         assert isinstance(prgm, Plan)
         prgm = add_cost_effective_workspaces(
+            prgm, bindings, stats, stats_factory, self.cost_model, self.options
+        )
+        prgm = add_cost_effective_reformats(
             prgm, bindings, stats, stats_factory, self.cost_model, self.options
         )
         return self.ctx(prgm, bindings, stats, stats_factory)

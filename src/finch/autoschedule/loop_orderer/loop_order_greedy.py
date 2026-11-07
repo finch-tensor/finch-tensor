@@ -1,8 +1,8 @@
 from collections.abc import Mapping
 from typing import Generic, TypeVar
 
-from finch.algebra.tensor import TensorFType
 from finch.autoschedule.cost_models import WORKSPACE_LOOP_COST_MODEL, CostModel, Prefix
+from finch.autoschedule.protocolizer.protocolize import merged_expr
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.autoschedule.tensor_stats.stats_interpreter import (
     StatsInterpreter,
@@ -22,7 +22,7 @@ from finch.finch_logic import (
     Table,
 )
 
-from .loop_ordering import AbstractLoopOrderer, priced_expr, with_loop_order
+from .loop_ordering import AbstractLoopOrderer, with_loop_order
 
 NS = TypeVar("NS", bound=NumericStats)
 
@@ -66,7 +66,6 @@ def set_greedy_loop_order(
     stats_factory: StatsFactory[NS],
     stats: dict[Alias, NS],
     cost_model: CostModel[Prefix] | None = None,
-    bindings: Mapping[Alias, TensorFType] | None = None,
 ) -> Plan:
     stats_bindings = dict(stats)
     new_queries = []
@@ -77,7 +76,7 @@ def set_greedy_loop_order(
             case Query(Table(_, out_idxs), Aggregate()) | QueryInto(
                 Table(_, out_idxs), _, _
             ):
-                arg = priced_expr(query, bindings)
+                arg = merged_expr(query)
                 idxs_2 = greedy_loop_order(
                     arg, stats_factory, stats_bindings, out_idxs, cost_model=cost_model
                 )
@@ -109,8 +108,5 @@ class GreedyLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         prgm: Plan,
         stats: dict[Alias, NS],
         stats_factory: StatsFactory[NS],
-        bindings: Mapping[Alias, TensorFType] | None = None,
     ) -> Plan:
-        return set_greedy_loop_order(
-            prgm, stats_factory, stats, self.cost_model, bindings
-        )
+        return set_greedy_loop_order(prgm, stats_factory, stats, self.cost_model)

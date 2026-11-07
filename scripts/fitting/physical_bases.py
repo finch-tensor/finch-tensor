@@ -21,13 +21,13 @@ examples coalesce_physical_data collects, so a new basis needs no new timings.
 - loop: for a random program, every loop order, with its inputs stored in
   that order, so that the program is concordant, and the output stored as the
   program stores it, which the loops may scatter into. Each order is passed
-  to the workspacer, which stages the writes which scatter in a workspace
-  where that costs less, then to the formatter, which chooses the formats
-  from the supports of its inputs, and then to the protocol optimizer. Its
-  features are those of the program as ordered, before any of them run, with
-  its inputs read as their formats read them by default and its outputs
-  unformatted, as the loop orderer prices it, so the model learns what a loop
-  order costs once they have run.
+  to the workspacer, which stages the writes which scatter in a workspace,
+  and copies inputs into new formats, where that costs less, then to the
+  formatter, which chooses the formats from the supports of its inputs, and
+  then to the protocol optimizer. Its features are those of the program as
+  ordered, before any of them run, from the stats of its inputs alone,
+  whatever their formats, as the loop orderer prices it, so the model learns
+  what a loop order costs once they have run.
 """
 
 import json
@@ -60,7 +60,10 @@ from finch.autoschedule.formatter.smart_formatter import (
 )
 from finch.autoschedule.tensor_stats.memo_stats import MemoStatsFactory
 from finch.autoschedule.util import fuse_loop_order
-from finch.autoschedule.workspacer import add_cost_effective_workspaces
+from finch.autoschedule.workspacer import (
+    add_cost_effective_reformats,
+    add_cost_effective_workspaces,
+)
 from finch.finch_logic import (
     Alias,
     Field,
@@ -271,10 +274,11 @@ def resolve(
     the protocols each input is read with, unless the variant gives those too,
     as the variants of the protocol and format stages do. Where the formats
     are chosen, the inputs are formatted first, as they are when the program
-    runs, then the workspacer stages the writes which scatter in workspaces
-    where that costs less, and then the formatter formats the outputs of the
-    program it leaves. The inputs the program reads are stored in the order it
-    reads them, which is the loop order in the loop stage.
+    runs, then the workspacer stages the writes which scatter in workspaces,
+    and copies inputs into new formats, where that costs less, and then the
+    formatter formats the outputs and copies of the program it leaves. The
+    inputs the program reads are stored in the order it reads them, which is
+    the loop order in the loop stage.
     """
     plan = variant_plan(record, variant)
     formats = {
@@ -288,13 +292,14 @@ def resolve(
         bindings = {
             tns: input_ftype(formats[tns], tensor) for tns, tensor in inputs.items()
         }
-        plan = add_cost_effective_workspaces(
-            plan,
-            bindings,
-            input_stats(plan, inputs, stats_factory),
-            stats_factory,
-            models["format"],
-        )
+        for staging in (add_cost_effective_workspaces, add_cost_effective_reformats):
+            plan = staging(
+                plan,
+                bindings,
+                input_stats(plan, inputs, stats_factory),
+                stats_factory,
+                models["format"],
+            )
         formats = {
             **{tns: formats[tns] for tns in inputs},
             **choose_formats(plan, inputs, stats_factory, models["format"], bindings),
@@ -346,28 +351,20 @@ def featurize_record(
 ) -> list[np.ndarray]:
     """
     The features of the basis name of each variant of the example of record,
-    whose inputs are inputs, as it was timed: with the formats it ran with,
-    where record saves them by the index of the variant, as
-    coalesce_physical_data does, and otherwise with the choices the stages
-    below make with models, as time_physical_data makes them, so nothing is
-    compiled or run. The loop stage orders loops before the workspacer and
-    the formatter run, so its features are those of the program as ordered,
-    reading its inputs as their formats read them by default, as the loop
-    orderer prices them, and its outputs without protocols.
+    whose inputs are inputs, as it was timed: the stages below make their
+    choices with models, as time_physical_data makes them, so nothing is
+    compiled or run. The loop stage orders loops before the workspacer and the
+    formatter run, so its features are those of the program as ordered, from
+    the stats of its inputs alone, whatever their formats, as the loop orderer
+    prices it, and it chooses nothing.
     """
-    stage = record["stage"]
     stats_factory = record_stats_factory(record)
-    saved = record.get("formats", {})
     rows = []
-    for index, variant in enumerate(record["variants"]):
-        # A variant which gives its formats isn't formatted again.
-        if str(index) in saved:
-            variant = {**variant, "formats": saved[str(index)]}
-        plan, formats = resolve(record, variant, inputs, models)
-        if stage == "loop":
-            # The loop orderer prices the concordant program before the
-            # workspacer, the formatter and the protocol optimizer run.
-            plan = variant_plan(record, variant)
+    for variant in record["variants"]:
+        if record["stage"] == "loop":
+            plan, formats = variant_plan(record, variant), {}
+        else:
+            plan, formats = resolve(record, variant, inputs, models)
         rows.append(
             features(
                 BASES[name],
@@ -375,6 +372,7 @@ def featurize_record(
                 formats,
                 read_inputs(record, plan, inputs),
                 stats_factory,
+                protocols=record["stage"] != "loop",
             )
         )
     return rows

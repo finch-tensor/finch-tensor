@@ -133,31 +133,21 @@ def test_loop_features_charge_writes_before_the_workspacer_runs():
     assert totals[("i", "k", "j")]["sequential_writes"] > 0
     # An outer product scatters into all of C, which no workspace fits.
     assert totals[("j", "i", "k")]["scatter_writes"] > 0
-    # The inputs are read as their formats read them by default, so a dense
-    # level is looked up where a list is walked.
-    _, formats = resolve(record, record["variants"][0], record_inputs(record), models)
-    assert record["variants"][0]["loop_order"] == ["i", "j", "k"]
-    dense_levels = any(opt.kind == "dense" for tns in (A, B) for opt in formats[tns])
-    assert (totals[("i", "j", "k")]["lookups"] > 0) == dense_levels
+    # The inputs are read without protocols, whatever their formats, so the
+    # loops walk them and look nothing up.
+    assert all(total["lookups"] == 0 for total in totals.values())
 
 
-def test_featurizing_reuses_the_formats_saved_when_timing(monkeypatch):
+def test_loop_features_need_no_formats(monkeypatch):
     record = gustavson_record(np.random.default_rng(0), lg=8)
     inputs = record_inputs(record)
-    models = parse_models(None)
-    saved = {
-        str(index): format_kinds(resolve(record, variant, inputs, models)[1])
-        for index, variant in enumerate(record["variants"])
-    }
-    chosen = featurize_record(record, inputs, "loop", models)
 
-    def choose_formats(*args, **kwargs):
-        raise AssertionError("Featurizing chose formats which were saved")
+    def resolve(*args, **kwargs):
+        raise AssertionError("The loop stage chose formats or protocols")
 
-    monkeypatch.setattr(physical_bases, "choose_formats", choose_formats)
-    rows = featurize_record({**record, "formats": saved}, inputs, "loop", models)
-    for row, row_2 in zip(rows, chosen, strict=True):
-        np.testing.assert_array_equal(row, row_2)
+    monkeypatch.setattr(physical_bases, "resolve", resolve)
+    rows = featurize_record(record, inputs, "loop", parse_models(None))
+    assert len(rows) == len(record["variants"])
 
 
 @pytest.mark.skipif(not julia_available(), reason="Finch.jl is not installed")

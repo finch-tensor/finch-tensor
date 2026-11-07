@@ -1,6 +1,5 @@
 import logging
 from abc import abstractmethod
-from collections.abc import Mapping
 from copy import deepcopy
 from functools import reduce
 from itertools import chain as join_chains
@@ -8,7 +7,6 @@ from itertools import chain as join_chains
 from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
 from finch.autoschedule.factorizer.optimize import with_unique_lhs
-from finch.autoschedule.protocolizer import protocolize
 from finch.autoschedule.stages import LogicLoopOrderer
 from finch.autoschedule.util import (
     flatten_plans,
@@ -239,26 +237,6 @@ def with_loop_order(
             raise ValueError(f"Expected an aggregate or in-place query, got {stmt}")
 
 
-def priced_expr(
-    query: Query | QueryInto, bindings: Mapping[Alias, TensorFType] | None = None
-) -> LogicExpression:
-    """
-    The expression a loop orderer prices for query: its right-hand side, or
-    the aggregate an update reduces into its table, reading each tensor of
-    bindings with the protocols its format reads its levels with by default,
-    as protocolize does, and the tensors not yet formatted, such as the
-    intermediates of the program, without protocols, so that they walk. The
-    loops cost as the formats of the inputs make them, while the formatter
-    and the protocol optimizer run after the loops are ordered.
-    """
-    match query:
-        case QueryInto():
-            query = query.as_query()
-    stmt = protocolize(query, bindings) if bindings else query
-    assert isinstance(stmt, Query)
-    return stmt.rhs
-
-
 def heuristic_loop_order(plan: Plan) -> Plan:
     new_queries = []
     for query in plan.bodies[:-1]:
@@ -292,10 +270,12 @@ class AbstractLoopOrderer(LogicLoopOrderer):
         prgm: Plan,
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
-        bindings: Mapping[Alias, TensorFType] | None = None,
     ) -> Plan:
-        """prgm, with the loop order of each query set, pricing its reads of
-        the formatted tensors of bindings as priced_expr does."""
+        """
+        prgm, with the loop order of each query set, priced from the stats of
+        the tensors it reads alone, whatever their formats, since the
+        workspacer may copy its inputs into any format.
+        """
 
     def lower(
         self,
@@ -307,7 +287,7 @@ class AbstractLoopOrderer(LogicLoopOrderer):
         def loop_order_transform(prgm, bindings):
             prgm = drop_internal_reorders(prgm)
             assert isinstance(prgm, Plan)
-            prgm = self.set_loop_orders(prgm, stats, stats_factory, bindings)
+            prgm = self.set_loop_orders(prgm, stats, stats_factory)
             prgm = push_relabels(prgm)
             assert isinstance(prgm, Plan)
             prgm = concordize(prgm, bindings)
@@ -328,6 +308,5 @@ class DefaultLoopOrderer(AbstractLoopOrderer):
         prgm: Plan,
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
-        bindings: Mapping[Alias, TensorFType] | None = None,
     ) -> Plan:
         return heuristic_loop_order(prgm)

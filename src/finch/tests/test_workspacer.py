@@ -10,8 +10,16 @@ from finch import ffuncs
 from finch.algebra import StaticFillFType, TensorFType, ftype
 from finch.autoschedule import CompilerFormLowerer, NotationGenerator
 from finch.autoschedule.capture import LogicCapture
-from finch.autoschedule.cost_models import PROTOCOL_COST_MODEL, Prefix, WriteBasis
-from finch.autoschedule.formatter.smart_formatter import CostFormatter
+from finch.autoschedule.cost_models import (
+    PROTOCOL_BASIS,
+    PROTOCOL_COST_MODEL,
+    CostModel,
+    DenseLevelOption,
+    Prefix,
+    SparseListLevelOption,
+    WriteBasis,
+)
+from finch.autoschedule.formatter.smart_formatter import CostFormatter, format_ftype
 from finch.autoschedule.loop_orderer import BFSLoopOrderer
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.tensor_stats import (
@@ -27,7 +35,9 @@ from finch.autoschedule.util import fuse_loop_order
 from finch.autoschedule.workspacer import (
     LogicWorkspacer,
     add_1d_workspaces,
+    add_cost_effective_reformats,
     add_cost_effective_workspaces,
+    add_reformat,
     add_workspace,
     workspace_depth,
 )
@@ -363,3 +373,57 @@ def test_scatter_workspaces_store_the_one_field_scattered_into():
     query = fuse_loop_order(Query(Table(c, (i, k, m)), rhs), (i, j, k, m))
     plan = Plan((query, Produces((c,))))
     assert add_1d_workspaces(plan, {}) == plan
+
+
+def test_add_reformat_copies_an_input_before_the_program():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, c, copy = (HardAlias(name) for name in ("a", "b", "c", "a_copy"))
+    plan, _ = _matmul(c, a, b, (i, k, j))
+    staged = add_reformat(plan, a, (i, j), copy)
+
+    rhs = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(ffuncs.mul), (Table(copy, (i, j)), Table(b, (j, k)))),
+        (j,),
+    )
+    assert staged == Plan(
+        (
+            fuse_loop_order(Query(Table(copy, (i, j)), Table(a, (i, j))), (i, j)),
+            fuse_loop_order(Query(Table(c, (i, k)), rhs), (i, k, j)),
+            Produces((c,)),
+        )
+    )
+    tensor = fl.asarray(np.ones((2, 2)))
+    bindings: dict[Alias, TensorFType] = {a: tensor.ftype, b: tensor.ftype}
+    LoopOrderedForm.validate_inputs(staged, bindings, {}, DCStatsFactory())
+
+
+def test_reformats_copy_inputs_where_they_cost_less():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
+    rng = np.random.default_rng(0)
+    sf = DCStatsFactory()
+    stats: dict[Alias, TensorStats] = {
+        a: sf(fl.asarray(rng.random((8, 8))), (i, j)),
+        b: sf(fl.asarray(rng.random((8, 8))), (j, k)),
+    }
+    fill = StaticFillFType(np.float64(0.0))
+    shape = (ftype(np.intp),) * 2
+    bindings: dict[Alias, TensorFType] = {
+        a: format_ftype([DenseLevelOption()] * 2, fill, shape),
+        b: format_ftype([SparseListLevelOption()] * 2, fill, shape),
+    }
+    # Looping over k before j reads a once for each k, so where the visits of
+    # dense levels cost, a copy of a read once into another format pays.
+    plan, _ = _matmul(c, a, b, (i, k, j))
+    dense_visits = CostModel(
+        PROTOCOL_BASIS,
+        [float(name == "dense.follow.visits") for name in PROTOCOL_BASIS.feature_names],
+    )
+    staged = add_cost_effective_reformats(plan, bindings, stats, sf, dense_visits)
+    copy = HardAlias("a_copy")
+    assert staged == add_reformat(plan, a, (i, j), copy)
+    # Where nothing costs, no copy pays for itself.
+    free = CostModel(PROTOCOL_BASIS, np.zeros(PROTOCOL_BASIS.n_features))
+    assert add_cost_effective_reformats(plan, bindings, stats, sf, free) == plan

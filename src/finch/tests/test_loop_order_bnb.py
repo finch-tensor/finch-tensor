@@ -40,7 +40,6 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
-    Follow,
     Fuse,
     HardAlias,
     Literal,
@@ -51,7 +50,6 @@ from finch.finch_logic import (
     QueryInto,
     Table,
     TensorStats,
-    Walk,
 )
 from finch.symbolic import PostOrderDFS
 from finch.tensor import dense, element, fiber_tensor, sparse_list
@@ -344,7 +342,7 @@ def test_loop_orderers_refresh_stats_of_redefined_aliases(
         (BruteForceLoopOrderer, loop_order_bnb, "loop_order_brute_force"),
     ],
 )
-def test_loop_orderers_price_inputs_as_their_formats_read_them(
+def test_loop_orderers_price_reads_whatever_their_formats(
     monkeypatch, orderer, module, search
 ):
     i = Field("i")
@@ -355,7 +353,6 @@ def test_loop_orderers_price_inputs_as_their_formats_read_them(
     query = Query(
         Table(out, ()), Aggregate(Literal(ffuncs.add), Literal(0.0), product, (i,))
     )
-    plan = Plan((query, Produces((out,))))
     seen = []
 
     def choose(expr, stats_factory, stats, output_vars, **kwargs):
@@ -375,16 +372,9 @@ def test_loop_orderers_price_inputs_as_their_formats_read_them(
             if isinstance(node, Table) and node.tns != out
         ]
 
-    # A list is walked and a dense level is looked up, while z, which isn't
-    # formatted yet, as an intermediate isn't when loops are ordered, walks.
-    ordered = orderer().set_loop_orders(plan, stats, sf, {x: lists, y: full})
-    assert protocols(seen[-1]) == [(Walk(),), (Follow(),), ()]
-    # The program keeps the reads it was given, for the protocol optimizer.
-    assert protocols(ordered) == [(), (), ()]
-    orderer().set_loop_orders(plan, stats, sf)
-    assert protocols(seen[-1]) == [(), (), ()]
-    # The loader passes the formats of its inputs on, and an intermediate
-    # has none yet.
+    # The workspacer may copy an input into any format, so the loops are priced
+    # from the stats of the tensors alone, and every read walks, whatever the
+    # format bound to it.
     copy = Query(Table(z, (i,)), Table(x, (i,)))
     orderer()(Plan((copy, query, Produces((out,)))), {x: lists, y: full}, stats, sf)
-    assert sorted(map(len, protocols(seen[-1]))) == [0, 1, 1]
+    assert protocols(seen[-1]) == [(), (), ()]
