@@ -1,6 +1,6 @@
 # Finch kernel
 eval(let
-        v0 = Finch.Tensor(Finch.DenseLevel(Finch.SparseListLevel(Finch.ElementLevel(0, FinchInterop.Buffer(Int64[])), 1, Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), Finch.PlusOneVector(FinchInterop.Buffer(Int64[]))), 1))
+        v0 = Finch.Tensor(Finch.DenseLevel(Finch.SparseListLevel{Int64}(Finch.ElementLevel(0, FinchInterop.Buffer(Int64[])), 1, Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), Finch.PlusOneVector(FinchInterop.Buffer(Int64[]))), 1))
         v1 = Finch.window(Finch.randommask((1,), 0.5; seed=UInt64(14276969152011380360)), Finch.Extent(1, 1))
         v2 = Finch.window(Finch.randommask((1,), 0.5; seed=UInt64(8095878257575067585)), Finch.Extent(1, 1))
         v3 = Finch.Tensor(Finch.SparseHashLevel{Int64}(Finch.SparseHashLevel{Int64}(Finch.ElementLevel(0, FinchInterop.Buffer(Int64[])), 1, 1, Finch.SPARSE_HASH_POS_MULTIPLIER, Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), FinchInterop.Buffer(UInt8[]), Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), Finch.PlusOneVector(FinchInterop.Buffer(Tuple{Int64,Int64,UInt8}[]), (1, 2)), Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), FinchInterop.Buffer(Int[0])), 1, 1, Finch.SPARSE_HASH_POS_MULTIPLIER, Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), FinchInterop.Buffer(UInt8[]), Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), Finch.PlusOneVector(FinchInterop.Buffer(Tuple{Int64,Int64,UInt8}[]), (1, 2)), Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), FinchInterop.Buffer(Int[0])))

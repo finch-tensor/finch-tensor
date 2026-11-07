@@ -36,6 +36,7 @@ from finch.autoschedule.tensor_stats import (
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.tensor_stats.uniform_stats import UniformStats
 from finch.autoschedule.util import fuse_loop_order
+from finch.autoschedule.workspacer import add_workspace
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -431,3 +432,31 @@ def test_storage_basis_prices_what_each_query_writes():
     )
     columns = [names.index(f"element.{name}") for name in ("values", "value_bytes")]
     np.testing.assert_allclose(np.array(rows[1])[:, columns], [[n, 8 * n] for n in nnz])
+
+
+def _matmul(c, a, b, loop_order):
+    # c[i, k] = sum_j a[i, j] * b[j, k], looping over loop_order.
+    i, j, k = Field("i"), Field("j"), Field("k")
+    rhs = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k)))),
+        (j,),
+    )
+    return Plan(
+        (fuse_loop_order(Query(Table(c, (i, k)), rhs), loop_order), Produces((c,)))
+    ), rhs
+
+
+def test_sparse_list_levels_reject_scatter_writes():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, c, w = (HardAlias(name) for name in "abcw")
+    plan, _ = _matmul(c, a, b, (i, j, k))
+    staged = add_workspace(plan, c, 1, w)
+    options = [SparseListLevelOption()]
+
+    # The query scatters into the columns of c, but the copy writes them in
+    # order, and both write the rows of c in order.
+    assert allowed_options(c, 1, plan, options) == []
+    assert allowed_options(c, 1, staged, options) == options
+    assert allowed_options(c, 0, plan, options) == options
