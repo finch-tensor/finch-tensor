@@ -58,6 +58,7 @@ from finch.autoschedule.formatter.smart_formatter import (
     format_ftype,
     optimize_formats,
 )
+from finch.autoschedule.tensor_stats.memo_stats import MemoStatsFactory
 from finch.autoschedule.util import fuse_loop_order
 from finch.autoschedule.workspacer import add_cost_effective_workspaces
 from finch.finch_logic import (
@@ -199,6 +200,14 @@ def read_inputs(
     }
 
 
+def record_stats_factory(record: Mapping[str, Any]) -> StatsFactory:
+    """
+    The exact stats of the inputs of the example of record, memoized, since
+    the optimizers rebuild the same stats for every option they price.
+    """
+    return MemoStatsFactory(KroneckerStatsFactory(record["block_bits"]))
+
+
 def input_stats(
     plan: LogicStatement,
     inputs: Mapping[Alias, KroneckerTensor],
@@ -273,7 +282,7 @@ def resolve(
         for name, kinds in variant.get("formats", {}).items()
     }
     inputs = read_inputs(record, plan, inputs)
-    stats_factory = KroneckerStatsFactory(record["block_bits"])
+    stats_factory = record_stats_factory(record)
     if "formats" not in variant:
         formats = choose_formats(plan, inputs, stats_factory, models["format"])
         bindings = {
@@ -347,7 +356,7 @@ def featurize_record(
     orderer prices them, and its outputs without protocols.
     """
     stage = record["stage"]
-    stats_factory = KroneckerStatsFactory(record["block_bits"])
+    stats_factory = record_stats_factory(record)
     saved = record.get("formats", {})
     rows = []
     for index, variant in enumerate(record["variants"]):
