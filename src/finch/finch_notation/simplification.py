@@ -1,5 +1,5 @@
 from finch import finch_notation as ntn
-from finch.algebra import FinchOperatorFType, is_annihilator, is_identity
+from finch.algebra import FinchOperatorFType, is_identity
 from finch.compile import looplets
 from finch.symbolic import simplify_rules
 from finch.symbolic.rewriters import Chain, Fixpoint, PostWalk, Rewrite
@@ -16,33 +16,17 @@ class LoopletSimplify(UnvalidatedForm, NotationTransform):
     @staticmethod
     def simplify(term: ntn.NotationNode):
         match term:
-            case ntn.Call(
-                ntn.NotationExpression(result_type=FinchOperatorFType() as op_type),
-                args,
+            # A run of a literal reads as that literal everywhere, so the read
+            # is replaced by the literal for the other rules to fold.
+            case ntn.Unwrap(
+                ntn.Access(
+                    ntn.Looplet(looplets.Run(ntn.Full(ntn.Literal(val))), _),
+                    ntn.Read(),
+                    _,
+                )
             ):
-                for arg in args:
-                    match arg:
-                        case ntn.Unwrap(
-                            ntn.Access(
-                                ntn.Looplet(
-                                    looplets.Run(ntn.Full(ntn.Literal(val))), _
-                                ) as tns,
-                                ntn.Read() as mode,
-                                idxs,
-                            )
-                        ):
-                            if is_annihilator(op_type, val):
-                                return ntn.Unwrap(ntn.Access(tns, mode, idxs))
-            case ntn.If(
-                ntn.Unwrap(
-                    ntn.Access(
-                        ntn.Looplet(looplets.Run(ntn.Full(ntn.Literal(val))), _),
-                        ntn.Read(),
-                        _,
-                    )
-                ),
-                body,
-            ):
+                return ntn.Literal(val)
+            case ntn.If(ntn.Literal(val), body):
                 return body if val else ntn.Block(())
             # Incrementing by the identity of the update leaves the tensor as
             # it was, so the increment, and any write it would cause, is dropped.
@@ -56,14 +40,7 @@ class LoopletSimplify(UnvalidatedForm, NotationTransform):
                     ),
                     _,
                 ),
-                ntn.Literal(val)
-                | ntn.Unwrap(
-                    ntn.Access(
-                        ntn.Looplet(looplets.Run(ntn.Full(ntn.Literal(val))), _),
-                        ntn.Read(),
-                        _,
-                    )
-                ),
+                ntn.Literal(val),
             ) if is_identity(op_type, val):
                 return ntn.Block(())
             case ntn.Loop(_, _, ntn.Block(())):
