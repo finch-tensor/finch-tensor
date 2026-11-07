@@ -40,7 +40,9 @@ class Prefix:
     output_vars orders the output of the query, when there is one, and output
     is the tensor it writes. formats, which bases that price formatted tensors
     need, lists the level options each alias stores, outermost first, as
-    level_formats lists them.
+    level_formats lists them. ordering says the prefix is priced by a loop
+    orderer, before concordize and formatting, when the format of a read is
+    known only for an input read in its stored order.
     """
 
     prefix: tuple[Field, ...]
@@ -48,6 +50,7 @@ class Prefix:
     output_vars: tuple[Field, ...] | None = None
     formats: Mapping[Alias, Any] | None = field(default=None, compare=False, hash=False)
     output: Alias | Literal | None = None
+    ordering: bool = False
 
 
 def prefixes(
@@ -119,18 +122,29 @@ class LoopSpaces(Generic[NS]):
     tables it merges, restricted as their formats and protocols allow, as
     unrestricted says. A table whose formats the prefix doesn't list is taken
     to be sparse, and a table without protocols walks the field of the loop.
+    When the prefix is priced for ordering loops, a read whose format isn't
+    known yet, as protocol says, gallops or walks instead.
     """
 
     def __init__(self, component: Prefix, machine: StatsMachine[NS]):
         self.machine = machine
         self.stats_factory = machine.stats_factory
+        self.loops = component.prefix
         self.parent = set(component.prefix[:-1])
         self.idx = component.prefix[-1]
+        self.ordering = component.ordering
         match component.expr:
             case Aggregate(arg=arg):
                 self.arg = arg
             case expr:
                 self.arg = expr
+        # The reads of each field, which meet where it has more than one.
+        self.readers: dict[Field, int] = {}
+        for node in PostOrderDFS(self.arg):
+            match node:
+                case Table(_, idxs):
+                    for idx in idxs:
+                        self.readers[idx] = self.readers.get(idx, 0) + 1
         # The extent of each field, from the tables which read it, and the
         # field of each level of each and whether it doesn't filter, outermost
         # first, where the formats list level options.
@@ -164,10 +178,24 @@ class LoopSpaces(Generic[NS]):
         return restrict(self.stats_factory, stat, {*self.parent, *fields} - {*followed})
 
     def protocol(self, node: Term) -> Protocol:
-        """The protocol node reads the field of the loop with."""
+        """
+        The protocol node reads the field of the loop with. When ordering
+        loops, the format of a read is known only for an input read in its
+        stored order. An intermediate is formatted later, and a table read out
+        of its stored order through a copy which concordize makes and which is
+        formatted later too, so either may gallop where it meets another read
+        of the field, as the protocols chosen then may, and walks otherwise.
+        """
         match node:
-            case Table(_, idxs, (_, *_) as protocols) if self.idx in idxs:
-                return protocols[idxs.index(self.idx)]
+            case Table(_, idxs, protocols) if self.idx in idxs:
+                if self.ordering:
+                    read = [idx for idx in self.loops if idx in idxs]
+                    if not protocols or read != list(idxs[: len(read)]):
+                        if self.readers[self.idx] > 1:
+                            return Gallop()
+                        return DefaultProtocol()
+                if protocols:
+                    return protocols[idxs.index(self.idx)]
         return DefaultProtocol()
 
     def unrestricted(self, table: Table, fields) -> set[Field]:

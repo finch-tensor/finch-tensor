@@ -18,6 +18,7 @@ from finch.autoschedule.cost_models import (
     TransposeBasis,
     WriteBasis,
 )
+from finch.autoschedule.cost_models.loop_cost_models import LoopSpaces
 from finch.autoschedule.loop_orderer import loop_order_bnb, loop_order_greedy
 from finch.autoschedule.loop_orderer.loop_order_bnb import (
     BFSLoopOrderer,
@@ -38,8 +39,11 @@ from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    DefaultProtocol,
     Field,
+    Follow,
     Fuse,
+    Gallop,
     HardAlias,
     Literal,
     MapJoin,
@@ -49,6 +53,7 @@ from finch.finch_logic import (
     QueryInto,
     Table,
     TensorStats,
+    Walk,
 )
 
 
@@ -328,3 +333,64 @@ def test_loop_orderers_refresh_stats_of_redefined_aliases(
         plan, {a: factory(sparse, (i,)), b: factory(dense, (i,))}, factory
     )
     assert seen == [5]
+
+
+@pytest.mark.parametrize(
+    "search", [loop_order_bfs, loop_order_dfs, loop_order_brute_force, greedy_loop_order]
+)
+def test_loop_orderers_read_a_csr_out_of_order_through_its_copy(search):
+    # X[i, k] = sum_j A[i, j] B[k, j] of CSR tensors. Looping over k within i
+    # follows the dense rows of B at every k, for every i: all n^2 of them.
+    # Looping over j and then k reads B through a transposed copy, which walks
+    # its rows; when ordering loops it is priced as that copy will be read, not
+    # with the protocols of the rows of B, which would price the walk of the
+    # copy over all n slots of each of its rows, more than n^2 at 3 a row.
+    rng = np.random.default_rng(0)
+    n = 200
+    data = np.zeros((n, n))
+    data[np.repeat(np.arange(n), 3), rng.integers(0, n, 3 * n)] = 1.0
+    sf = DCStatsFactory()
+    i, j, k = (Field(name) for name in "ijk")
+    a, b = HardAlias("a"), HardAlias("b")
+    stats: dict[Alias, TensorStats] = {
+        a: sf(fl.asarray(data), (i, j)),
+        b: sf(fl.asarray(data), (k, j)),
+    }
+    csr = (Follow(), Walk())
+    expr = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(ffuncs.mul), (Table(a, (i, j), csr), Table(b, (k, j), csr))),
+        (j,),
+    )
+    assert search(expr, sf, stats, (i, k), ordering=True) == (i, j, k)
+
+
+@pytest.mark.parametrize("order", ["ij", "ji"])
+def test_ordering_gallops_the_shared_fields_of_reads_not_yet_formatted(order):
+    # Y[j] = sum_i X[i, j] v[i] of an intermediate X, which has no protocols
+    # until it is formatted: in either loop order it may gallop where it meets
+    # v, at i, and walks j, which it reads alone.
+    sf = DCStatsFactory()
+    i, j = Field("i"), Field("j")
+    x, v = HardAlias("x"), HardAlias("v")
+    stats: dict[Alias, TensorStats] = {
+        x: sf(fl.asarray(np.eye(4)), (i, j)),
+        v: sf(fl.asarray(np.ones(4)), (i,)),
+    }
+    read = Table(x, (i, j))
+    expr = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(ffuncs.mul), (read, Table(v, (i,), (Walk(),)))),
+        (i,),
+    )
+    loops = tuple(Field(name) for name in order)
+    machine = StatsMachine(sf, dict(stats))
+    protocols = {
+        loops[n - 1]: LoopSpaces(
+            Prefix(loops[:n], expr, (j,), ordering=True), machine
+        ).protocol(read)
+        for n in (1, 2)
+    }
+    assert protocols == {i: Gallop(), j: DefaultProtocol()}
