@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import math
+from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
 
+from finch.algebra import ftype, ftypes
 from finch.algebra.tensor import TensorFType
 from finch.autoschedule.cost_models import (
     PROTOCOL_COST_MODEL,
@@ -11,9 +14,11 @@ from finch.autoschedule.cost_models import (
 )
 from finch.autoschedule.formatter.smart_formatter import (
     LEVEL_OPTIONS,
-    program_cost,
+    optimize_formats,
 )
 from finch.autoschedule.stages import LoopOrderedForm
+from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
+from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.util import flatten_plans, fuse_loop_order
 from finch.finch_assembly import AssemblyLibrary
 from finch.finch_logic import (
@@ -114,37 +119,79 @@ def add_workspace(
 def stage_workspaces(
     prgm: Plan,
     bindings: Mapping[Alias, TensorFType],
-    keep: Callable[[Plan, Plan, int, int], bool],
+    keep: Callable[[Plan, Plan, HardAlias, HardAlias], bool],
 ) -> Plan:
     """
     Redirect each query of prgm which scatters into an output of prgm into a
     workspace fused over the fields it writes in loop order, as add_workspace
     does, if the workspace stores fewer fields than the output, and keep, given
-    prgm, the program with the workspace, the fields the workspace is fused
-    over, and the fields of the output, keeps it. The inputs of bindings have
-    no workspaces.
+    prgm, the program with the workspace, the output, and the workspace, keeps
+    it. The inputs of bindings have no workspaces.
     """
     prgm = flatten_plans(prgm)
     spc = Namespace(prgm)
-    outputs: dict[HardAlias, int] = {}
+    outputs: dict[HardAlias, None] = {}
     for node in PostOrderDFS(prgm):
         match node:
-            case Query(Table(HardAlias() as lhs, idxs), _) if lhs not in bindings:
-                outputs[lhs] = len(idxs)
-    for alias, rank in outputs.items():
+            case Query(Table(HardAlias() as lhs, _), _) if lhs not in bindings:
+                outputs[lhs] = None
+    for alias in outputs:
         depth = workspace_depth(prgm, alias)
         if not depth:
             continue
-        staged = add_workspace(
-            prgm, alias, depth, HardAlias(spc.freshen(alias.name, "ws"))
-        )
+        ws = HardAlias(spc.freshen(alias.name, "ws"))
+        staged = add_workspace(prgm, alias, depth, ws)
         assert isinstance(staged, Plan)
-        if keep(prgm, staged, depth, rank):
+        if keep(prgm, staged, alias, ws):
             prgm = staged
     return prgm
 
 
-def add_workspaces(
+def format_cost(
+    prgm: LogicStatement,
+    bindings: Mapping[Alias, TensorFType],
+    stats: Mapping[Alias, TensorStats],
+    stats_factory: StatsFactory,
+    cost_model: CostModel[ProtocolChoice],
+    options: Sequence[LevelOption] = LEVEL_OPTIONS,
+) -> tuple[dict[Alias, TensorFType], float]:
+    """
+    The formats of the aliases prgm defines which bindings doesn't format, as
+    optimize_formats chooses them, and the cost of prgm with them under
+    cost_model, once choose_protocols chooses its protocols.
+    """
+    shape_types = prgm.infer_shape_type(
+        {var: val.shape_type for var, val in bindings.items()}
+    )
+    # Each new alias stores the fields its first definition doesn't fuse.
+    nfused: dict[Alias, int] = {}
+    for node in PostOrderDFS(prgm):
+        match node:
+            case Query(Table(Alias() as lhs, _), _) | QueryInto(
+                Table(Alias() as lhs, _), _, _
+            ) if lhs.unfused not in bindings:
+                nfused.setdefault(lhs.unfused, lhs.nfused)
+    stored = {
+        alias: tuple(
+            ftype(dim) if dim is not None else ftypes.intp
+            for dim in shape_types[alias][n:]
+        )
+        for alias, n in nfused.items()
+    }
+    fill_types = prgm.infer_fill_type(
+        {var: val.fill_type for var, val in bindings.items()}
+    )
+    return optimize_formats(
+        prgm, bindings, stats, stats_factory, stored, fill_types, cost_model, options
+    )
+
+
+def is_dense(stats: TensorStats) -> bool:
+    assert isinstance(stats, NumericStats)
+    return stats.estimate_non_fill_values() >= 0.5 * math.prod(stats.dim_sizes.values())
+
+
+def add_cost_effective_workspaces(
     prgm: Plan,
     bindings: Mapping[Alias, TensorFType],
     stats: Mapping[Alias, TensorStats],
@@ -153,39 +200,42 @@ def add_workspaces(
     options: Sequence[LevelOption] = LEVEL_OPTIONS,
 ) -> Plan:
     """
-    Stage the workspaces of prgm, as stage_workspaces does, which make prgm
-    cost less under cost_model, once the formats and protocols of each program
-    are chosen, as program_cost prices them.
+    Add workspaces that improve cost, as defined by the format_cost function.
+    Because this relies on further optimization, we need to be a bit careful
+    to only reoptimize formats for the current alias and workspace.
     """
-    costs: dict[Plan, float] = {}
+    # The formats and cost of the program so far, found when a workspace is
+    # first priced, and updated with each workspace kept.
+    formats: dict[Alias, TensorFType] | None = None
+    cost = math.inf
 
-    def cost(stmt: Plan) -> float:
-        if stmt not in costs:
-            costs[stmt] = program_cost(
-                stmt, bindings, stats, stats_factory, cost_model, options
+    def keep(prgm, staged, alias, ws) -> bool:
+        nonlocal formats, cost
+        machine = StatsMachine(stats_factory, OrderedDict(stats))
+        machine(prgm)
+        if is_dense(machine.bindings[alias]):
+            return False
+        if formats is None:
+            formats, cost = format_cost(
+                prgm, bindings, stats, stats_factory, cost_model, options
             )
-        return costs[stmt]
+        fixed = {tns: fmt for tns, fmt in formats.items() if tns != alias}
+        staged_formats, staged_cost = format_cost(
+            staged, {**bindings, **fixed}, stats, stats_factory, cost_model, options
+        )
+        if staged_cost < cost:
+            formats, cost = {**fixed, **staged_formats}, staged_cost
+            return True
+        return False
 
-    return stage_workspaces(
-        prgm, bindings, lambda prgm, staged, _, __: cost(staged) < cost(prgm)
-    )
-
-
-def add_scatter_workspaces(prgm: Plan, bindings: Mapping[Alias, TensorFType]) -> Plan:
-    """
-    Stage the workspaces of prgm, as stage_workspaces does, which store one
-    field, the only one the query scatters into, without pricing them.
-    """
-    return stage_workspaces(
-        prgm, bindings, lambda _, __, depth, rank: rank - depth == 1
-    )
+    return stage_workspaces(prgm, bindings, keep)
 
 
 class LogicWorkspacer(LoopOrderedForm, LogicLoader):
     """
     Pass a program in LoopOrderedForm to ctx, after redirecting the queries
     which scatter into their outputs into workspaces where they cost less
-    under cost_model, by default PROTOCOL_COST_MODEL, as add_workspaces
+    under cost_model, by default PROTOCOL_COST_MODEL, as add_cost_effective_workspaces
     does. A loop orderer wraps it, so that the copies out of workspaces aren't
     propagated, and the formatter it wraps should price programs with the same
     model.
@@ -211,17 +261,34 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
         stats_factory: StatsFactory,
     ) -> tuple[AssemblyLibrary, dict[Alias, TensorFType]]:
         assert isinstance(prgm, Plan)
-        prgm = add_workspaces(
+        prgm = add_cost_effective_workspaces(
             prgm, bindings, stats, stats_factory, self.cost_model, self.options
         )
         return self.ctx(prgm, bindings, stats, stats_factory)
+
+
+def add_1d_workspaces(prgm: Plan, bindings: Mapping[Alias, TensorFType]) -> Plan:
+    """
+    Stage the workspaces of prgm, as stage_workspaces does, which store one
+    field, the only one the query scatters into, without pricing them.
+    """
+
+    def keep(_, staged, __, ws) -> bool:
+        # The workspace stores the fields of its table which it isn't fused over.
+        for node in PostOrderDFS(staged):
+            match node:
+                case Table(FusedAlias(alias=tns, n=n), idxs) if tns == ws:
+                    return len(idxs) - n == 1
+        return False
+
+    return stage_workspaces(prgm, bindings, keep)
 
 
 class DefaultLogicWorkspacer(LoopOrderedForm, LogicLoader):
     """
     Pass a program in LoopOrderedForm to ctx, after redirecting the queries
     which scatter into one field of their outputs into workspaces, as
-    add_scatter_workspaces does, without statistics. A loop orderer wraps it,
+    add_1d_workspaces does, without statistics. A loop orderer wraps it,
     so that the copies out of workspaces aren't propagated.
     """
 
@@ -236,5 +303,5 @@ class DefaultLogicWorkspacer(LoopOrderedForm, LogicLoader):
         stats_factory: StatsFactory,
     ) -> tuple[AssemblyLibrary, dict[Alias, TensorFType]]:
         assert isinstance(prgm, Plan)
-        prgm = add_scatter_workspaces(prgm, bindings)
+        prgm = add_1d_workspaces(prgm, bindings)
         return self.ctx(prgm, bindings, stats, stats_factory)

@@ -8,7 +8,7 @@ from itertools import chain as join_chains
 from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
 from finch.autoschedule.factorizer.optimize import with_unique_lhs
-from finch.autoschedule.protocolize import protocolize
+from finch.autoschedule.protocolizer import protocolize
 from finch.autoschedule.stages import LogicLoopOrderer
 from finch.autoschedule.util import (
     flatten_plans,
@@ -148,15 +148,16 @@ def drop_internal_reorders(root: LogicStatement) -> LogicStatement:
 
 def with_copy_loop_orders(root: Plan) -> Plan:
     """
-    Set the loop order of each copy, which visits the fields of its left-hand
-    table in order and then the fields it reduces. A copy may read its argument
-    in another order, representing a transpose.
+    Set the loop order of each copy, which visits the fields of its argument in
+    the order it stores them, and then the fields only its left-hand table has.
+    A transposing copy reads its argument in order and scatters into its
+    left-hand table, rather than reading a sparse argument out of order.
     """
 
     def loop_ordered(stmt: LogicStatement) -> LogicStatement:
         match stmt:
             case Query(Table(_, lhs_idxs), Table(_, idxs)):
-                return fuse_loop_order(stmt, (*lhs_idxs, *setdiff(idxs, lhs_idxs)))
+                return fuse_loop_order(stmt, (*idxs, *setdiff(lhs_idxs, idxs)))
         return stmt
 
     return Plan(tuple(loop_ordered(body) for body in root.bodies))
@@ -189,8 +190,12 @@ def toposort(chains: list[list[Field]]) -> tuple[Field, ...]:
     return tuple(perm)
 
 
-def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
-    chains = []
+def _heuristic_loop_order(
+    root: LogicExpression, output: tuple[Field, ...] = ()
+) -> tuple[Field, ...]:
+    # The output is ordered like an input, so that it is written in the order
+    # it stores its fields in, unless the inputs disagree.
+    chains = [list(intersect(output, root.fields()))]
     for node in PostOrderDFS(root):
         match node:
             case Table(_, idxs_1):
@@ -219,17 +224,16 @@ def with_loop_order(
 ) -> LogicStatement:
     """
     Set the loop order of an aggregate query or in-place update by wrapping it
-    in a Fuse node for each field of the loop order. A query can't change the
-    layout of the table it writes, so its loop order is permuted to visit the
-    fields of that table in order, and includes the fields which only that
-    table has, such as output-only unit dimensions.
+    in a Fuse node for each field of the loop order, followed by the fields
+    which only the table it writes has, such as output-only unit dimensions.
+    The loop order may visit the fields of that table out of the order it
+    stores them in, in which case the query scatters into the table.
     """
     match stmt:
         case Query(Table(_, lhs_idxs), Aggregate()) | QueryInto(
             Table(_, lhs_idxs), _, _
         ):
-            loop_order = with_subsequence(intersect(lhs_idxs, loop_order), loop_order)
-            loop_order = toposort([list(loop_order), list(lhs_idxs)])
+            loop_order = (*loop_order, *setdiff(lhs_idxs, loop_order))
             return fuse_loop_order(stmt, loop_order)
         case _:
             raise ValueError(f"Expected an aggregate or in-place query, got {stmt}")
@@ -250,10 +254,9 @@ def priced_expr(
     match query:
         case QueryInto():
             query = query.as_query()
-    if bindings:
-        query = protocolize(query, bindings)
-    assert isinstance(query, Query)
-    return query.rhs
+    stmt = protocolize(query, bindings) if bindings else query
+    assert isinstance(stmt, Query)
+    return stmt.rhs
 
 
 def heuristic_loop_order(plan: Plan) -> Plan:
@@ -264,8 +267,10 @@ def heuristic_loop_order(plan: Plan) -> Plan:
             match query:
                 case QueryInto(_, _, Literal()):
                     return query
-                case Query(_, Aggregate(_, _, arg, _)) | QueryInto(_, _, arg):
-                    return with_loop_order(query, _heuristic_loop_order(arg))
+                case Query(Table(_, lhs_idxs), Aggregate(_, _, arg, _)) | QueryInto(
+                    Table(_, lhs_idxs), _, arg
+                ):
+                    return with_loop_order(query, _heuristic_loop_order(arg, lhs_idxs))
                 case Query(_, Table(Alias(), _)) as q:
                     return q
                 case _:

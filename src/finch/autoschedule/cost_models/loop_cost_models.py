@@ -1,3 +1,4 @@
+import threading
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Generic
@@ -151,7 +152,9 @@ class LoopSpaces(Generic[NS]):
         # and its merge steps only where every fiber it merges has positions
         # at idx.
         self.exec_space = self.stats_factory.support(self.merged(self.arg))
-        self.merge_space = self.project(self.merged(self.arg, (self.idx,)))
+        self._merged_at_idx = self.merged(self.arg, (self.idx,))
+        self.merge_space = self.project(self._merged_at_idx)
+        self._visited: NS | None = None
 
     def project(self, stat: NS, fields=(), followed=()) -> NS:
         """
@@ -227,11 +230,13 @@ class LoopSpaces(Generic[NS]):
 
     def visited(self) -> NS:
         """Where the loop visits idx, which its walks and gallops restrict."""
-        return self.stats_factory.mapjoin(
-            ffuncs.and_,
-            self.exec_space,
-            self.stats_factory.support(self.merged(self.arg, (self.idx,))),
-        )
+        if self._visited is None:
+            self._visited = self.stats_factory.mapjoin(
+                ffuncs.and_,
+                self.exec_space,
+                self.stats_factory.support(self._merged_at_idx),
+            )
+        return self._visited
 
     def located(self, stat: NS, fields) -> float:
         """
@@ -256,6 +261,37 @@ class LoopSpaces(Generic[NS]):
 
     def walk(self, table: Table) -> float:
         return self.count(self.stepped(table))
+
+
+# The LoopSpaces built last in each thread, with what it was built from.
+_last_spaces = threading.local()
+
+
+def loop_spaces(component: Prefix, machine: StatsMachine[NS]) -> LoopSpaces[NS]:
+    """
+    The LoopSpaces of component, shared with the last call in this thread if it
+    was given the same prefix, by identity since prefixes compare without their
+    formats, and the same machine, binding the same stats to the aliases the
+    prefix reads. The accesses of a prefix, and the bases of a Concat, are
+    priced one after another, so they share it.
+    """
+    bound = []
+    for node in PostOrderDFS(component.expr):
+        match node:
+            case Alias():
+                bound.append(machine.bindings.get(node))
+    last = getattr(_last_spaces, "value", None)
+    if (
+        last is not None
+        and last[0] is component
+        and last[1] is machine
+        and len(last[2]) == len(bound)
+        and all(x is y for x, y in zip(last[2], bound, strict=True))
+    ):
+        return last[3]
+    spaces = LoopSpaces(component, machine)
+    _last_spaces.value = (component, machine, bound, spaces)
+    return spaces
 
 
 class PigeonBasis(LoopBasis, LoopOrderedForm):
@@ -298,7 +334,7 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
             return np.array(
                 [[0.0, 0.0, out_space.estimate_non_fill_values(), 0.0, 0.0]]
             )
-        spaces = LoopSpaces(component, machine)
+        spaces = loop_spaces(component, machine)
         idx = spaces.idx
         exec_space = spaces.exec_space
         inputs, walks, lookups = [], [], 0
@@ -442,7 +478,7 @@ class WriteBasis(LoopBasis, LoopOrderedForm):
             if not set(order) <= set(prefix) or prefix[-1] not in order:
                 continue
             if visits is None:
-                spaces = LoopSpaces(component, machine)
+                spaces = loop_spaces(component, machine)
                 visits = spaces.count(spaces.visited())
             if prefix == order:
                 features[0, 0] += visits

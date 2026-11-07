@@ -20,7 +20,6 @@ from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
 from finch.autoschedule.loop_orderer.loop_order_greedy import (
     GreedyLoopOrderer,
-    connected_loop_candidates,
     greedy_loop_order,
 )
 from finch.autoschedule.normalize import LogicNormalizer
@@ -150,22 +149,6 @@ def test_greedy_orderer_matches_reference_results():
         with fl.with_default_scheduler(scheduler):
             result = fl.compute(build())
         assert np.allclose(np.asarray(result), expected)
-
-
-def test_candidates_preserve_remaining_order():
-    """Candidates must stay ordered: iterating a set would make tie-breaking
-    depend on ``Field`` hashes, which differ between processes.
-    """
-    i, j, k = Field("i"), Field("j"), Field("k")
-
-    remaining = [k, j, i]
-    assert connected_loop_candidates((), remaining) == remaining
-
-    candidates = connected_loop_candidates((j,), [k, i])
-    assert isinstance(candidates, list)
-    assert candidates == [k, i]
-    assert connected_loop_candidates((j,), [i, k]) == [i, k]
-    assert connected_loop_candidates((i,), [k, j]) == [k, j]
 
 
 def test_greedy_order_breaks_ties_by_field_order():

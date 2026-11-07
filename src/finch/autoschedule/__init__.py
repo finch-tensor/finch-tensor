@@ -42,7 +42,7 @@ from .formatter.formatter import (
 from .formatter.smart_formatter import FDFormatter, SmartFormatter
 from .loop_orderer.loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
-from .protocolize import (
+from .protocolizer import (
     CostProtocolizer,
     LogicProtocolizer,
     optimize_protocols,
