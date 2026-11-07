@@ -22,7 +22,7 @@ from finch.finch_logic import (
     Table,
 )
 
-from .loop_ordering import AbstractLoopOrderer, with_loop_order
+from .loop_ordering import AbstractLoopOrderer, galloping, with_loop_order
 
 NS = TypeVar("NS", bound=NumericStats)
 
@@ -76,7 +76,7 @@ def set_greedy_loop_order(
             case Query(Table(_, out_idxs), Aggregate()) | QueryInto(
                 Table(_, out_idxs), _, _
             ):
-                arg = merged_expr(query)
+                arg = galloping(merged_expr(query))
                 idxs_2 = greedy_loop_order(
                     arg, stats_factory, stats_bindings, out_idxs, cost_model=cost_model
                 )

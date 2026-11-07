@@ -17,25 +17,36 @@ predicts to be fastest over that of the fastest, for each example.
 To show how the fit improves with data, a held-out tenth of the examples
 scores models fitted to growing subsets of the rest, and the relative R^2 and
 the median regret of each are printed and plotted next to EXAMPLES, to
-NAME.learning_curve.png. The model of the format stage is the one the physical
-optimizers use, read from src/finch/autoschedule/cost_models/
-protocol_cost_model.json, so a fit which should ship is written there.
+NAME.learning_curve.png. With --tune-cutoffs, the cutoffs of the classes of
+the writes of the loop basis are tuned first, as tune_cutoffs tunes them, and
+written with the model, which parse_models reads them back from. The model of
+the format stage is the one the physical optimizers use, read from
+src/finch/autoschedule/cost_models/protocol_cost_model.json, so a fit which
+should ship is written there.
 
     pixi run -e fitting python -m scripts.fitting.fit_physical_data \\
-        EXAMPLES [--basis NAME] [--model NAME=PATH]... [--seed S] [model.json]
+        EXAMPLES [--basis NAME] [--model NAME=PATH]... [--seed S] \\
+        [--tune-cutoffs] [model.json]
 """
 
 import argparse
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
+from scipy.optimize import differential_evolution
 
-import matplotlib.pyplot as plt
-
-from finch.autoschedule.cost_models import CostModel
+from finch.autoschedule.cost_models import CostModel, WriteClasses, write_class
 from scripts.fitting.generate_physical_data import record_inputs
-from scripts.fitting.physical_bases import BASES, featurize_record, parse_models
+from scripts.fitting.physical_bases import (
+    BASES,
+    TUNING_BASIS,
+    featurize_record,
+    loop_basis,
+    parse_models,
+    stratified,
+)
 
 
 def r_squared(predicted, actual) -> float:
@@ -100,6 +111,9 @@ def learning_curve(basis, features, runtimes, examples, rng, n_points=12):
 
 
 def plot_learning_curve(sizes, scores, medians, n_test, n_features, path) -> None:
+    # Only the fitting environment has matplotlib, and only plots need it.
+    import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots()
     # A model fitted to a few programs can score far below zero, so scores
     # below -1 are drawn at -1 and marked.
@@ -124,10 +138,10 @@ def plot_learning_curve(sizes, scores, medians, n_test, n_features, path) -> Non
     plt.close(fig)
 
 
-def featurize(records, name, models):
+def featurize(records, name, models, basis=None):
     features, runtimes, examples = [], [], []
     for i, record in enumerate(records, 1):
-        rows = featurize_record(record, record_inputs(record), name, models)
+        rows = featurize_record(record, record_inputs(record), name, models, basis)
         timed = record["runtimes"]
         for index, variant_rows in enumerate(rows):
             if str(index) in timed:
@@ -138,7 +152,67 @@ def featurize(records, name, models):
     return features, runtimes, examples
 
 
-def fit(data: Path, name, models, output: Path | None, seed) -> None:
+# The bounds of the log10 of each cutoff of WriteClasses which tune_cutoffs
+# searches: the entries of the scattered region, and the densities of the
+# output and of the iteration space, which sparse tensors and loops make tiny.
+CUTOFF_BOUNDS = [(1.0, 9.0), (-9.0, 0.0), (-9.0, 0.0)]
+
+
+def tune_cutoffs(raw, runtimes, examples, seed, folds=5, maxiter=40) -> WriteClasses:
+    """
+    The cutoffs of WriteClasses under which models of the loop basis, fitted
+    to raw, the rows of TUNING_BASIS of each variant, have the least mean log
+    regret over folds of the examples, each held out in turn, as differential
+    evolution finds them in the log10 of each cutoff. The regret is piecewise
+    constant in the cutoffs, so the search isn't polished by a gradient.
+    """
+    groups = by_example(examples)
+    names = list(np.random.default_rng(seed).permutation(list(groups)))
+    held = [set(names[k::folds]) for k in range(folds)]
+    runtimes = np.asarray(runtimes)
+    stacked = np.concatenate(raw)
+    starts = np.cumsum([0, *(len(rows) for rows in raw[:-1])])
+
+    def score(x) -> float:
+        classes = WriteClasses(*(10.0 ** np.asarray(x)))
+        basis = loop_basis(classes)
+        sums = np.add.reduceat(stratified(stacked, classes), starts, axis=0)
+        logs = []
+        for test in held:
+            train = [i for name in names if name not in test for i in groups[name]]
+            model = CostModel(basis, np.zeros(basis.n_features)).fit(
+                sums[train][:, None, :], runtimes[train]
+            )
+            predicted = sums @ model.coefficients
+            for name in test:
+                indices = groups[name]
+                if len(indices) > 1:
+                    chosen = indices[int(np.argmin(predicted[indices]))]
+                    logs.append(np.log(runtimes[chosen] / runtimes[indices].min()))
+        return float(np.mean(logs)) if logs else 0.0
+
+    default = np.log10(list(asdict(write_class).values()))
+    print(f"mean log regret at the default cutoffs {score(default):.4f}", flush=True)
+
+    def progress(intermediate_result):
+        print(
+            f"cutoffs {10.0**intermediate_result.x}: "
+            f"mean log regret {intermediate_result.fun:.4f}",
+            flush=True,
+        )
+
+    result = differential_evolution(
+        score,
+        CUTOFF_BOUNDS,
+        seed=seed,
+        maxiter=maxiter,
+        polish=False,
+        callback=progress,
+    )
+    return WriteClasses(*(10.0**result.x))
+
+
+def fit(data: Path, name, models, output: Path | None, seed, tune=False) -> None:
     records = json.loads(data.read_text())["examples"]
     if name is None:
         stages = {record["stage"] for record in records}
@@ -147,8 +221,18 @@ def fit(data: Path, name, models, output: Path | None, seed) -> None:
                 f"Expected examples of one stage, got {sorted(stages)}; pass --basis"
             )
         (name,) = stages
-    basis = BASES[name]
-    features, runtimes, examples = featurize(records, name, models)
+    classes = None
+    if tune:
+        if name != "loop":
+            raise ValueError(f"Only the loop basis has cutoffs to tune, not {name}")
+        raw, runtimes, examples = featurize(records, name, models, TUNING_BASIS)
+        classes = tune_cutoffs(raw, runtimes, examples, seed)
+        print(f"tuned cutoffs {classes}", flush=True)
+        basis = loop_basis(classes)
+        features = [stratified(rows, classes) for rows in raw]
+    else:
+        basis = BASES[name]
+        features, runtimes, examples = featurize(records, name, models)
     groups = by_example(examples)
     print(f"fitting to {len(features)} variants of {len(groups)} examples", flush=True)
     model = CostModel(basis, np.zeros(basis.n_features)).fit(features, runtimes)
@@ -181,7 +265,11 @@ def fit(data: Path, name, models, output: Path | None, seed) -> None:
         plot = data.parent / f"{name}.learning_curve.png"
         plot_learning_curve(sizes, scores, medians, n_test, basis.n_features, plot)
     if output is not None:
-        output.write_text(json.dumps(model.to_json(), indent=2))
+        saved = model.to_json()
+        if classes is not None:
+            # parse_models classes the writes of the model by these cutoffs.
+            saved["write_cutoffs"] = asdict(classes)
+        output.write_text(json.dumps(saved, indent=2))
 
 
 def main() -> None:
@@ -201,9 +289,21 @@ def main() -> None:
     parser.add_argument(
         "--seed", type=int, default=0, help="the seed which holds examples out"
     )
+    parser.add_argument(
+        "--tune-cutoffs",
+        action="store_true",
+        help="tune the cutoffs of the classes of writes of the loop basis",
+    )
     parser.add_argument("output", type=Path, nargs="?", metavar="model.json")
     args = parser.parse_args()
-    fit(args.data, args.basis, parse_models(args.model), args.output, args.seed)
+    fit(
+        args.data,
+        args.basis,
+        parse_models(args.model),
+        args.output,
+        args.seed,
+        args.tune_cutoffs,
+    )
 
 
 if __name__ == "__main__":

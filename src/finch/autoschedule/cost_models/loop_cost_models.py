@@ -1,3 +1,4 @@
+import math
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Generic
@@ -29,7 +30,7 @@ from finch.finch_logic import (
 )
 from finch.symbolic import PostOrderDFS, PostWalk, Rewrite, Term
 
-from .cost_models import NS, Basis, Concat, CostModel
+from .cost_models import NS, Basis, Concat, CostModel, Stratify
 
 
 @dataclass(frozen=True)
@@ -502,88 +503,140 @@ class TransposeBasis(LoopBasis, LoopOrderedForm):
 
 # The most entries a slice of a workspace may have, so that it can be reset and
 # copied out cheaply.
-WORKSPACE_LIMIT = 100_000
-
-
 class WriteBasis(LoopBasis, LoopOrderedForm):
     """
-    Count the writes to each level of the output of a query, at the loop which
-    reaches that level: the last loop over the fields of the levels from the
-    root to it. Where the loops up to it are those fields in storage order, the
-    level is written once for each of its indices, in order, and otherwise its
-    writes scatter, as util.write_protocols infers. The element level is written
-    with its parent.
-
-    A workspace fused over the leading fields of the output which the loops
-    visit in storage order can take the writes which scatter, and stores one
-    slice of the rest of the output. The writes which scatter are counted
-    apart when that slice has at most workspace_limit entries, since only a
-    workspace so small can be reset and copied out cheaply.
+    The writes to the levels of the output of a query which the last loop of
+    each prefix reaches: those whose fields, and those of the levels above
+    them, the prefix loops over, the last of them last. Where the loops up to a
+    level are its fields in storage order, the level is written once for each
+    of its indices, in order, and otherwise its writes scatter, as
+    util.write_protocols infers. The element level is written with its parent.
+    Besides the writes, a row has the measures which WriteClasses classes it
+    by: the entries of the region of the output the writes scatter into, a
+    slice over the fields after the leading ones the loops visit in storage
+    order, which a workspace fused over those could hold, or none where
+    nothing scatters, the distinct entries of the levels reached, those
+    levels would have if dense, and the points of the loops if dense. Sizes
+    are products of the extents of the fields, where a field which no table
+    has, such as a unit dimension of the output alone, has one index.
     """
-
-    def __init__(self, workspace_limit: float = WORKSPACE_LIMIT):
-        self.workspace_limit = workspace_limit
 
     @property
     def n_features(self) -> int:
-        return 3
+        return 6
 
     @property
     def feature_names(self) -> tuple[str, ...]:
-        return ("sequential_writes", "scatter_writes", "workspace_writes")
+        return (
+            "sequential_writes",
+            "scatter_writes",
+            "scattered_region",
+            "distinct_outputs",
+            "dense_outputs",
+            "dense_loops",
+        )
 
     def get_component_features(
         self,
         component: Prefix,
         machine: StatsMachine[NS],
     ) -> np.ndarray:
-        prefix, expr = component.prefix, component.expr
-        # Without output_vars, the output stores the fields of expr in order.
-        output_vars = component.output_vars
-        if output_vars is None:
-            output_vars = expr.fields()
+        prefix, output_vars = component.prefix, written_fields(component)
         features = np.zeros((1, self.n_features))
-        if not prefix or not output_vars:
+        reached = [
+            output_vars[: depth + 1]
+            for depth in range(len(output_vars))
+            if set(output_vars[: depth + 1]) <= set(prefix)
+            and prefix[-1] in output_vars[: depth + 1]
+        ]
+        if not reached:
             return features
-        visits = None
-        for depth in range(len(output_vars)):
-            order = output_vars[: depth + 1]
-            # The level is reached by this prefix only if its last loop ends it.
-            if not set(order) <= set(prefix) or prefix[-1] not in order:
-                continue
-            if visits is None:
-                spaces = loop_spaces(component, machine)
-                visits = spaces.count(spaces.visited())
-            if prefix == order:
-                features[0, 0] += visits
-            elif self.workspace_size(prefix, output_vars, expr, machine) <= (
-                self.workspace_limit
-            ):
-                features[0, 2] += visits
-            else:
-                features[0, 1] += visits
-        return features
-
-    @staticmethod
-    def workspace_size(prefix, output_vars, expr, machine) -> float:
-        """
-        The entries of a slice of a workspace fused over the leading fields of
-        output_vars which prefix visits in order: the product of the dimensions
-        of the rest. A field which no table has, such as a unit dimension of the
-        output alone, has one index.
-        """
-        fused = 0
-        while (
-            fused < len(prefix)
-            and prefix[fused : fused + 1] == output_vars[fused : fused + 1]
-        ):
-            fused += 1
-        dims = {}
-        for node in PostOrderDFS(expr):
+        dims: dict[Field, float] = {}
+        for node in PostOrderDFS(component.expr):
             match node:
                 case Table():
                     dims.update(machine(node).dim_sizes)
-        return float(np.prod([dims.get(idx, 1) for idx in output_vars[fused:]]))
+
+        def size(fields) -> float:
+            return math.prod(dims.get(idx, 1.0) for idx in fields)
+
+        spaces = loop_spaces(component, machine)
+        visits = spaces.count(spaces.visited())
+        output = machine(component.expr)
+        for order in reached:
+            features[0, 0 if prefix == order else 1] += visits
+            distinct = restrict(machine.stats_factory, output, order)
+            features[0, 3] += distinct.estimate_non_fill_values()
+            features[0, 4] += size(order)
+        if features[0, 1]:
+            fused = 0
+            while (
+                fused < len(prefix)
+                and prefix[fused : fused + 1] == output_vars[fused : fused + 1]
+            ):
+                fused += 1
+            features[0, 2] = size(output_vars[fused:])
+        features[0, 5] = size(prefix)
+        return features
+
+
+def written_fields(component: Prefix) -> tuple[Field, ...]:
+    """The fields of the output of the query of component, in the order it
+    stores them, which are those of its expression without output_vars."""
+    if component.output_vars is None:
+        return component.expr.fields()
+    return component.output_vars
+
+
+N_WRITE_CLASSES = 8
+
+
+@dataclass(frozen=True)
+class WriteClasses:
+    """
+    The class of each row of WriteBasis, as four times whether the region
+    its writes scatter into, plus two times whether the density of the levels
+    of the output it reaches, its distinct outputs over its dense ones, plus
+    whether the density of its loops, its writes over its dense loops,
+    exceeds its cutoff. The default region cutoff is the most entries a
+    workspace can reset and copy out cheaply.
+    """
+
+    region: float = 100_000
+    output_density: float = 0.5
+    loop_density: float = 0.5
+
+    def __call__(self, rows: np.ndarray) -> np.ndarray:
+        sequential, scattered, region, distinct, dense_outputs, dense_loops = rows.T
+        output_density = np.divide(
+            distinct, dense_outputs, out=np.zeros(len(rows)), where=dense_outputs > 0
+        )
+        loop_density = np.divide(
+            sequential + scattered,
+            dense_loops,
+            out=np.zeros(len(rows)),
+            where=dense_loops > 0,
+        )
+        return (
+            4 * (region > self.region)
+            + 2 * (output_density > self.output_density)
+            + (loop_density > self.loop_density)
+        )
+
+
+write_class = WriteClasses()
+WRITE_BASIS = Stratify(WriteBasis(), N_WRITE_CLASSES, write_class)
+
+
+def write_coefficients(scatter: float, workspace: float) -> list[float]:
+    """The coefficients of WRITE_BASIS which charge a write which scatters
+    workspace in the classes whose scattered region is within its cutoff,
+    scatter in the rest, and nothing else."""
+    return [
+        cost
+        for cls in range(N_WRITE_CLASSES)
+        for cost in (0.0, scatter if cls >= 4 else workspace, 0.0, 0.0, 0.0, 0.0)
+    ]
 
 
 # Allocations are weighted 10x reads and operations, a lookup costs as much as
@@ -591,13 +644,13 @@ class WriteBasis(LoopBasis, LoopOrderedForm):
 # write which scatters costs 10 iterations more than one in order, as it does
 # into a hash level, which most sparse outputs need for it.
 LOOP_COST_MODEL = CostModel(
-    Concat(PigeonBasis(), TransposeBasis(), WriteBasis()),
-    [1.0, 1.0, 10.0, 1.0, 0.0, 0.5, 60.0, 0.0, 10.0, 10.0],
+    Concat(PigeonBasis(), TransposeBasis(), WRITE_BASIS),
+    [1.0, 1.0, 10.0, 1.0, 0.0, 0.5, 60.0, *write_coefficients(10.0, 10.0)],
 )
 # A small workspace takes the writes of a query which scatter, as a dense level
-# or a byte map does, almost as cheaply as those in order. Without one, they
-# cost as much as they do without workspaces.
+# or a byte map does, almost as cheaply as those in order. Otherwise, they cost
+# as much as they do without workspaces.
 WORKSPACE_LOOP_COST_MODEL = CostModel(
-    Concat(PigeonBasis(), TransposeBasis(), WriteBasis()),
-    [1.0, 1.0, 10.0, 1.0, 0.0, 0.5, 60.0, 0.0, 10.0, 1.0],
+    Concat(PigeonBasis(), TransposeBasis(), WRITE_BASIS),
+    [1.0, 1.0, 10.0, 1.0, 0.0, 0.5, 60.0, *write_coefficients(10.0, 1.0)],
 )

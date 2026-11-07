@@ -18,6 +18,7 @@ from finch.autoschedule.cost_models import (
     Prefix,
     SparseListLevelOption,
     WriteBasis,
+    write_class,
 )
 from finch.autoschedule.formatter.smart_formatter import CostFormatter, format_ftype
 from finch.autoschedule.loop_orderer import BFSLoopOrderer
@@ -329,31 +330,24 @@ def test_only_small_workspaces_make_scattered_writes_cheap():
         b: UniformStats(BaseTensorStats((j, k), {j: n, k: n}, fill), nnz=4 * n),
     }
     _, rhs = _matmul(HardAlias("c"), a, b)
-    basis = WriteBasis(workspace_limit=100_000)
     machine = StatsMachine(UniformStatsFactory(), dict(stats))
 
-    def writes(order):
-        rows = [
-            basis.get_component_features(Prefix(order[:n], rhs, (i, k)), machine)
-            for n in range(len(order) + 1)
-        ]
-        totals = np.concatenate(rows).sum(axis=0)
-        return dict(zip(basis.feature_names, totals > 0, strict=True))
+    def scattered(order):
+        """Whether each prefix of order which scatters writes does so into a
+        region beyond the cutoff a workspace could hold."""
+        regions = set()
+        for n in range(1, len(order) + 1):
+            prefix = Prefix(order[:n], rhs, (i, k))
+            rows = WriteBasis().get_component_features(prefix, machine)
+            if rows[0, 1] > 0:
+                regions.add(bool(write_class(rows)[0] >= 4))
+        return regions
 
-    # Gustavson writes the rows of c in order, so a workspace for one row of n
-    # entries takes the writes which scatter.
-    assert writes((i, j, k)) == {
-        "sequential_writes": True,
-        "scatter_writes": False,
-        "workspace_writes": True,
-    }
-    # An outer product scatters from the outermost loop, so its workspace would
-    # hold all n * n entries of c.
-    assert writes((j, i, k)) == {
-        "sequential_writes": False,
-        "scatter_writes": True,
-        "workspace_writes": False,
-    }
+    # Gustavson scatters within each row of c, n entries, which a workspace
+    # for the row could hold.
+    assert scattered((i, j, k)) == {False}
+    # An outer product scatters from the outermost loop into all n * n entries.
+    assert scattered((j, i, k)) == {True}
 
 
 def test_scatter_workspaces_store_the_one_field_scattered_into():

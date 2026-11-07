@@ -26,7 +26,7 @@ from finch.finch_logic import (
 )
 
 from .loop_order_greedy import greedy_loop_order
-from .loop_ordering import AbstractLoopOrderer, with_loop_order
+from .loop_ordering import AbstractLoopOrderer, galloping, with_loop_order
 
 NS = TypeVar("NS", bound=NumericStats)
 
@@ -225,7 +225,7 @@ class BFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
                 case Query(Table(_, out_idxs), Aggregate()) | QueryInto(
                     Table(_, out_idxs), _, _
                 ):
-                    arg = merged_expr(query)
+                    arg = galloping(merged_expr(query))
                     idxs_2 = loop_order_bfs(
                         arg,
                         stats_factory,
@@ -273,7 +273,7 @@ class DFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
                 case Query(Table(_, out_idxs), Aggregate()) | QueryInto(
                     Table(_, out_idxs), _, _
                 ):
-                    arg = merged_expr(query)
+                    arg = galloping(merged_expr(query))
                     idxs_2 = loop_order_dfs(
                         arg,
                         stats_factory,
@@ -320,7 +320,7 @@ class BruteForceLoopOrderer(AbstractLoopOrderer, Generic[NS]):
                 case Query(Table(_, out_idxs), Aggregate()) | QueryInto(
                     Table(_, out_idxs), _, _
                 ):
-                    arg = merged_expr(query)
+                    arg = galloping(merged_expr(query))
                     idxs_2 = loop_order_brute_force(
                         arg,
                         stats_factory,

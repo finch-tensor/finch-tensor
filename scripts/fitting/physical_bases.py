@@ -26,8 +26,8 @@ examples coalesce_physical_data collects, so a new basis needs no new timings.
   formatter, which chooses the formats from the supports of its inputs, and
   then to the protocol optimizer. Its features are those of the program as
   ordered, before any of them run, from the stats of its inputs alone,
-  whatever their formats, as the loop orderer prices it, so the model learns
-  what a loop order costs once they have run.
+  whatever their formats, with every table galloping, as the loop orderer
+  prices it, so the model learns what a loop order costs once they have run.
 """
 
 import json
@@ -49,15 +49,20 @@ from finch.autoschedule.cost_models import (
     ElementLevelOption,
     LevelOption,
     PigeonBasis,
+    Stratify,
     TransposeBasis,
     WriteBasis,
+    WriteClasses,
     level_options,
+    write_class,
 )
+from finch.autoschedule.cost_models.loop_cost_models import N_WRITE_CLASSES
 from finch.autoschedule.formatter.smart_formatter import (
     LEVEL_OPTIONS,
     format_ftype,
     optimize_formats,
 )
+from finch.autoschedule.loop_orderer.loop_ordering import galloping
 from finch.autoschedule.tensor_stats.memo_stats import MemoStatsFactory
 from finch.autoschedule.util import fuse_loop_order
 from finch.autoschedule.workspacer import (
@@ -86,20 +91,46 @@ OPTIONS = {option.kind: option for option in LEVEL_OPTIONS}
 A, B, C = HardAlias("A"), HardAlias("B"), HardAlias("C")
 INPUTS = (A, B)
 
+
+def loop_basis(classes: WriteClasses = write_class) -> Basis:
+    """The basis of the loop model, whose writes are of the classes of the
+    cutoffs of classes."""
+    return Affine(
+        Concat(PigeonBasis(), Stratify(WriteBasis(), N_WRITE_CLASSES, classes))
+    )
+
+
 # The formatter and the protocol optimizer price the same basis, so the format
 # stage fits it again, to examples whose formats vary.
 BASES: dict[str, Basis] = {
     "protocol": PROTOCOL_BASIS,
     "format": PROTOCOL_BASIS,
     "transpose": Affine(TransposeBasis()),
-    "loop": Affine(Concat(PigeonBasis(), WriteBasis())),
+    "loop": loop_basis(),
 }
+
+
+# The rows of the loop basis before its writes are classed, from which
+# stratified gives the rows of the loop basis under any cutoffs without
+# featurizing again.
+TUNING_BASIS = Affine(Concat(PigeonBasis(), WriteBasis()))
+
+
+def stratified(rows: np.ndarray, classes: WriteClasses) -> np.ndarray:
+    """The rows of loop_basis(classes) of rows of TUNING_BASIS."""
+    start = PigeonBasis().n_features
+    end = start + WriteBasis().n_features
+    writes = Stratify(WriteBasis(), N_WRITE_CLASSES, classes)
+    return np.hstack(
+        [rows[:, :start], writes.transform(rows[:, start:end]), rows[:, end:]]
+    )
 
 
 def parse_models(args: list[str] | None) -> dict[str, CostModel]:
     """
     The models of NAME=PATH arguments, which fit_physical_data wrote, over the
-    models the optimizers use until they are fitted.
+    models the optimizers use until they are fitted. A loop model whose
+    cutoffs were tuned classes its writes by them.
     """
     models = {"protocol": PROTOCOL_COST_MODEL, "format": PROTOCOL_COST_MODEL}
     for arg in args or ():
@@ -108,9 +139,12 @@ def parse_models(args: list[str] | None) -> dict[str, CostModel]:
             raise ValueError(
                 f"Expected NAME=PATH with NAME of {list(BASES)}, got {arg}"
             )
+        data = json.loads(Path(path).read_text())
         basis = BASES[name]
+        if "write_cutoffs" in data:
+            basis = loop_basis(WriteClasses(**data["write_cutoffs"]))
         untrained = CostModel(basis, np.zeros(basis.n_features))
-        models[name] = untrained.from_json(json.loads(Path(path).read_text()))
+        models[name] = untrained.from_json(data)
     return models
 
 
@@ -154,6 +188,21 @@ def variant_plan(record: Mapping[str, Any], variant: Mapping[str, Any]) -> Plan:
     if stage == "transpose":
         query = Query(Table(C, order), query.rhs)
     return fused_plan(query, order)
+
+
+def galloped(plan: Plan) -> Plan:
+    """plan, with every query reading its tables as the loop orderer prices
+    them, galloping."""
+
+    def query(node):
+        match node:
+            case Query(lhs, rhs):
+                return Query(lhs, galloping(rhs))
+        return None
+
+    result = Rewrite(PostWalk(query))(plan)
+    assert isinstance(result, Plan)
+    return result
 
 
 def input_perms(
@@ -348,26 +397,28 @@ def featurize_record(
     inputs: Mapping[Alias, KroneckerTensor],
     name: str,
     models: Mapping[str, CostModel],
+    basis: Basis | None = None,
 ) -> list[np.ndarray]:
     """
-    The features of the basis name of each variant of the example of record,
+    The features of basis, by default the basis name, of each variant of the
+    example of record,
     whose inputs are inputs, as it was timed: the stages below make their
     choices with models, as time_physical_data makes them, so nothing is
     compiled or run. The loop stage orders loops before the workspacer and the
     formatter run, so its features are those of the program as ordered, from
     the stats of its inputs alone, whatever their formats, as the loop orderer
-    prices it, and it chooses nothing.
+    prices it, galloping, and it chooses nothing.
     """
     stats_factory = record_stats_factory(record)
     rows = []
     for variant in record["variants"]:
         if record["stage"] == "loop":
-            plan, formats = variant_plan(record, variant), {}
+            plan, formats = galloped(variant_plan(record, variant)), {}
         else:
             plan, formats = resolve(record, variant, inputs, models)
         rows.append(
             features(
-                BASES[name],
+                BASES[name] if basis is None else basis,
                 plan,
                 formats,
                 read_inputs(record, plan, inputs),

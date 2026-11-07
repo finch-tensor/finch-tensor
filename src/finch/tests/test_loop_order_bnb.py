@@ -41,6 +41,7 @@ from finch.finch_logic import (
     Alias,
     Field,
     Fuse,
+    Gallop,
     HardAlias,
     Literal,
     MapJoin,
@@ -263,7 +264,7 @@ def test_loop_orderers_write_outputs_in_order_when_it_pays(search):
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), Table(a, (i, j)), (j,))
     # Scattering into the output costs more than looping over i first saves.
     basis = Concat(PreferFieldBasis(i), WriteBasis())
-    writes = CostModel(basis, [1.0, 0.0, 100.0, 100.0])
+    writes = CostModel(basis, [1.0, 0.0, 100.0, 0.0, 0.0, 0.0, 0.0])
     assert search(expr, sf, stats, (unit, i), cost_model=writes) == (unit, i, j)
 
 
@@ -373,8 +374,8 @@ def test_loop_orderers_price_reads_whatever_their_formats(
         ]
 
     # The workspacer may copy an input into any format, so the loops are priced
-    # from the stats of the tensors alone, and every read walks, whatever the
+    # from the stats of the tensors alone, and every read gallops, whatever the
     # format bound to it.
     copy = Query(Table(z, (i,)), Table(x, (i,)))
     orderer()(Plan((copy, query, Produces((out,)))), {x: lists, y: full}, stats, sf)
-    assert protocols(seen[-1]) == [(), (), ()]
+    assert protocols(seen[-1]) == [(Gallop(),), (Gallop(),), (Gallop(),)]

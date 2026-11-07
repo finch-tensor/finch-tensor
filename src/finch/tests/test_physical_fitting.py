@@ -15,7 +15,14 @@ import numpy as np
 import scipy.sparse as sps
 
 from finch import ffuncs
-from finch.autoschedule.cost_models import DenseLevelOption
+from finch.autoschedule.cost_models import (
+    Affine,
+    Concat,
+    DenseLevelOption,
+    Stratify,
+    WriteClasses,
+    write_class,
+)
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.compile_jl.julia import julia_available
@@ -41,14 +48,17 @@ from scripts.fitting.generate_physical_data import (
 )
 from scripts.fitting.physical_bases import (
     BASES,
+    TUNING_BASIS,
     A,
     B,
     C,
     featurize_record,
     format_kinds,
     input_perms,
+    loop_basis,
     parse_models,
     resolve,
+    stratified,
 )
 
 i, j, k = Field("i"), Field("j"), Field("k")
@@ -117,10 +127,23 @@ def test_loop_features_charge_writes_before_the_workspacer_runs():
     rows = featurize_record(record, record_inputs(record), "loop", models)
     basis = BASES["loop"]
     names = basis.feature_names
+
+    def summed(variant_rows):
+        total = dict(zip(names, np.asarray(variant_rows).sum(axis=0), strict=True))
+        # A workspace could hold the region the writes of the first four
+        # classes scatter into.
+        scattered = [total[f"class{cls}.scatter_writes"] for cls in range(8)]
+        return {
+            "sequential_writes": sum(
+                total[f"class{cls}.sequential_writes"] for cls in range(8)
+            ),
+            "workspace_writes": sum(scattered[:4]),
+            "scatter_writes": sum(scattered[4:]),
+            "lookups": total["lookups"],
+        }
+
     totals = {
-        tuple(variant["loop_order"]): dict(
-            zip(names, np.asarray(variant_rows).sum(axis=0), strict=True)
-        )
+        tuple(variant["loop_order"]): summed(variant_rows)
         for variant, variant_rows in zip(record["variants"], rows, strict=True)
     }
     assert all(np.asarray(r).shape[1] == basis.n_features for r in rows)
@@ -133,9 +156,9 @@ def test_loop_features_charge_writes_before_the_workspacer_runs():
     assert totals[("i", "k", "j")]["sequential_writes"] > 0
     # An outer product scatters into all of C, which no workspace fits.
     assert totals[("j", "i", "k")]["scatter_writes"] > 0
-    # The inputs are read without protocols, whatever their formats, so the
-    # loops walk them and look nothing up.
-    assert all(total["lookups"] == 0 for total in totals.values())
+    # Every input gallops, whatever its format, so the loops look each up at
+    # every point they visit.
+    assert all(total["lookups"] > 0 for total in totals.values())
 
 
 def test_loop_features_need_no_formats(monkeypatch):
@@ -202,3 +225,58 @@ def test_timing_runs_the_resolved_programs(tmp_path):
     expected = (sparse[A] @ sparse[B]).toarray()
     dense = reformat(result, [DenseLevelOption(), DenseLevelOption()])
     np.testing.assert_allclose(dense.to_numpy(), expected)
+
+
+def test_stratified_rows_are_those_of_the_loop_basis_under_any_cutoffs():
+    record = gustavson_record(np.random.default_rng(0), lg=8)
+    inputs = record_inputs(record)
+    models = parse_models(None)
+    raw = featurize_record(record, inputs, "loop", models, TUNING_BASIS)
+    for classes in (write_class, WriteClasses(10.0, 1e-3, 1e-3)):
+        rows = featurize_record(record, inputs, "loop", models, loop_basis(classes))
+        for raw_rows, variant_rows in zip(raw, rows, strict=True):
+            np.testing.assert_array_equal(stratified(raw_rows, classes), variant_rows)
+
+
+def test_tuning_finds_the_region_past_which_scattered_writes_cost_more():
+    from scripts.fitting.fit_physical_data import tune_cutoffs
+
+    # Each example scatters its writes into a region of some size, or writes in
+    # order at a cost of 20 iterations, and scattered writes cost 50 times
+    # more past 1e4 entries, where the regions skip from 5e3 to 2e4.
+    rng = np.random.default_rng(0)
+    raw, runtimes, examples = [], [], []
+    for example in range(60):
+        region = rng.choice([1e3, 2e3, 5e3, 2e4, 1e5, 1e6])
+        # The columns are those of TUNING_BASIS: five of the Pigeon basis, six
+        # of the write basis, and a constant.
+        scattered = np.zeros((1, 12))
+        scattered[0, 6:] = [1.0, region, 1.0, 2.0, 2.0, 1.0]
+        in_order = np.zeros((1, 12))
+        in_order[0, [0, 11]] = [20.0, 1.0]
+        for index, (rows, runtime) in enumerate(
+            [(scattered, 1.0 if region <= 1e4 else 50.0), (in_order, 20.0)]
+        ):
+            raw.append(rows)
+            runtimes.append(runtime)
+            examples.append((f"{example}", index))
+    classes = tune_cutoffs(raw, runtimes, examples, seed=0, maxiter=20)
+    assert 5e3 <= classes.region < 2e4
+
+
+def test_models_with_tuned_cutoffs_class_writes_by_them(tmp_path):
+    classes = WriteClasses(3e3, 0.4, 0.01)
+    basis = loop_basis(classes)
+    path = tmp_path / "loop.model.json"
+    saved = {
+        "feature_names": list(basis.feature_names),
+        "coefficients": list(np.arange(basis.n_features, dtype=float)),
+        "write_cutoffs": {"region": 3e3, "output_density": 0.4, "loop_density": 0.01},
+    }
+    path.write_text(json.dumps(saved))
+    model = parse_models([f"loop={path}"])["loop"]
+    match model.basis:
+        case Affine(basis=Concat(bases=(_, Stratify(classify=classify)))):
+            assert classify == classes
+        case other:
+            raise AssertionError(f"Expected a stratified loop basis, got {other}")
