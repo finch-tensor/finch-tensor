@@ -17,27 +17,26 @@ predicts to be fastest over that of the fastest, for each example.
 To show how the fit improves with data, a held-out tenth of the examples
 scores models fitted to growing subsets of the rest, and the relative R^2 and
 the median regret of each are printed and plotted next to EXAMPLES, to
-NAME.learning_curve.png. With --tune-cutoffs, the cutoffs of the classes of
-the writes of the loop basis are tuned first, as tune_cutoffs tunes them, and
-written with the model, which parse_models reads them back from. The model of
+NAME.learning_curve.png. With --tune-cutoff, the region cutoff of the classes
+of the writes of the loop basis is tuned first, as tune_cutoff tunes it, and
+written with the model, which parse_models reads it back from. The model of
 the protocol stage is the protocol cost model the physical optimizers use,
 read from src/finch/autoschedule/cost_models/protocol_cost_model.json, so a
 fit which should ship is written there.
 
     pixi run -e fitting python -m scripts.fitting.fit_physical_data \\
         EXAMPLES [--basis NAME] [--model NAME=PATH]... [--seed S] \\
-        [--tune-cutoffs] [model.json]
+        [--tune-cutoff] [model.json]
 """
 
 import argparse
 import json
-from dataclasses import asdict
+import math
 from pathlib import Path
 
 import numpy as np
-from scipy.optimize import differential_evolution
 
-from finch.autoschedule.cost_models import CostModel, WriteClasses, write_class
+from finch.autoschedule.cost_models import CostModel, WriteClasses
 from scripts.fitting.generation import record_inputs
 from scripts.fitting.physical_bases import (
     BASES,
@@ -152,12 +151,6 @@ def featurize(records, name, models, basis=None):
     return features, runtimes, examples
 
 
-# The bounds of the log10 of each cutoff of WriteClasses which tune_cutoffs
-# searches: the entries of the scattered region, and the densities of the
-# output and of the iteration space, which sparse tensors and loops make tiny.
-CUTOFF_BOUNDS = [(1.0, 9.0), (-9.0, 0.0), (-9.0, 0.0)]
-
-
 def cross_validated_regret(basis, sums, runtimes, examples, seed, folds=5) -> float:
     """
     The mean log regret of models of basis over folds of the examples, each
@@ -183,44 +176,31 @@ def cross_validated_regret(basis, sums, runtimes, examples, seed, folds=5) -> fl
     return float(np.mean(logs)) if logs else 0.0
 
 
-def tune_cutoffs(raw, runtimes, examples, seed, maxiter=40) -> WriteClasses:
+def tune_cutoff(raw, runtimes, examples, seed) -> WriteClasses:
     """
-    The cutoffs of WriteClasses under which models of the loop basis, fitted
-    to raw, the rows of TUNING_BASIS of each variant, have the least
-    cross_validated_regret, as differential evolution finds them in the log10
-    of each cutoff. The regret is piecewise constant in the cutoffs, so the
-    search isn't polished by a gradient.
+    The region cutoff of WriteClasses under which models of the loop basis,
+    fitted to raw, the rows of TUNING_BASIS of each variant, have the least
+    cross_validated_regret. The classes change only where the cutoff passes
+    the scattered region of some row, so it is tried between each two regions,
+    at their geometric mean, and past the largest, where no row is above it.
     """
     runtimes = np.asarray(runtimes)
     stacked = np.concatenate(raw)
     starts = np.cumsum([0, *(len(rows) for rows in raw[:-1])])
-
-    def score(x) -> float:
-        classes = WriteClasses(*(10.0 ** np.asarray(x)))
+    regions = np.unique(
+        stacked[:, TUNING_BASIS.feature_names.index("scattered_region")]
+    )
+    best, best_score = WriteClasses(math.inf), math.inf
+    for cutoff in [*np.sqrt(regions[:-1] * regions[1:]), math.inf]:
+        classes = WriteClasses(float(cutoff))
         sums = np.add.reduceat(stratified(stacked, classes), starts, axis=0)
-        return cross_validated_regret(
+        score = cross_validated_regret(
             loop_basis(classes), sums, runtimes, examples, seed
         )
-
-    default = np.log10(list(asdict(write_class).values()))
-    print(f"mean log regret at the default cutoffs {score(default):.4f}", flush=True)
-
-    def progress(intermediate_result):
-        print(
-            f"cutoffs {10.0**intermediate_result.x}: "
-            f"mean log regret {intermediate_result.fun:.4f}",
-            flush=True,
-        )
-
-    result = differential_evolution(
-        score,
-        CUTOFF_BOUNDS,
-        seed=seed,
-        maxiter=maxiter,
-        polish=False,
-        callback=progress,
-    )
-    return WriteClasses(*(10.0**result.x))
+        print(f"region cutoff {cutoff:.4g}: mean log regret {score:.4f}", flush=True)
+        if score < best_score:
+            best, best_score = classes, score
+    return best
 
 
 def importances(basis, model, features, runtimes, examples, seed):
@@ -261,10 +241,10 @@ def fit(data: Path, name, models, output: Path | None, seed, tune=False) -> None
     classes = None
     if tune:
         if name != "loop":
-            raise ValueError(f"Only the loop basis has cutoffs to tune, not {name}")
+            raise ValueError(f"Only the loop basis has a cutoff to tune, not {name}")
         raw, runtimes, examples = featurize(records, name, models, TUNING_BASIS)
-        classes = tune_cutoffs(raw, runtimes, examples, seed)
-        print(f"tuned cutoffs {classes}", flush=True)
+        classes = tune_cutoff(raw, runtimes, examples, seed)
+        print(f"tuned region cutoff {classes.region:.4g}", flush=True)
         basis = loop_basis(classes)
         features = [stratified(rows, classes) for rows in raw]
     else:
@@ -311,8 +291,8 @@ def fit(data: Path, name, models, output: Path | None, seed, tune=False) -> None
     if output is not None:
         saved = model.to_json()
         if classes is not None:
-            # parse_models classes the writes of the model by these cutoffs.
-            saved["write_cutoffs"] = asdict(classes)
+            # parse_models classes the writes of the model by this cutoff.
+            saved["region_cutoff"] = classes.region
         output.write_text(json.dumps(saved, indent=2))
 
 
@@ -334,9 +314,9 @@ def main() -> None:
         "--seed", type=int, default=0, help="the seed which holds examples out"
     )
     parser.add_argument(
-        "--tune-cutoffs",
+        "--tune-cutoff",
         action="store_true",
-        help="tune the cutoffs of the classes of writes of the loop basis",
+        help="tune the region cutoff of the classes of writes of the loop basis",
     )
     parser.add_argument("output", type=Path, nargs="?", metavar="model.json")
     args = parser.parse_args()
@@ -346,7 +326,7 @@ def main() -> None:
         parse_models(args.model),
         args.output,
         args.seed,
-        args.tune_cutoffs,
+        args.tune_cutoff,
     )
 
 

@@ -23,8 +23,8 @@
 # chooses with have fitted them, which it takes as its --model, over those
 # given: the transpose and loop stages choose with the protocol model, and
 # the factorize stage with that and the loop model. The loop fit tunes the
-# cutoffs of its classes of writes. The generator options are given to each
-# stage.
+# region cutoff of its classes of writes. The generator options are given to
+# each stage.
 set -euo pipefail
 
 usage="usage: $0 [--account A] [--stage STAGE]... [--model NAME=PATH]... \
@@ -174,7 +174,7 @@ for n in "${!stages[@]}"; do
   record coalesce "$coalesce"
   # Fitting featurizes the examples as they were timed, with the same models.
   tune=()
-  [[ $stage != loop ]] || tune=(--tune-cutoffs)
+  [[ $stage != loop ]] || tune=(--tune-cutoff)
   fit=$(submit --dependency="afterok:$coalesce" --job-name="fit-$stage" \
     --cpus-per-task=1 --mem=16G --time=02:00:00 --mail-type=END,FAIL \
     --output="$logs/fit-%j.log" \

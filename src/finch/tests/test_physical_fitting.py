@@ -132,15 +132,13 @@ def test_loop_features_charge_writes_before_the_workspacer_runs():
 
     def summed(variant_rows):
         total = dict(zip(names, np.asarray(variant_rows).sum(axis=0), strict=True))
-        # A workspace could hold the region the writes of the first four
-        # classes scatter into.
-        scattered = [total[f"class{cls}.scatter_writes"] for cls in range(8)]
+        # A workspace could hold the region the writes of the first class
+        # scatter into.
         return {
-            "sequential_writes": sum(
-                total[f"class{cls}.sequential_writes"] for cls in range(8)
-            ),
-            "workspace_writes": sum(scattered[:4]),
-            "scatter_writes": sum(scattered[4:]),
+            "sequential_writes": total["class0.sequential_writes"]
+            + total["class1.sequential_writes"],
+            "workspace_writes": total["class0.scatter_writes"],
+            "scatter_writes": total["class1.scatter_writes"],
             "lookups": total["lookups"],
         }
 
@@ -229,19 +227,19 @@ def test_timing_runs_the_resolved_programs(tmp_path):
     np.testing.assert_allclose(dense.to_numpy(), expected)
 
 
-def test_stratified_rows_are_those_of_the_loop_basis_under_any_cutoffs():
+def test_stratified_rows_are_those_of_the_loop_basis_under_any_cutoff():
     record = gustavson_record(np.random.default_rng(0), lg=8)
     inputs = record_inputs(record)
     models = parse_models(None)
     raw = featurize_record(record, inputs, "loop", models, TUNING_BASIS)
-    for classes in (write_class, WriteClasses(10.0, 1e-3, 1e-3)):
+    for classes in (write_class, WriteClasses(10.0)):
         rows = featurize_record(record, inputs, "loop", models, loop_basis(classes))
         for raw_rows, variant_rows in zip(raw, rows, strict=True):
             np.testing.assert_array_equal(stratified(raw_rows, classes), variant_rows)
 
 
 def test_tuning_finds_the_region_past_which_scattered_writes_cost_more():
-    from scripts.fitting.fit_physical_data import tune_cutoffs
+    from scripts.fitting.fit_physical_data import tune_cutoff
 
     # Each example scatters its writes into a region of some size, or writes in
     # order at a cost of 20 iterations, and scattered writes cost 50 times
@@ -250,30 +248,30 @@ def test_tuning_finds_the_region_past_which_scattered_writes_cost_more():
     raw, runtimes, examples = [], [], []
     for example in range(60):
         region = rng.choice([1e3, 2e3, 5e3, 2e4, 1e5, 1e6])
-        # The columns are those of TUNING_BASIS: five of the Pigeon basis, six
+        # The columns are those of TUNING_BASIS: five of the Pigeon basis, four
         # of the write basis, and a constant.
-        scattered = np.zeros((1, 12))
-        scattered[0, 6:] = [1.0, region, 1.0, 2.0, 2.0, 1.0]
-        in_order = np.zeros((1, 12))
-        in_order[0, [0, 11]] = [20.0, 1.0]
+        scattered = np.zeros((1, 10))
+        scattered[0, 6:] = [1.0, region, 1.0, 1.0]
+        in_order = np.zeros((1, 10))
+        in_order[0, [0, 9]] = [20.0, 1.0]
         for index, (rows, runtime) in enumerate(
             [(scattered, 1.0 if region <= 1e4 else 50.0), (in_order, 20.0)]
         ):
             raw.append(rows)
             runtimes.append(runtime)
             examples.append((f"{example}", index))
-    classes = tune_cutoffs(raw, runtimes, examples, seed=0, maxiter=20)
+    classes = tune_cutoff(raw, runtimes, examples, seed=0)
     assert 5e3 <= classes.region < 2e4
 
 
-def test_models_with_tuned_cutoffs_class_writes_by_them(tmp_path):
-    classes = WriteClasses(3e3, 0.4, 0.01)
+def test_models_with_a_tuned_cutoff_class_writes_by_it(tmp_path):
+    classes = WriteClasses(3e3)
     basis = loop_basis(classes)
     path = tmp_path / "loop.model.json"
     saved = {
         "feature_names": list(basis.feature_names),
         "coefficients": list(np.arange(basis.n_features, dtype=float)),
-        "write_cutoffs": {"region": 3e3, "output_density": 0.4, "loop_density": 0.01},
+        "region_cutoff": 3e3,
     }
     path.write_text(json.dumps(saved))
     model = parse_models([f"loop={path}"])["loop"]
