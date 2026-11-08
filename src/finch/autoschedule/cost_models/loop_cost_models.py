@@ -180,22 +180,25 @@ class LoopSpaces(Generic[NS]):
     def protocol(self, node: Term) -> Protocol:
         """
         The protocol node reads the field of the loop with. When ordering
-        loops, the format of a read is known only for an input read in its
-        stored order. An intermediate is formatted later, and a table read out
-        of its stored order through a copy which concordize makes and which is
-        formatted later too, so either may gallop where it meets another read
-        of the field, as the protocols chosen then may, and walks otherwise.
+        loops, the protocols are chosen later, so a read which steps through
+        the field may gallop where it meets another read of it, as the
+        protocols chosen then may, and walks otherwise. Only an input read in
+        its stored order has a format by then, and keeps a follow it gives; an
+        intermediate is formatted later, as is the copy which concordize makes
+        of a table read out of its stored order. Pricing only those as gallops
+        would favor the copy over the input it transposes.
         """
         match node:
             case Table(_, idxs, protocols) if self.idx in idxs:
+                given = protocols[idxs.index(self.idx)] if protocols else None
                 if self.ordering:
                     read = [idx for idx in self.loops if idx in idxs]
-                    if not protocols or read != list(idxs[: len(read)]):
-                        if self.readers[self.idx] > 1:
-                            return Gallop()
-                        return DefaultProtocol()
-                if protocols:
-                    return protocols[idxs.index(self.idx)]
+                    if read != list(idxs[: len(read)]):
+                        given = None
+                    if given != Follow() and self.readers[self.idx] > 1:
+                        return Gallop()
+                if given is not None:
+                    return given
         return DefaultProtocol()
 
     def unrestricted(self, table: Table, fields) -> set[Field]:
