@@ -2,8 +2,9 @@
 What the generators of programs for fitting share: the random draws they make,
 the seeds of the Kronecker products of R-MAT blocks their inputs are drawn as,
 the records of their examples, and how a step writes them to DIR/data and
-reads them back. Each generator, generate_format_data and generate_loop_data,
-draws its own programs, and their variants, with these.
+reads them back. Each generator, generate_protocol_data, generate_loop_data,
+and generate_factorize_data, draws its own programs, and their variants, with
+these.
 """
 
 import argparse

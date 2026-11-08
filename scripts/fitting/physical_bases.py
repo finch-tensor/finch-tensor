@@ -7,17 +7,15 @@ choosing it, and the best option of each example is known. Each stage names
 the basis its model is fitted to, which fit_physical_data extracts from the
 examples coalesce_physical_data collects, so a new basis needs no new timings.
 
-- protocol: for a random program with random formats, every assignment of
-  the protocols its inputs are read with.
-- format: for a random program, every assignment of the formats and protocols
-  of one of its tensors, with the protocols of the loops over its fields,
-  under random formats and protocols of the rest, as the formatter re-chooses
-  the protocols of the loops a format changes. It fits the protocol basis
-  from the same examples as the protocol stage, with formats too.
+- protocol: for a random program, every assignment of the formats and
+  protocols of one of its tensors, with the protocols of the loops over its
+  fields, under random formats and protocols of the rest, as the formatter
+  re-chooses the protocols of the loops a format changes. Its model, the
+  protocol cost model, is the one the formatter, the workspacer, and the
+  protocol optimizer price with.
 - transpose: for a random input, every order a copy of it can be stored in,
   which the copy reads out of order, as the loop orderer transposes an input
-  it would read out of order. The loop orderer charges such copies with the
-  transpose model, on top of the loop model.
+  it would read out of order. No optimizer prices with its model yet.
 - loop: for a random program, every loop order, with its inputs stored in
   that order, so that the program is concordant, and the output stored as the
   program stores it, which the loops may scatter into. Each order is passed
@@ -109,7 +107,7 @@ from scripts.fitting.kronecker_stats import (
     support_tensor,
 )
 
-STAGES = ("protocol", "format", "transpose", "loop", "factorize")
+STAGES = ("protocol", "transpose", "loop", "factorize")
 OPTIONS = {option.kind: option for option in LEVEL_OPTIONS}
 A, B, C = HardAlias("A"), HardAlias("B"), HardAlias("C")
 
@@ -122,11 +120,8 @@ def loop_basis(classes: WriteClasses = write_class) -> Basis:
     )
 
 
-# The formatter and the protocol optimizer price the same basis, so the format
-# stage fits it again, to examples whose formats vary.
 BASES: dict[str, Basis] = {
     "protocol": PROTOCOL_BASIS,
-    "format": PROTOCOL_BASIS,
     "transpose": Affine(TransposeBasis()),
     "loop": loop_basis(),
     "factorize": Affine(FlopsBasis()),
@@ -155,11 +150,7 @@ def parse_models(args: list[str] | None) -> dict[str, CostModel]:
     models the optimizers use until they are fitted. A loop model whose
     cutoffs were tuned classes its writes by them.
     """
-    models = {
-        "protocol": PROTOCOL_COST_MODEL,
-        "format": PROTOCOL_COST_MODEL,
-        "loop": WORKSPACE_LOOP_COST_MODEL,
-    }
+    models = {"protocol": PROTOCOL_COST_MODEL, "loop": WORKSPACE_LOOP_COST_MODEL}
     for arg in args or ():
         name, _, path = arg.partition("=")
         if name not in BASES or not path:
@@ -356,13 +347,13 @@ def resolve(
     stages below its stage have made their choices from the exact stats of
     inputs: the formats of every tensor, unless the variant gives them, and
     the protocols each input is read with, unless the variant gives those too,
-    as the variants of the protocol and format stages do. Where the formats
-    are chosen, the inputs are formatted first, as they are when the program
-    runs, then the workspacer stages the writes which scatter in workspaces,
-    and copies inputs into new formats, where that costs less, and then the
-    formatter formats the outputs and copies of the program it leaves. The
-    inputs the program reads are stored in the order it reads them, which is
-    the loop order in the loop stage.
+    as the variants of the protocol stage do. Where the formats are chosen, the
+    inputs are formatted first, as they are when the program runs, then the
+    workspacer stages the writes which scatter in workspaces, and copies
+    inputs into new formats, where that costs less, and then the formatter
+    formats the outputs and copies of the program it leaves. The inputs the
+    program reads are stored in the order it reads them, which is the loop
+    order in the loop stage.
     """
     plan = variant_plan(record, variant)
     formats = {
@@ -372,7 +363,7 @@ def resolve(
     inputs = read_inputs(record, plan, inputs)
     stats_factory = record_stats_factory(record)
     if "formats" not in variant:
-        formats = choose_formats(plan, inputs, stats_factory, models["format"])
+        formats = choose_formats(plan, inputs, stats_factory, models["protocol"])
         bindings = {
             tns: input_ftype(formats[tns], tensor) for tns, tensor in inputs.items()
         }
@@ -382,11 +373,11 @@ def resolve(
                 bindings,
                 input_stats(plan, inputs, stats_factory),
                 stats_factory,
-                models["format"],
+                models["protocol"],
             )
         formats = {
             **{tns: formats[tns] for tns in inputs},
-            **choose_formats(plan, inputs, stats_factory, models["format"], bindings),
+            **choose_formats(plan, inputs, stats_factory, models["protocol"], bindings),
         }
     if "protocols" not in variant:
         plan = optimize_protocols(

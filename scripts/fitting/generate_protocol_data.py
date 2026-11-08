@@ -1,6 +1,6 @@
 """
-Draw programs for fitting the cost models of the protocol, format, and
-transpose stages of physical_bases, and their inputs. Each program is a random
+Draw programs for fitting the cost models of the protocol and transpose
+stages of physical_bases, and their inputs. Each program is a random
 subprogram of C_lmq += A_jlpq * B_kmpq, which loops in the order its inputs
 store their fields, and its inputs are Kronecker products of R-MAT blocks of
 drawn densities, as kronecker_stats draws them. Its variants are every option
@@ -16,7 +16,7 @@ chunk, so jobs of different chunks can share DIR. No tensors are stored:
 record_inputs draws the blocks of the inputs from their seeds again, checking
 that they match, and materialize expands them into COO tensors.
 
-    pixi run -e fitting python -m scripts.fitting.generate_format_data DIR \\
+    pixi run -e fitting python -m scripts.fitting.generate_protocol_data DIR \\
         [--stage STAGE] [--programs N] [--chunk K] [--seed S]
 """
 
@@ -58,8 +58,8 @@ from scripts.fitting.physical_bases import (
     with_subsequence,
 )
 
-STAGES = ("protocol", "format", "transpose")
-# The most fields of an input, which bounds the variants of the format stage.
+STAGES = ("protocol", "transpose")
+# The most fields of an input, which bounds the variants of the protocol stage.
 MAX_RANK = 3
 # log2 of the most entries all the fields of a program may address, and of the
 # most values of any one field.
@@ -71,16 +71,16 @@ FIELD_PROBABILITY = 0.5
 # most they may be, distributed as the largest of SKEW uniform draws.
 SKEW = 3
 # The draws of the seeds of the inputs of each program, of which KEEP of its
-# stage are kept as examples. In the protocol and format stages, the variants
-# of the examples of a program compile to the same kernels, so they are
-# compiled once for them all, and more are kept. The transpose stage chooses
-# protocols from the stats of each example, so its kernels can differ, and one
-# is kept, for more programs instead.
+# stage are kept as examples. In the protocol stage, the variants of the
+# examples of a program compile to the same kernels, so they are compiled
+# once for them all, and more are kept. The transpose stage chooses protocols
+# from the stats of each example, so its kernels can differ, and one is kept,
+# for more programs instead.
 SAMPLES = 1000
-KEEP = {"protocol": 10, "format": 10, "transpose": 1}
+KEEP = {"protocol": 10, "transpose": 1}
 # The most variants of a program, where a stage has too many to time: the
-# format stage has up to 6561.
-VARIANTS = {"format": 64}
+# protocol stage has up to 6561.
+VARIANTS = {"protocol": 64}
 
 
 def program(rng):
@@ -178,32 +178,6 @@ def variant_space(
     The variants are the product of the choices.
     """
     if stage == "protocol":
-        # The formats are drawn once, and every protocol of them is a variant.
-        formats = {
-            tns.name: [choose(rng, list(OPTIONS)) for _ in idxs]
-            for tns, idxs in input_fields.items()
-        }
-        formats[C.name] = [
-            choose(rng, kinds) for kinds in output_kinds(query, loop_order)
-        ]
-        spaces = [
-            [
-                proto
-                for kind, proto in read_kinds(idxs, loop_order)[depth]
-                if kind == formats[tns.name][depth]
-            ]
-            for tns, idxs in input_fields.items()
-            for depth in range(len(idxs))
-        ]
-
-        def make(choices):
-            protocols = {}
-            for tns, idxs in input_fields.items():
-                protocols[tns.name] = [choices.pop(0) for _ in idxs]
-            return {"formats": formats, "protocols": protocols}
-
-        return spaces, make
-    if stage == "format":
         # One drawn tensor takes every kind and protocol of its levels, and
         # the formatter re-chooses the protocols of the loops it changes, so
         # the levels of the other input read at the loops over its fields take

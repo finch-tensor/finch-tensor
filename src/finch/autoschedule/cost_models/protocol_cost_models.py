@@ -736,9 +736,10 @@ STORAGE_BASIS = StorageBasis()
 # the levels together, with a constant for each access.
 PROTOCOL_BASIS = Affine(Concat(STORAGE_BASIS, ProtocolBasis()))
 
-# The coefficients are those scripts/fitting fitted to the timings of its
-# format stage, which fit_physical_data writes, so that a basis which changes
-# refuses them until it is fitted again.
+# The protocol cost model, which the formatter, the workspacer, and the
+# protocol optimizer price with. Its coefficients are those scripts/fitting
+# fitted to the timings of its protocol stage, which fit_physical_data writes,
+# so that a basis which changes refuses them until it is fitted again.
 PROTOCOL_COST_MODEL = CostModel(
     PROTOCOL_BASIS, np.zeros(PROTOCOL_BASIS.n_features)
 ).from_json(

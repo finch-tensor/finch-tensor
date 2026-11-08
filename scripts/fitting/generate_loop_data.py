@@ -7,8 +7,8 @@ as kronecker_stats draws them. Its variants are its loop orders, or VARIANTS
 of them drawn without replacement. Of SAMPLES draws of the inputs of a
 program, KEEP are kept, spread over the densities of A, B, and C, and each
 makes an example with the program. The programs are larger than those of
-generate_format_data, so that most of their kernels do much more work than a
-call costs, and the loop order decides much of what they cost.
+generate_protocol_data, so that most of their kernels do much more work than
+a call costs, and the loop order decides much of what they cost.
 Each example is written to DIR/data as JSON, with the text of its query, its
 loop order, its variants, and the log shape, the R-MAT seed of each block, and
 the RNG seed of each of its inputs, with the version of numpy which drew its

@@ -12,15 +12,19 @@
 # IDs to DIR/jobs.txt, for status_physical_data.sh. With --resume, DIR's
 # programs are kept rather than generated, and the jobs are added to
 # DIR/jobs.txt. Options before DIR are this script's; those after it are
-# those of the generator of the stage, generate_format_data for the protocol,
-# format and transpose stages, and generate_loop_data and
+# those of the generator of the stage, generate_protocol_data for the
+# protocol and transpose stages, and generate_loop_data and
 # generate_factorize_data for the loop and factorize stages.
 #
 # --stage may be given more than once, for stages which each fit a model
-# that the next ones use, such as --stage loop --stage factorize. Each stage
-# then goes to DIR/STAGE, and is generated at once, but timed only once the
-# stages before it have fitted their models, which it takes as its --model,
-# with those given. The generator options are given to each stage.
+# that later ones use, such as --stage protocol --stage loop --stage factorize,
+# the models the physical optimizers use. Each stage then goes to DIR/STAGE,
+# and is generated at once, but timed only once the stages whose models it
+# chooses with have fitted them, which it takes as its --model, over those
+# given: the transpose and loop stages choose with the protocol model, and
+# the factorize stage with that and the loop model. The loop fit tunes the
+# cutoffs of its classes of writes. The generator options are given to each
+# stage.
 set -euo pipefail
 
 usage="usage: $0 [--account A] [--stage STAGE]... [--model NAME=PATH]... \
@@ -115,18 +119,37 @@ record() {
   submitted+=("$2")
   records+=("$1 $2")
 }
-# The fit of the stage before, which the timing of the next waits for.
-fitted=
+# The stages whose models the timing of a stage chooses with, as resolve in
+# physical_bases.py does. The protocol stage gives every choice.
+uses() {
+  case $1 in
+    transpose | loop) echo protocol ;;
+    factorize) echo protocol loop ;;
+  esac
+}
+# The fit job and the model of each stage submitted so far.
+declare -A fits fitted_models
 summary=()
 for n in "${!stages[@]}"; do
   stage=${stages[$n]}
   directory=${directories[$n]}
   logs=$directory/logs
   records=()
+  dependencies=()
+  stage_models=("${models[@]}")
+  for used in $(uses "$stage"); do
+    if [[ -n ${fits[$used]:-} ]]; then
+      dependencies+=("afterok:${fits[$used]}")
+      stage_models+=(--model "$used=${fitted_models[$used]}")
+    elif [[ " ${stages[*]} " == *" $used "* ]]; then
+      echo "$0: the $stage stage uses the $used model, so --stage $used goes first" >&2
+      exit 2
+    fi
+  done
   case $stage in
     loop) generator=generate_loop_data ;;
     factorize) generator=generate_factorize_data ;;
-    *) generator=generate_format_data ;;
+    *) generator=generate_protocol_data ;;
   esac
   generate=
   if [[ ! $resume ]]; then
@@ -135,14 +158,12 @@ for n in "${!stages[@]}"; do
       "$step" "$generator" "$directory" --stage "$stage" "$@")
     record generate "$generate"
   fi
-  dependencies=()
   [[ -z $generate ]] || dependencies+=("aftercorr:$generate")
-  [[ -z $fitted ]] || dependencies+=("afterok:$fitted")
   dependency=$(IFS=,; echo "${dependencies[*]}")
   time=$(submit "$array" ${dependency:+"--dependency=$dependency"} \
     --job-name="time-$stage" --exclusive --mem=0 --time="$limit" \
     --output="$logs/time-%A_%a.log" \
-    "$step" time_physical_data "$directory" "${models[@]}" --hours "$hours")
+    "$step" time_physical_data "$directory" "${stage_models[@]}" --hours "$hours")
   record time "$time"
   # The chunks which ran out of time still count, so coalescing waits for the
   # timing to end however it ends.
@@ -152,14 +173,16 @@ for n in "${!stages[@]}"; do
     "$step" coalesce_physical_data "$directory")
   record coalesce "$coalesce"
   # Fitting featurizes the examples as they were timed, with the same models.
-  fitted=$(submit --dependency="afterok:$coalesce" --job-name="fit-$stage" \
+  tune=()
+  [[ $stage != loop ]] || tune=(--tune-cutoffs)
+  fit=$(submit --dependency="afterok:$coalesce" --job-name="fit-$stage" \
     --cpus-per-task=1 --mem=16G --time=02:00:00 --mail-type=END,FAIL \
     --output="$logs/fit-%j.log" \
     "$step" fit_physical_data "$directory/examples.json" --basis "$stage" \
-    "${models[@]}" "$directory/$stage.model.json")
-  record fit "$fitted"
-  # The stages after this one take its model.
-  models+=(--model "$stage=$directory/$stage.model.json")
+    "${tune[@]}" "${stage_models[@]}" "$directory/$stage.model.json")
+  record fit "$fit"
+  fits[$stage]=$fit
+  fitted_models[$stage]=$directory/$stage.model.json
 
   [[ $resume ]] || : >"$directory/jobs.txt"
   printf '%s\n' "${records[@]}" >>"$directory/jobs.txt"

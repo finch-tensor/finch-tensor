@@ -20,9 +20,9 @@ the median regret of each are printed and plotted next to EXAMPLES, to
 NAME.learning_curve.png. With --tune-cutoffs, the cutoffs of the classes of
 the writes of the loop basis are tuned first, as tune_cutoffs tunes them, and
 written with the model, which parse_models reads them back from. The model of
-the format stage is the one the physical optimizers use, read from
-src/finch/autoschedule/cost_models/protocol_cost_model.json, so a fit which
-should ship is written there.
+the protocol stage is the protocol cost model the physical optimizers use,
+read from src/finch/autoschedule/cost_models/protocol_cost_model.json, so a
+fit which should ship is written there.
 
     pixi run -e fitting python -m scripts.fitting.fit_physical_data \\
         EXAMPLES [--basis NAME] [--model NAME=PATH]... [--seed S] \\
