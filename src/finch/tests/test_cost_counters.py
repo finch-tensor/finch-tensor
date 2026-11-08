@@ -302,13 +302,16 @@ def test_gallops_jump_within_the_smallest_support():
         ]
         return sum(rows)[basis.feature_names.index("sparse_list.gallop.visits")]
 
-    # Two gallops each jump at most as often as the smaller list has entries,
-    # and a gallop driven by a walk jumps once for each step of the walk.
+    # Two gallops each jump at most as often as the smaller list has entries.
+    # A walk doesn't end the phases of a gallop beside it, so the gallop jumps
+    # through every entry of its own.
     assert jumps(Gallop(), Gallop()) == 10
-    assert jumps(Walk(), Gallop()) == 5
+    assert jumps(Walk(), Gallop()) == 100
     assert jumps(Gallop(), Walk()) == 5
     assert jumps(Walk(), Follow()) == 0
     walks, _ = run(program(Walk(), Walk()), inputs, {c: ()})
     gallops, _ = run(program(Gallop(), Gallop()), inputs, {c: ()})
+    walk_gallop, _ = run(program(Walk(), Gallop()), inputs, {c: ()})
+    assert walk_gallop["while"] >= 100
     assert gallops["while"] < walks["while"]
     assert loads(gallops, "y", "idx") < loads(walks, "y", "idx")

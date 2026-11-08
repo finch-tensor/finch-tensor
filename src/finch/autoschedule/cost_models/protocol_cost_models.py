@@ -605,16 +605,19 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
                 case Walk():
                     visits = spaces.walk(table)
                 case Gallop():
-                    # A gallop jumps at most once for each visit the loop would
-                    # make if the level were dense, and for each step of the
-                    # smallest walk among the gallops.
-                    dense = LoopSpaces(
-                        replace(prefix, expr=followed(prefix.expr, table)), machine
-                    )
-                    smallest = min(
-                        (spaces.walk(node) for node in galloped), default=0.0
-                    )
-                    visits = min(dense.count(dense.visited()), smallest)
+                    # Gallops leapfrog: each phase ends at the furthest next
+                    # entry among them and the others seek to it, so they jump
+                    # once for each step of the smallest. A walk doesn't end a
+                    # phase, it is stepped within those of the gallops, so
+                    # beside one they jump through every entry of the smallest
+                    # in the fibers entered. Without one, they jump at most once
+                    # for each visit the loop would make if the level were dense.
+                    visits = min(spaces.walk(node) for node in galloped)
+                    if spaces.walked(spaces.arg) is None:
+                        dense = LoopSpaces(
+                            replace(prefix, expr=followed(prefix.expr, table)), machine
+                        )
+                        visits = min(dense.count(dense.visited()), visits)
         return np.array(
             [
                 [

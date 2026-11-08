@@ -280,10 +280,10 @@ def test_optimize_protocols_chooses_the_cheaper_read():
     sparse = fl.asarray(np.array([0, 0, 0, 0, 5, 0, 0, 0, 0, 0.0]))
     full = fl.asarray(np.ones(10))
     stats: dict[Alias, TensorStats] = {x: sf(sparse, (i,)), y: sf(full, (i,))}
-    # Walking y steps through every entry for the one entry of x, so y is
-    # galloped, or followed by a hash, which can't gallop.
+    # Walking y, or galloping it beside the walk of x, steps through every entry
+    # of y for the one entry of x, so y is followed, as it is by a hash.
     out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf, SIMPLE)
-    assert read_protocols(out, x, y) == [(Walk(),), (Gallop(),)]
+    assert read_protocols(out, x, y) == [(Walk(),), (Follow(),)]
     out = optimize_protocols(plan, {x: LIST, y: HASH}, stats, sf, SIMPLE)
     assert read_protocols(out, x, y) == [(Walk(),), (Follow(),)]
     # Tensors of the same density are walked together.
@@ -309,7 +309,7 @@ def test_optimize_protocols_keeps_the_protocols_a_program_gives():
     # Only the read without a protocol is chosen.
     plan = product_plan(x, y, c, i, ((Walk(),), ()))
     out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf, SIMPLE)
-    assert read_protocols(out, x, y) == [(Walk(),), (Gallop(),)]
+    assert read_protocols(out, x, y) == [(Walk(),), (Follow(),)]
 
 
 def test_optimize_protocols_only_follows_levels_read_out_of_order():
@@ -569,7 +569,7 @@ def test_cost_protocolizer_states_the_protocols_it_chooses():
         cost_model=SIMPLE,
     )
     formatter(plan, {var: tns.ftype for var, tns in bindings.items()}, stats, sf)
-    assert read_protocols(capture.last_prgm, x, y) == [(Walk(),), (Gallop(),)]
+    assert read_protocols(capture.last_prgm, x, y) == [(Walk(),), (Follow(),)]
     program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
     bindings[c] = capture.last_bindings[c].construct((10,))
     (result,) = NotationCompiler(loader)(program).main(
