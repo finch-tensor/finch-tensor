@@ -585,11 +585,19 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
         else:
             distinct = spaces.located(spaces.stepped(table), component.fields)
             arg = loop_arg(prefix.expr)
-            galloped = []
+            galloped, walks = [], False
             for node in dict.fromkeys(PostOrderDFS(arg)):
                 match node:
-                    case Table() if spaces.protocol(node) == Gallop():
-                        galloped.append(node)
+                    case Table(Alias() as tns, idxs) if (
+                        spaces.idx in idxs[tns.nfused :]
+                    ):
+                        match spaces.protocol(node):
+                            case Gallop():
+                                galloped.append(node)
+                            case Follow():
+                                pass
+                            case _:
+                                walks = True
             match component.protocol:
                 case Walk() if not galloped:
                     # With no gallop to lead it, the loop merges its walks,
@@ -597,32 +605,33 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
                     # expression combines them, and otherwise stepping through
                     # every entry of each, not only those the others share.
                     stats_factory = machine.stats_factory
-                    walked = spaces.walked(arg)
-                    entered = spaces.exec_space
-                    if walked is not None:
-                        entered = stats_factory.mapjoin(
-                            ffuncs.and_, entered, stats_factory.support(walked)
-                        )
                     visits = spaces.count(
                         stats_factory.mapjoin(
                             ffuncs.and_,
-                            entered,
+                            spaces.exec_space,
+                            stats_factory.support(spaces.walked(arg)),
                             spaces.project(machine(table), (spaces.idx,)),
                         )
                     )
                 case Walk():
                     visits = spaces.walk(table)
                 case Gallop():
-                    # A gallop jumps at most once for each visit the loop would
-                    # make if the level were dense, and for each step of the
-                    # smallest walk among the gallops.
-                    dense = loop_spaces(
-                        replace(prefix, expr=followed(prefix.expr, table)), machine
+                    # Gallops leapfrog: each phase ends at the furthest next
+                    # entry among them and the others seek to it, so they jump
+                    # once for each step of the smallest. A walk doesn't end a
+                    # phase, it is stepped within those of the gallops, so
+                    # beside one they jump through every entry of the smallest
+                    # in the fibers entered. Without one, they jump at most once
+                    # for each visit the loop would make if the level were dense.
+                    visits = min(
+                        (spaces.walk(node) for node in galloped),
+                        default=spaces.walk(table),
                     )
-                    smallest = min(
-                        (spaces.walk(node) for node in galloped), default=0.0
-                    )
-                    visits = min(dense.count(dense.visited()), smallest)
+                    if not walks:
+                        dense = loop_spaces(
+                            replace(prefix, expr=followed(prefix.expr, table)), machine
+                        )
+                        visits = min(dense.count(dense.visited()), visits)
         return np.array(
             [
                 [
