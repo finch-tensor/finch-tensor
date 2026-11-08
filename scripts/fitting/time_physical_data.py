@@ -32,6 +32,7 @@ from finch.autoschedule.formatter.smart_formatter import CostFormatter, format_f
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.autoschedule.util import fuse_loop_order
 from finch.compile_jl.compiler import FinchJLCompiler
+from finch.compile_jl.runtime import DefaultFinchJLRuntime
 from finch.finch_logic import Alias, Field, HardAlias, Plan, Produces, Query, Table
 from scripts.fitting.generation import (
     examples,
@@ -59,8 +60,8 @@ class FixedFormatter(CostFormatter):
         }
 
 
-def julia_loader():
-    return CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
+def julia_loader(runtime: DefaultFinchJLRuntime | None = None):
+    return CompilerFormLowerer(LogicCompiler(FinchJLCompiler(runtime)))
 
 
 def reformat(tns: Tensor, options: list[LevelOption], perm=()) -> Tensor:
@@ -105,31 +106,41 @@ class Timer:
     """
     Times programs with their formats, keeping the executor of each program
     and its formats, which keeps the kernel it compiled for every example
-    which runs it again.
+    which runs it again, and the Julia runtime the kernel runs in.
     """
 
     def __init__(self, models: Mapping[str, CostModel], repeat=10, seconds=5.0):
         self.models = models
         self.repeat = repeat
         self.seconds = seconds
-        self.executors: dict[str, LogicExecutor] = {}
+        self.executors: dict[str, tuple[LogicExecutor, DefaultFinchJLRuntime]] = {}
 
     def measure(self, plan, formats, bindings) -> float:
         key = json.dumps([str(plan), format_kinds(formats)], sort_keys=True)
         if key not in self.executors:
-            formatter = FixedFormatter(julia_loader(), formats)
-            self.executors[key] = LogicExecutor(
+            runtime = DefaultFinchJLRuntime()
+            formatter = FixedFormatter(julia_loader(runtime), formats)
+            executor = LogicExecutor(
                 formatter, stats_factory=DCStatsFactory(), cache=True
             )
-        executor = self.executors[key]
-        # The first run compiles the kernel, which the others reuse. The others
-        # stop after repeat runs or seconds of runs, so a slow variant runs once.
-        executor(plan, bindings)
-        runs: list[float] = []
-        while len(runs) < self.repeat and sum(runs) < self.seconds:
+            self.executors[key] = (executor, runtime)
+        executor, runtime = self.executors[key]
+
+        def run() -> float:
+            # The runtime would lend each run the storage of the outputs and
+            # workspaces the last run grew, so each run allocates them anew
+            # instead, as a program run once does.
+            runtime.free_pool.clear()
             start = time.perf_counter()
             executor(plan, bindings)
-            runs.append(time.perf_counter() - start)
+            return time.perf_counter() - start
+
+        # The first run compiles the kernel, which the others reuse. The others
+        # stop after repeat runs or seconds of runs, so a slow variant runs once.
+        run()
+        runs: list[float] = []
+        while len(runs) < self.repeat and sum(runs) < self.seconds:
+            runs.append(run())
         return min(runs)
 
     def time_example(self, directory: Path, example, deadline) -> dict[str, float]:
