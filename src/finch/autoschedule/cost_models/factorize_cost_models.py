@@ -9,6 +9,7 @@ from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    FillTable,
     Fuse,
     Literal,
     LogicExpression,
@@ -108,7 +109,7 @@ class FlopsBasis(FactorizeBasis, AliasedForm):
                 case Relabel(arg, idxs):
                     out_stats, iter_stats = visit_expr(arg)
                     return stats_factory.relabel(out_stats, idxs), iter_stats
-                case Table() | Literal():
+                case Table() | FillTable() | Literal():
                     out_stats = machine(expr)
                     return out_stats, out_stats
                 case _:

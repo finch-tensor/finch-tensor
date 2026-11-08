@@ -19,14 +19,13 @@ import numpy as np
 import finch as fl
 from finch.algebra import ftype
 from finch.codegen import NumpyBuffer
-from finch.finch_logic import Alias, LogicInterpreter
+from finch.finch_logic import Alias, HardAlias, LogicInterpreter
 from finch.tensor import ElementLevel, FiberTensor, SparseCOOLevel, element
 from scripts.fitting.kronecker_stats import (
     KroneckerTensor,
     block_shapes,
     kronecker_rmat,
 )
-from scripts.fitting.physical_bases import INPUTS, A, B, C
 
 # Each dimension is split into digits of BLOCK_BITS bits, and the block of each
 # digit is drawn by R-MAT.
@@ -93,12 +92,13 @@ def seed_lg_densities(prgm, input_fields, lg_dims, seeds):
     are the same at levels where the same fields have bits left.
     """
     query, _ = prgm.bodies
-    fields = {**input_fields, C: query.lhs.idxs}
+    output = query.lhs.tns
+    fields = {**input_fields, output: query.lhs.idxs}
     lg_size = {
         tns: sum(lg_dims[idx.name] for idx in idxs) for tns, idxs in fields.items()
     }
     nnzs = {tns: round(np.sum(seeds[tns]) * 2 ** lg_size[tns]) for tns in input_fields}
-    products = nnzs[A] * nnzs[B]
+    products = math.prod(nnzs.values())
     done = 0
     for lg in sorted(set(lg_dims.values())):
         level = {}
@@ -114,9 +114,8 @@ def seed_lg_densities(prgm, input_fields, lg_dims, seeds):
         return min(np.log2(max(nnz, 1)) / lg, 1.0) if lg else 1.0
 
     return [
-        fraction(nnzs[A], lg_size[A]),
-        fraction(nnzs[B], lg_size[B]),
-        fraction(products, lg_size[C]),
+        *(fraction(nnzs[tns], lg_size[tns]) for tns in input_fields),
+        fraction(products, lg_size[output]),
     ]
 
 
@@ -172,8 +171,8 @@ def examples(directory: Path, chunk=None, kind="program.json") -> list[str]:
 
 def record_inputs(record: dict[str, Any]) -> dict[Alias, KroneckerTensor]:
     inputs = {}
-    for tns in INPUTS:
-        spec = record["inputs"][tns.name]
+    for name, spec in record["inputs"].items():
+        tns = HardAlias(name)
         tensor = kronecker_rmat(
             spec["lg_shape"],
             [np.asarray(S) for S in spec["rmat_seeds"]],

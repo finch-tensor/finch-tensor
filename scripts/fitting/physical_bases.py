@@ -28,10 +28,20 @@ examples coalesce_physical_data collects, so a new basis needs no new timings.
   ordered, before any of them run, from the stats of its inputs alone,
   whatever their formats, with every table galloping, as the loop orderer
   prices it, so the model learns what a loop order costs once they have run.
+- factorize: for a random sum of products, every factorization the factorizer
+  can make of it, by the order it eliminates the fields it sums over. Each
+  query of a factorization which computes something is timed on its own, as
+  an example of the loop stage, in the loop order the loop orderer chooses
+  for it with the loop model, with every tensor it reads copied into that
+  order, and the results of earlier queries drawn from their exact supports,
+  so no copy is timed, as the factorizer prices queries whatever their order.
+  A variant's runtime is the sum of those of its queries, and its features
+  are those of its queries, from the stats of its inputs alone, as the
+  factorizer prices them.
 """
 
 import json
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -42,11 +52,13 @@ from finch.autoschedule import optimize_protocols, protocolize
 from finch.autoschedule.cost_models import (
     PROTOCOL_BASIS,
     PROTOCOL_COST_MODEL,
+    WORKSPACE_LOOP_COST_MODEL,
     Affine,
     Basis,
     Concat,
     CostModel,
     ElementLevelOption,
+    FlopsBasis,
     LevelOption,
     PigeonBasis,
     Stratify,
@@ -62,8 +74,13 @@ from finch.autoschedule.formatter.smart_formatter import (
     format_ftype,
     optimize_formats,
 )
-from finch.autoschedule.loop_orderer.loop_ordering import galloping
-from finch.autoschedule.tensor_stats.memo_stats import MemoStatsFactory
+from finch.autoschedule.loop_orderer import BFSLoopOrderer
+from finch.autoschedule.loop_orderer.loop_ordering import (
+    drop_internal_reorders,
+    galloping,
+)
+from finch.autoschedule.tensor_stats.memo_stats import MemoStats, MemoStatsFactory
+from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.util import fuse_loop_order
 from finch.autoschedule.workspacer import (
     add_cost_effective_reformats,
@@ -72,6 +89,7 @@ from finch.autoschedule.workspacer import (
 from finch.finch_logic import (
     Alias,
     Field,
+    Fuse,
     HardAlias,
     LogicStatement,
     Plan,
@@ -83,13 +101,17 @@ from finch.finch_logic import (
     parse_logic,
 )
 from finch.finch_logic.parser import PROTOCOLS
+from finch.finch_logic.simplification import simplify_logic
 from finch.symbolic import PostOrderDFS, PostWalk, Rewrite
-from scripts.fitting.kronecker_stats import KroneckerStatsFactory, KroneckerTensor
+from scripts.fitting.kronecker_stats import (
+    KroneckerStatsFactory,
+    KroneckerTensor,
+    support_tensor,
+)
 
-STAGES = ("protocol", "format", "transpose", "loop")
+STAGES = ("protocol", "format", "transpose", "loop", "factorize")
 OPTIONS = {option.kind: option for option in LEVEL_OPTIONS}
 A, B, C = HardAlias("A"), HardAlias("B"), HardAlias("C")
-INPUTS = (A, B)
 
 
 def loop_basis(classes: WriteClasses = write_class) -> Basis:
@@ -107,6 +129,7 @@ BASES: dict[str, Basis] = {
     "format": PROTOCOL_BASIS,
     "transpose": Affine(TransposeBasis()),
     "loop": loop_basis(),
+    "factorize": Affine(FlopsBasis()),
 }
 
 
@@ -132,7 +155,11 @@ def parse_models(args: list[str] | None) -> dict[str, CostModel]:
     models the optimizers use until they are fitted. A loop model whose
     cutoffs were tuned classes its writes by them.
     """
-    models = {"protocol": PROTOCOL_COST_MODEL, "format": PROTOCOL_COST_MODEL}
+    models = {
+        "protocol": PROTOCOL_COST_MODEL,
+        "format": PROTOCOL_COST_MODEL,
+        "loop": WORKSPACE_LOOP_COST_MODEL,
+    }
     for arg in args or ():
         name, _, path = arg.partition("=")
         if name not in BASES or not path:
@@ -153,7 +180,15 @@ def with_subsequence(order, fields):
 
 
 def fused_plan(query: Query, loop_order: tuple[Field, ...]) -> Plan:
-    return Plan((fuse_loop_order(query, loop_order), Produces((C,))))
+    return Plan((fuse_loop_order(query, loop_order), Produces((query.lhs.tns,))))
+
+
+def fused_order(stmt: LogicStatement) -> tuple[Field, ...]:
+    """The loop order of the Fuse nodes around a statement."""
+    match stmt:
+        case Fuse(idx, body):
+            return (idx, *fused_order(body))
+    return ()
 
 
 def variant_plan(record: Mapping[str, Any], variant: Mapping[str, Any]) -> Plan:
@@ -175,7 +210,7 @@ def variant_plan(record: Mapping[str, Any], variant: Mapping[str, Any]) -> Plan:
 
     def read(node):
         match node:
-            case Table(HardAlias(name) as tns, idxs) if tns in INPUTS:
+            case Table(HardAlias(name) as tns, idxs):
                 if stage == "loop":
                     idxs = with_subsequence(order, idxs)
                 if name in protocols:
@@ -364,6 +399,80 @@ def resolve(
     return plan, formats
 
 
+def factorized_plan(variant: Mapping[str, Any]) -> Plan:
+    """
+    The plan of a variant of the factorize stage, as the loop orderer receives
+    it, without its copies, which happen outside the timer.
+    """
+    plan = drop_internal_reorders(simplify_logic(parse_logic(variant["plan"])))
+    assert isinstance(plan, Plan)
+
+    def computes(body: LogicStatement) -> bool:
+        match body:
+            case Query(_, Table()):
+                return False
+        return True
+
+    return Plan(tuple(filter(computes, plan.bodies)))
+
+
+def unmemoized(stats: TensorStats) -> TensorStats:
+    match stats:
+        case MemoStats():
+            return stats.inner
+    return stats
+
+
+def factorized_queries(
+    record: Mapping[str, Any],
+    variant: Mapping[str, Any],
+    inputs: Mapping[Alias, KroneckerTensor],
+    models: Mapping[str, CostModel],
+) -> Iterator[tuple[dict[str, Any], dict[Alias, KroneckerTensor]]]:
+    """
+    Each query of the factorized_plan of a variant of the example of record,
+    as the record of an example of the loop stage of that query alone, in the
+    loop order the loop orderer chooses for it with models["loop"], and the
+    tensors it reads, under their names in the query: the inputs of record,
+    and the results of earlier queries, as KroneckerTensors of their exact
+    supports, which are drawn when they are reached. Each query stores its
+    result as the factorization does.
+    """
+    plan = factorized_plan(variant)
+    stats_factory = record_stats_factory(record)
+    stats = input_stats(plan, inputs, stats_factory)
+    orderer = BFSLoopOrderer(cost_model=models["loop"])
+    ordered = orderer.set_loop_orders(plan, dict(stats), stats_factory)
+    stored = input_fields(parse_logic(record["query"]))
+    machine = StatsMachine(stats_factory, dict(stats))
+    dtype = np.dtype(record["dtype"]).type
+    idx_type = np.dtype(record["idx_type"]).type
+    for query, fused in zip(plan.bodies[:-1], ordered.bodies[:-1], strict=True):
+        assert isinstance(query, Query)
+        tensors = {}
+        for tns, idxs in input_fields(query.rhs).items():
+            if tns in inputs:
+                # The factorizer keeps the fields of the inputs as they are.
+                if idxs != stored[tns]:
+                    raise ValueError(f"Expected {tns} read as {stored[tns]}")
+                tensors[tns] = inputs[tns]
+            else:
+                support = unmemoized(machine(Table(tns, idxs)))
+                tensors[tns] = support_tensor(support, dtype, idx_type)
+        machine(query)
+        yield (
+            {
+                "stage": "loop",
+                "query": str(Plan((query, Produces((query.lhs.tns,))))),
+                "loop_order": [idx.name for idx in fused_order(fused)],
+                "dtype": record["dtype"],
+                "idx_type": record["idx_type"],
+                "block_bits": record["block_bits"],
+            },
+            tensors,
+        )
+
+
 def format_kinds(formats: Mapping[Alias, list[LevelOption]]) -> dict[str, list[str]]:
     return {
         tns.name: [option.kind for option in options]
@@ -407,15 +516,22 @@ def featurize_record(
     compiled or run. The loop stage orders loops before the workspacer and the
     formatter run, so its features are those of the program as ordered, from
     the stats of its inputs alone, whatever their formats, as the loop orderer
-    prices it, galloping, and it chooses nothing.
+    prices it, galloping, and it chooses nothing. The factorize stage factors
+    before any of them, so its features are those of the queries of the
+    factorization, from the stats of its inputs alone, as the factorizer
+    prices them.
     """
     stats_factory = record_stats_factory(record)
+    stage = record["stage"]
     rows = []
     for variant in record["variants"]:
-        if record["stage"] == "loop":
-            plan, formats = galloped(variant_plan(record, variant)), {}
-        else:
-            plan, formats = resolve(record, variant, inputs, models)
+        match stage:
+            case "loop":
+                plan, formats = galloped(variant_plan(record, variant)), {}
+            case "factorize":
+                plan, formats = factorized_plan(variant), {}
+            case _:
+                plan, formats = resolve(record, variant, inputs, models)
         rows.append(
             features(
                 BASES[name] if basis is None else basis,
@@ -423,7 +539,7 @@ def featurize_record(
                 formats,
                 read_inputs(record, plan, inputs),
                 stats_factory,
-                protocols=record["stage"] != "loop",
+                protocols=stage not in ("loop", "factorize"),
             )
         )
     return rows

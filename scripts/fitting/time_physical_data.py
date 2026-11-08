@@ -13,6 +13,11 @@ written to DIR/data as JSON after it is measured, by its index, so that
 fit_physical_data needn't choose the formats again, and the variants already
 timed are skipped. With --hours H, no variant is timed after H hours, so a
 job measures for about as long as it is given, whatever its programs cost.
+In the factorize stage, each query of a variant which computes something is
+timed on its own, as physical_bases splits it, with the tensors it reads
+copied into its loop order and formats outside the timer, and the runtime of
+the variant is the sum of theirs. The runtime, loop order, and formats of
+each query are written to the timing too, under queries.
 
     pixi run -e fitting python -m scripts.fitting.time_physical_data DIR [options]
 """
@@ -41,6 +46,7 @@ from scripts.fitting.generation import (
     record_inputs,
 )
 from scripts.fitting.physical_bases import (
+    factorized_queries,
     format_kinds,
     input_perms,
     parse_models,
@@ -143,6 +149,47 @@ class Timer:
             runs.append(run())
         return min(runs)
 
+    def time_variant(self, record, variant, inputs, copy):
+        """
+        The runtime of a variant of the example of record, whose inputs are
+        inputs, each of which copy(tns, options, perm) materializes in the
+        formats and the order the variant reads it in, and the formats it ran
+        with.
+        """
+        plan, formats = resolve(record, variant, inputs, self.models)
+        # The inputs the program reads are stored in the order it reads them.
+        perms = input_perms(record, plan)
+        bindings = {
+            tns: copy(tns, formats[tns], perms[tns]) for tns in inputs if tns in perms
+        }
+        return self.measure(plan, formats, bindings), format_kinds(formats)
+
+    def time_factorization(self, record, variant, inputs, materialized, reformatter):
+        """
+        The runtime of a variant of the factorize stage, the sum of those of
+        its queries, and the runtime, loop order, and formats of each. The
+        results of earlier queries a query reads are materialized for it alone.
+        """
+        queries = []
+        for query, tensors in factorized_queries(record, variant, inputs, self.models):
+
+            def copy(tns, options, perm, tensors=tensors):
+                if tns in materialized:
+                    return reformatter(materialized[tns], options, perm)
+                return reformat(materialize(tensors[tns]), options, perm)
+
+            runtime, kinds = self.time_variant(
+                query, {"loop_order": query["loop_order"]}, tensors, copy
+            )
+            queries.append(
+                {
+                    "runtime": runtime,
+                    "loop_order": query["loop_order"],
+                    "formats": kinds,
+                }
+            )
+        return sum(query["runtime"] for query in queries), queries
+
     def time_example(self, directory: Path, example, deadline) -> dict[str, float]:
         """
         Time each variant of example which hasn't been timed, and write their
@@ -153,11 +200,13 @@ class Timer:
         timing_path = path(directory, example, "timing.json")
         runtimes: dict[str, float] = {}
         kinds: dict[str, dict[str, list[str]]] = {}
+        queries: dict[str, list[dict]] = {}
         if timing_path.exists():
             timing = json.loads(timing_path.read_text())
             runtimes = timing["runtimes"]
             # Timings written before formats were saved have none.
             kinds = timing.get("formats", {})
+            queries = timing.get("queries", {})
         if len(runtimes) == len(record["variants"]):
             return runtimes
         inputs = record_inputs(record)
@@ -168,17 +217,22 @@ class Timer:
                 continue
             if time.monotonic() > deadline:
                 break
-            plan, formats = resolve(record, variant, inputs, self.models)
-            # The inputs the program reads are stored in the order it reads them.
-            perms = input_perms(record, plan)
-            bindings = {
-                tns: reformatter(tensor, formats[tns], perms[tns])
-                for tns, tensor in materialized.items()
-                if tns in perms
-            }
-            runtimes[str(index)] = self.measure(plan, formats, bindings)
-            kinds[str(index)] = format_kinds(formats)
-            write_json(timing_path, {"runtimes": runtimes, "formats": kinds})
+            if record["stage"] == "factorize":
+                runtimes[str(index)], queries[str(index)] = self.time_factorization(
+                    record, variant, inputs, materialized, reformatter
+                )
+                timing = {"runtimes": runtimes, "queries": queries}
+            else:
+                runtimes[str(index)], kinds[str(index)] = self.time_variant(
+                    record,
+                    variant,
+                    inputs,
+                    lambda tns, options, perm: reformatter(
+                        materialized[tns], options, perm
+                    ),
+                )
+                timing = {"runtimes": runtimes, "formats": kinds}
+            write_json(timing_path, timing)
         return runtimes
 
 

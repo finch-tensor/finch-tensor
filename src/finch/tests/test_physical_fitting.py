@@ -36,6 +36,7 @@ from finch.finch_logic import (
     Produces,
     Query,
     Table,
+    parse_logic,
 )
 from finch.symbolic import PostOrderDFS
 from scripts.fitting import physical_bases
@@ -52,6 +53,7 @@ from scripts.fitting.physical_bases import (
     A,
     B,
     C,
+    factorized_queries,
     featurize_record,
     format_kinds,
     input_perms,
@@ -280,3 +282,128 @@ def test_models_with_tuned_cutoffs_class_writes_by_them(tmp_path):
             assert classify == classes
         case other:
             raise AssertionError(f"Expected a stratified loop basis, got {other}")
+
+
+def chain_record(rng, lg=8, per_row=4):
+    """
+    The record of a factorize stage example of E_il = sum_jk A_ij B_jk C_kl,
+    with inputs of shape 2 ** lg and about per_row entries in each row, whose
+    variants are its two factorizations, (A B) C and A (B C).
+    """
+    from scripts.fitting.generate_factorize_data import E, factorizations
+    from scripts.fitting.physical_bases import input_stats, record_stats_factory
+
+    last = Field("l")
+    fields = {A: (i, j), B: (j, k), C: (k, last)}
+    prgm = Plan(
+        (
+            Query(
+                Table(E, (i, last)),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0.0),
+                    MapJoin(
+                        Literal(ffuncs.mul),
+                        tuple(Table(tns, idxs) for tns, idxs in fields.items()),
+                    ),
+                    (j, k),
+                ),
+            ),
+            Produces((E,)),
+        )
+    )
+    S = np.ones((2, 2)) / 4 * per_row / 2**lg
+    record = {
+        "stage": "factorize",
+        "query": str(prgm),
+        "exhaustive": True,
+        "dtype": "float64",
+        "idx_type": "int64",
+        "block_bits": BLOCK_BITS,
+        "inputs": {tns.name: input_record(S, [lg, lg], rng) for tns in fields},
+    }
+    stats_factory = record_stats_factory(record)
+    stats = input_stats(prgm, record_inputs(record), stats_factory)
+    plans = factorizations(prgm, stats, stats_factory)
+    record["variants"] = [{"plan": str(plan)} for plan in plans]
+    return record
+
+
+def test_factorizations_of_a_chain_are_its_two_products():
+    record = chain_record(np.random.default_rng(0))
+    # Each reduces one product into T1, then the other into T2, which E copies.
+    assert [variant["plan"].splitlines()[0] for variant in record["variants"]] == [
+        "T1[i, k] = Aggregate(add, 0.0, MapJoin(mul, A[i, j], B[j, k]), j)",
+        "T1[j, l] = Aggregate(add, 0.0, MapJoin(mul, B[j, k], C[k, l]), k)",
+    ]
+
+
+def test_factorized_queries_read_the_exact_supports_of_earlier_ones():
+    record = chain_record(np.random.default_rng(0))
+    inputs = record_inputs(record)
+    models = parse_models(None)
+    for variant in record["variants"]:
+        queries = list(factorized_queries(record, variant, inputs, models))
+        # The copy of T2 into E happens outside the timer, so isn't a query.
+        assert [query["query"].splitlines()[0][:2] for query, _ in queries] == [
+            "T1",
+            "T2",
+        ]
+        (first, first_tensors), (second, second_tensors) = queries
+        assert set(first_tensors) <= set(inputs)
+        assert all(first_tensors[tns] is inputs[tns] for tns in first_tensors)
+        # The second reads T1, drawn from its support, which is that of the
+        # product of the two inputs the first reads.
+        (t1,) = set(second_tensors) - set(inputs)
+        a, b = (first_tensors[tns] for tns in sorted(first_tensors, key=str))
+        product = sps.coo_array(
+            (np.ones(a.nnz), a.coords()), shape=a.shape
+        ) @ sps.coo_array((np.ones(b.nnz), b.coords()), shape=b.shape)
+        assert second_tensors[t1].nnz == product.nnz
+        # Each query loops over all of its fields.
+        for query, _ in queries:
+            match parse_logic(query["query"]):
+                case Plan((Query(Table(_, idxs), Aggregate(arg=arg)), _)):
+                    order = [Field(name) for name in query["loop_order"]]
+                    assert sorted(order, key=str) == sorted(
+                        {*idxs, *arg.fields()}, key=str
+                    )
+                case other:
+                    raise AssertionError(f"Expected one aggregate query, got {other}")
+
+
+def test_factorize_features_price_each_query_from_the_inputs_alone(monkeypatch):
+    record = chain_record(np.random.default_rng(0))
+
+    def resolve(*args, **kwargs):
+        raise AssertionError("The factorize stage chose formats or protocols")
+
+    monkeypatch.setattr(physical_bases, "resolve", resolve)
+    rows = featurize_record(
+        record, record_inputs(record), "factorize", parse_models(None)
+    )
+    basis = BASES["factorize"]
+    assert basis.feature_names == ("iterations", "outputs", "constant")
+    # Each of the two products is a row, and the copy into E isn't.
+    assert [np.asarray(r).shape for r in rows] == [(2, 3), (2, 3)]
+
+
+@pytest.mark.skipif(not julia_available(), reason="Finch.jl is not installed")
+def test_timing_a_factorization_sums_its_queries(tmp_path):
+    from scripts.fitting.time_physical_data import Timer
+
+    record = chain_record(np.random.default_rng(0))
+    (tmp_path / "data").mkdir()
+    path(tmp_path, "0000-00000", "program.json").write_text(json.dumps(record))
+    runtimes = Timer(parse_models(None), repeat=1).time_example(
+        tmp_path, "0000-00000", math.inf
+    )
+    timing = json.loads(path(tmp_path, "0000-00000", "timing.json").read_text())
+    assert timing["runtimes"] == runtimes
+    assert set(runtimes) == {"0", "1"}
+    for index, runtime in runtimes.items():
+        queries = timing["queries"][index]
+        assert len(queries) == 2
+        assert runtime == pytest.approx(sum(query["runtime"] for query in queries))
+        assert all(query["runtime"] > 0 for query in queries)
+        assert all(query["loop_order"] for query in queries)
