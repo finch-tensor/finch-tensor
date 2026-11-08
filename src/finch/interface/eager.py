@@ -17,6 +17,9 @@ from . import lazy
 from .fuse import compute
 
 EighResult = namedtuple("EighResult", ["eigenvalues", "eigenvectors"])
+LstsqResult = namedtuple(
+    "LstsqResult", ["solution", "residuals", "rank", "singular_values"]
+)
 QRResult = namedtuple("QRResult", ["Q", "R"])
 SlogdetResult = namedtuple("SlogdetResult", ["sign", "logabsdet"])
 SVDResult = namedtuple("SVDResult", ["U", "S", "Vh"])
@@ -602,6 +605,20 @@ def eigvalsh(x, /, *, k=None, rtol=None, atol=None):
         )
     x = to_numpy(lazy.asarray(x))
     return lazy.asarray(np.linalg.eigvalsh(x))
+
+
+def lstsq(x1, x2, /, *, rcond=None):
+    x1 = _warn_compute(x1, "lstsq")
+    x2 = _warn_compute(x2, "lstsq")
+    x1 = to_numpy(lazy.asarray(x1))
+    x2 = to_numpy(lazy.asarray(x2))
+    solution, residuals, rank, singular_values = np.linalg.lstsq(x1, x2, rcond=rcond)
+    return LstsqResult(
+        lazy.asarray(solution),
+        lazy.asarray(residuals),
+        int(rank),
+        lazy.asarray(singular_values),
+    )
 
 
 def matrix_rank(x, /, *, rtol=None, atol=None):

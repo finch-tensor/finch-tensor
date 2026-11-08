@@ -594,7 +594,7 @@ def full(
 
     - out (array): an array where every element is equal to fill_value.
     """
-    shape = (shape,) if isinstance(shape, int) else tuple(shape)
+    shape = (shape,) if isinstance(shape, (int, np.integer)) else tuple(shape)
     if isinstance(fill_value, LazyTensor):
         # The value may be a zero-dimensional tensor, such as a dynamic fill.
         if dtype is not None:
@@ -1927,6 +1927,10 @@ def eigvalsh(x, /, *, k=None, rtol=None, atol=None):
 
 def lu(x, /, *, permute_l=False, p_indices=False):
     _eager_only("lu")
+
+
+def lstsq(x1, x2, /, *, rcond=None):
+    _eager_only("lstsq")
 
 
 def matrix_rank(x, /, *, rtol=None, atol=None):
