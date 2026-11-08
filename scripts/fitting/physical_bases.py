@@ -114,7 +114,7 @@ A, B, C = HardAlias("A"), HardAlias("B"), HardAlias("C")
 
 def loop_basis(classes: WriteClasses = write_class) -> Basis:
     """The basis of the loop model, whose writes are of the classes of the
-    cutoffs of classes."""
+    region cutoff of classes."""
     return Affine(
         Concat(PigeonBasis(), Stratify(WriteBasis(), N_WRITE_CLASSES, classes))
     )
@@ -129,7 +129,7 @@ BASES: dict[str, Basis] = {
 
 
 # The rows of the loop basis before its writes are classed, from which
-# stratified gives the rows of the loop basis under any cutoffs without
+# stratified gives the rows of the loop basis under any cutoff without
 # featurizing again.
 TUNING_BASIS = Affine(Concat(PigeonBasis(), WriteBasis()))
 
@@ -148,7 +148,7 @@ def parse_models(args: list[str] | None) -> dict[str, CostModel]:
     """
     The models of NAME=PATH arguments, which fit_physical_data wrote, over the
     models the optimizers use until they are fitted. A loop model whose
-    cutoffs were tuned classes its writes by them.
+    region cutoff was tuned classes its writes by it.
     """
     models = {"protocol": PROTOCOL_COST_MODEL, "loop": WORKSPACE_LOOP_COST_MODEL}
     for arg in args or ():
@@ -159,8 +159,8 @@ def parse_models(args: list[str] | None) -> dict[str, CostModel]:
             )
         data = json.loads(Path(path).read_text())
         basis = BASES[name]
-        if "write_cutoffs" in data:
-            basis = loop_basis(WriteClasses(**data["write_cutoffs"]))
+        if "region_cutoff" in data:
+            basis = loop_basis(WriteClasses(data["region_cutoff"]))
         untrained = CostModel(basis, np.zeros(basis.n_features))
         models[name] = untrained.from_json(data)
     return models

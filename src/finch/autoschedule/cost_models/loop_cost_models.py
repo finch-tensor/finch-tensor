@@ -511,19 +511,18 @@ class WriteBasis(LoopBasis, LoopOrderedForm):
     level are its fields in storage order, the level is written once for each
     of its indices, in order, and otherwise its writes scatter, as
     util.write_protocols infers. The element level is written with its parent.
-    Besides the writes, a row has the measures which WriteClasses classes it
-    by: the entries of the region of the output the writes scatter into, a
-    slice over the fields after the leading ones the loops visit in storage
-    order, which a workspace fused over those could hold, or none where
-    nothing scatters, the distinct entries of the levels reached, those
-    levels would have if dense, and the points of the loops if dense. Sizes
-    are products of the extents of the fields, where a field which no table
-    has, such as a unit dimension of the output alone, has one index.
+    Besides the writes, a row has the entries of the region of the output the
+    writes scatter into, which WriteClasses classes it by, a slice over the
+    fields after the leading ones the loops visit in storage order, which a
+    workspace fused over those could hold, or none where nothing scatters, and
+    the distinct entries of the levels reached. Sizes are products of the
+    extents of the fields, where a field which no table has, such as a unit
+    dimension of the output alone, has one index.
     """
 
     @property
     def n_features(self) -> int:
-        return 6
+        return 4
 
     @property
     def feature_names(self) -> tuple[str, ...]:
@@ -532,8 +531,6 @@ class WriteBasis(LoopBasis, LoopOrderedForm):
             "scatter_writes",
             "scattered_region",
             "distinct_outputs",
-            "dense_outputs",
-            "dense_loops",
         )
 
     def get_component_features(
@@ -567,7 +564,6 @@ class WriteBasis(LoopBasis, LoopOrderedForm):
             features[0, 0 if prefix == order else 1] += visits
             distinct = restrict(machine.stats_factory, output, order)
             features[0, 3] += distinct.estimate_non_fill_values()
-            features[0, 4] += size(order)
         if features[0, 1]:
             fused = 0
             while (
@@ -576,7 +572,6 @@ class WriteBasis(LoopBasis, LoopOrderedForm):
             ):
                 fused += 1
             features[0, 2] = size(output_vars[fused:])
-        features[0, 5] = size(prefix)
         return features
 
 
@@ -588,40 +583,22 @@ def written_fields(component: Prefix) -> tuple[Field, ...]:
     return component.output_vars
 
 
-N_WRITE_CLASSES = 8
+N_WRITE_CLASSES = 2
 
 
 @dataclass(frozen=True)
 class WriteClasses:
     """
-    The class of each row of WriteBasis, as four times whether the region
-    its writes scatter into, plus two times whether the density of the levels
-    of the output it reaches, its distinct outputs over its dense ones, plus
-    whether the density of its loops, its writes over its dense loops,
-    exceeds its cutoff. The default region cutoff is the most entries a
-    workspace can reset and copy out cheaply.
+    The class of each row of WriteBasis, whether the region its writes
+    scatter into exceeds the region cutoff. The default cutoff is the most
+    entries a workspace can reset and copy out cheaply.
     """
 
     region: float = 100_000
-    output_density: float = 0.5
-    loop_density: float = 0.5
 
     def __call__(self, rows: np.ndarray) -> np.ndarray:
-        sequential, scattered, region, distinct, dense_outputs, dense_loops = rows.T
-        output_density = np.divide(
-            distinct, dense_outputs, out=np.zeros(len(rows)), where=dense_outputs > 0
-        )
-        loop_density = np.divide(
-            sequential + scattered,
-            dense_loops,
-            out=np.zeros(len(rows)),
-            where=dense_loops > 0,
-        )
-        return (
-            4 * (region > self.region)
-            + 2 * (output_density > self.output_density)
-            + (loop_density > self.loop_density)
-        )
+        _, _, region, _ = rows.T
+        return (region > self.region).astype(int)
 
 
 write_class = WriteClasses()
@@ -630,12 +607,12 @@ WRITE_BASIS = Stratify(WriteBasis(), N_WRITE_CLASSES, write_class)
 
 def write_coefficients(scatter: float, workspace: float) -> list[float]:
     """The coefficients of WRITE_BASIS which charge a write which scatters
-    workspace in the classes whose scattered region is within its cutoff,
-    scatter in the rest, and nothing else."""
+    workspace in the class whose scattered region is within its cutoff,
+    scatter in the other, and nothing else."""
     return [
         cost
         for cls in range(N_WRITE_CLASSES)
-        for cost in (0.0, scatter if cls >= 4 else workspace, 0.0, 0.0, 0.0, 0.0)
+        for cost in (0.0, scatter if cls else workspace, 0.0, 0.0)
     ]
 
 

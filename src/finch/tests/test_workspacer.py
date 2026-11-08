@@ -340,7 +340,7 @@ def test_only_small_workspaces_make_scattered_writes_cheap():
             prefix = Prefix(order[:n], rhs, (i, k))
             rows = WriteBasis().get_component_features(prefix, machine)
             if rows[0, 1] > 0:
-                regions.add(bool(write_class(rows)[0] >= 4))
+                regions.add(bool(write_class(rows)[0]))
         return regions
 
     # Gustavson scatters within each row of c, n entries, which a workspace
