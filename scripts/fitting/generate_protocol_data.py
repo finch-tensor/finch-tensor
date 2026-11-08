@@ -63,13 +63,13 @@ STAGES = ("protocol", "transpose")
 MAX_RANK = 3
 # log2 of the most entries all the fields of a program may address, and of the
 # most values of any one field.
-LG_MAX_SPACE = 30
-LG_MAX_DIM = 15
+LG_MAX_SPACE = 32
+LG_MAX_DIM = 16
 # The chance that a program has each field.
 FIELD_PROBABILITY = 0.5
 # The sizes of programs and the densities of their inputs are fractions of the
 # most they may be, distributed as the largest of SKEW uniform draws.
-SKEW = 3
+SKEW = 5
 # The draws of the seeds of the inputs of each program, of which KEEP of its
 # stage are kept as examples. In the protocol stage, the variants of the
 # examples of a program compile to the same kernels, so they are compiled

@@ -6,13 +6,17 @@ input has each of the fields of FIELDS with chance FIELD_PROBABILITY, and E
 has each field of the inputs with chance OUTPUT_PROBABILITY, so that the
 inputs are connected by the fields they share, and the program sums over at
 least two of them. The inputs are Kronecker products of R-MAT blocks of drawn
-densities, as kronecker_stats draws them. Of SAMPLES draws of them, KEEP are
-kept, spread over the densities of the inputs and E, and each makes an
-example with the program. Its variants are the distinct
+densities, as kronecker_stats draws them. Its variants are the distinct
 factorizations the factorizer makes of it, one for each order of the fields
 it sums over, or VARIANTS of them drawn without replacement, leaving out those
 with an intermediate or output of more than 2 ** LG_MAX_NNZ nonzeros, which
-bounds the memory of each query. A program with fewer than two is drawn again.
+bounds the memory of each query, and those estimated to run for more than
+MAX_SECONDS. Of SAMPLES draws of the inputs, spread over the densities of the
+inputs and E, up to RETRIES are tried in turn, and the first with two
+variants whose mean is estimated to run for MIN_MEAN_SECONDS to
+MAX_MEAN_SECONDS, so that its queries do much more work than a call costs,
+makes the example of the program. A program none of whose tries does is
+drawn again.
 Each example is written to DIR/data as JSON, with the text of its query, its
 variants, as the text of their plans, and the log shape, the R-MAT seed of
 each block, and the RNG seed of each of its inputs, with the version of numpy
@@ -32,6 +36,7 @@ from typing import Any
 import numpy as np
 
 from finch import ffuncs
+from finch.autoschedule.cost_models import FlopsBasis
 from finch.autoschedule.factorizer.galley_factorizer.annotated_query import (
     AnnotatedQuery,
 )
@@ -67,7 +72,11 @@ from scripts.fitting.generation import (
     spread,
     variants,
 )
-from scripts.fitting.physical_bases import input_stats, record_stats_factory
+from scripts.fitting.physical_bases import (
+    factorized_plan,
+    input_stats,
+    record_stats_factory,
+)
 
 STAGES = ("factorize",)
 INPUTS = tuple(HardAlias(name) for name in "ABCD")
@@ -81,8 +90,8 @@ MAX_RANK = 3
 # log2 of the most entries all the fields of a program may address, of the
 # most values of any one field, and of the most nonzeros of any input,
 # intermediate, or output, which bounds the memory of each query.
-LG_MAX_SPACE = 34
-LG_MAX_DIM = 18
+LG_MAX_SPACE = 44
+LG_MAX_DIM = 22
 LG_MAX_NNZ = 27
 # The chance that an input has each field, and that the output has each field
 # of the inputs.
@@ -91,14 +100,25 @@ OUTPUT_PROBABILITY = 0.3
 # The sizes of programs and the densities of their inputs are fractions of the
 # most they may be, distributed as the largest of SKEW uniform draws.
 SKEW = 8
-# The draws of the seeds of the inputs of each program, of which KEEP are kept
-# as examples. The queries of each factorization choose loop orders and
-# protocols from the stats of its example, so their kernels can differ, and
-# one is kept, for more programs instead.
-SAMPLES = 1000
-KEEP = 1
+# The draws of the seeds of the inputs of each program, of which up to RETRIES
+# are tried, and one is kept as its example. The queries of each
+# factorization choose loop orders and protocols from the stats of its
+# example, so their kernels can differ, and one is kept, for more programs
+# instead.
+SAMPLES = 200
+RETRIES = 32
 # The most factorizations of a program, of up to 720.
 VARIANTS = 16
+# The seconds the variants of an example are estimated to run for: the most
+# of any, and the fewest and most of their mean. The seconds of an iteration
+# and of an output are the median rates of the variants of the factorize data
+# of 2026-11-08 which ran for more than 0.1 s, about which they ran for half
+# to twice as long.
+MAX_SECONDS = 60.0
+MIN_MEAN_SECONDS = 1.0
+MAX_MEAN_SECONDS = 10.0
+SECONDS_PER_ITERATION = 1.4e-9
+SECONDS_PER_OUTPUT = 6.5e-8
 
 
 def connected(field_sets: list[set[str]]) -> bool:
@@ -227,12 +247,21 @@ def largest_nonzeros(plan, stats, stats_factory) -> float:
     return max(machine(body).estimate_non_fill_values() for body in plan.bodies[:-1])
 
 
+def estimated_seconds(plan: Plan, stats, stats_factory) -> float:
+    """The seconds the queries of plan which are timed run for, from their
+    iterations and outputs, counted exactly from stats."""
+    rows = FlopsBasis().get_features(
+        factorized_plan({"plan": str(plan)}), {}, stats, stats_factory
+    )
+    return float(rows.sum(axis=0) @ [SECONDS_PER_ITERATION, SECONDS_PER_OUTPUT])
+
+
 def program_inputs(rng, stage) -> list[dict[str, Any]]:
     """
-    The records of the examples of a drawn program of the first MIN_INPUTS to
-    MAX_INPUTS of INPUTS, as draw_program_inputs draws them, drawn again until
-    there are two factorizations under the cap. The inputs are drawn first,
-    so each number of them is as likely, however often the rest is drawn.
+    The record of the example of a drawn program of the first MIN_INPUTS to
+    MAX_INPUTS of INPUTS, as draw_program_inputs draws it, drawn again until
+    one of its tries makes one. The inputs are drawn first, so each number of
+    them is as likely, however often the rest is drawn.
     """
     inputs = INPUTS[: rng.integers(MIN_INPUTS, MAX_INPUTS + 1)]
     while True:
@@ -243,25 +272,26 @@ def program_inputs(rng, stage) -> list[dict[str, Any]]:
 
 def draw_program_inputs(rng, stage, inputs) -> list[dict[str, Any]] | None:
     """
-    The records of the examples of a drawn program, each with its query, its
-    variants, and the seeds of its inputs, which are KEEP of SAMPLES draws,
-    spread over the log densities of the inputs and the log expected products
-    of E, or None if any has fewer than two factorizations under the cap.
+    The record of the example of a drawn program, with its query, its
+    variants, and the seeds of its inputs, the first of RETRIES of SAMPLES
+    draws, spread over the log densities of the inputs and the log expected
+    products of E, with two variants under the caps whose mean is estimated
+    to run for MIN_MEAN_SECONDS to MAX_MEAN_SECONDS, or None if none has.
     """
     prgm, input_fields, lg_dims = program(rng, inputs)
     dtype = choose(rng, ["float32", "float64"])
+    idx_type = choose(rng, ["int32", "int64"])
     seeds = [
         {tns: choose_seed(rng, idxs, lg_dims) for tns, idxs in input_fields.items()}
         for _ in range(SAMPLES)
     ]
     points = [seed_lg_densities(prgm, input_fields, lg_dims, S) for S in seeds]
-    records = []
-    for i in spread(rng, points, KEEP, SKEW):
+    for i in spread(rng, points, RETRIES, SKEW):
         record = {
             "stage": stage,
             "query": str(prgm),
             "dtype": dtype,
-            "idx_type": choose(rng, ["int32", "int64"]),
+            "idx_type": idx_type,
             "block_bits": BLOCK_BITS,
             "inputs": {
                 tns.name: input_record(
@@ -273,24 +303,28 @@ def draw_program_inputs(rng, stage, inputs) -> list[dict[str, Any]] | None:
         stats_factory = record_stats_factory(record)
         stats = input_stats(prgm, record_inputs(record), stats_factory)
         plans = factorizations(prgm, stats, stats_factory)
-        kept = [
-            str(plan)
+        seconds = {
+            str(plan): estimated_seconds(plan, stats, stats_factory)
             for plan in plans
             if largest_nonzeros(plan, stats, stats_factory) <= 2**LG_MAX_NNZ
-        ]
+        }
+        kept = [plan for plan, time in seconds.items() if time <= MAX_SECONDS]
         if len(kept) < 2:
-            return None
+            continue
+        mean = np.mean([seconds[plan] for plan in kept])
+        if not MIN_MEAN_SECONDS <= mean <= MAX_MEAN_SECONDS:
+            continue
         options, exhaustive = variants(
             [kept], lambda choices: {"plan": choices[0]}, rng, VARIANTS
         )
-        records.append(
+        return [
             {
                 **record,
                 "exhaustive": exhaustive and len(kept) == len(plans),
                 "variants": options,
             }
-        )
-    return records
+        ]
+    return None
 
 
 if __name__ == "__main__":
