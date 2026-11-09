@@ -51,7 +51,14 @@ from finch.tensor import (
 )
 
 from .cost_models import NS, Affine, Basis, ByKind, Concat, CostModel
-from .loop_cost_models import LoopSpaces, Prefix, prefixes, restrict
+from .loop_cost_models import (
+    LoopSpaces,
+    Prefix,
+    loop_arg,
+    loop_spaces,
+    prefixes,
+    restrict,
+)
 
 
 def nnz_after(stats: NS, stats_factory: StatsFactory[NS], depth: int, over: tuple = ()):
@@ -570,7 +577,7 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
         machine: StatsMachine[NS],
     ) -> np.ndarray:
         prefix, table = component.prefix, component.table
-        spaces = LoopSpaces(prefix, machine)
+        spaces = loop_spaces(prefix, machine)
         visited = spaces.visited()
         visits = spaces.count(visited)
         if component.write:
@@ -584,11 +591,11 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
                     # A gallop jumps at most once for each visit the loop would
                     # make if the level were dense, and for each step of the
                     # smallest walk among the gallops.
-                    dense = LoopSpaces(
+                    dense = loop_spaces(
                         replace(prefix, expr=followed(prefix.expr, table)), machine
                     )
                     galloped = []
-                    for node in dict.fromkeys(PostOrderDFS(spaces.arg)):
+                    for node in dict.fromkeys(PostOrderDFS(loop_arg(prefix.expr))):
                         match node:
                             case Table() if spaces.protocol(node) == Gallop():
                                 galloped.append(node)
@@ -729,9 +736,10 @@ STORAGE_BASIS = StorageBasis()
 # the levels together, with a constant for each access.
 PROTOCOL_BASIS = Affine(Concat(STORAGE_BASIS, ProtocolBasis()))
 
-# The coefficients are those scripts/fitting fitted to the timings of its
-# format stage, which fit_physical_data writes, so that a basis which changes
-# refuses them until it is fitted again.
+# The protocol cost model, which the formatter, the workspacer, and the
+# protocol optimizer price with. Its coefficients are those scripts/fitting
+# fitted to the timings of its protocol stage, which fit_physical_data writes,
+# so that a basis which changes refuses them until it is fitted again.
 PROTOCOL_COST_MODEL = CostModel(
     PROTOCOL_BASIS, np.zeros(PROTOCOL_BASIS.n_features)
 ).from_json(

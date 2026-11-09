@@ -24,7 +24,7 @@ module=$1
 shift
 args=()
 # Each submission of the generator draws new programs, unless ARGS give a seed.
-if [[ $module == generate_physical_data ]]; then
+if [[ $module == generate_*_data ]]; then
   args+=(--seed "${SLURM_ARRAY_JOB_ID:-0}")
 fi
 args+=("$@")
@@ -36,7 +36,10 @@ local=$(mktemp -d "${TMPDIR:-/tmp}/physical-data-XXXXXX")
 trap 'rm -rf "$local"' EXIT
 echo "installing the environment in $local"
 mkdir "$local/repo"
-git ls-files -z | tar --null -T - -cf - |
+# git lists tracked files deleted from the checkout too, which tar can't copy.
+git ls-files -z | while IFS= read -r -d '' file; do
+  if [[ -e $file || -L $file ]]; then printf '%s\0' "$file"; fi
+done | tar --null -T - -cf - |
   tar -xf - -C "$local/repo"
 cd "$local/repo"
 # pixi's package cache goes there too, rather than filling the home quota.

@@ -25,7 +25,7 @@ from finch.autoschedule.cost_models import (
     write_protocols,
 )
 from finch.autoschedule.cost_models.protocol_cost_models import FIELD_KINDS
-from finch.autoschedule.protocolize import choose_protocols
+from finch.autoschedule.protocolizer.protocolize import alias_costs, choose_protocols
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
@@ -77,15 +77,16 @@ def optimize_formats(
     fill_types: Mapping[lgc.Alias, AbstractFillFType],
     cost_model: CostModel[ProtocolChoice] = PROTOCOL_COST_MODEL,
     options: Sequence[LevelOption] = LEVEL_OPTIONS,
-) -> dict[lgc.Alias, TensorFType]:
+) -> tuple[dict[lgc.Alias, TensorFType], float]:
     """
     The format of each alias of stored, whose levels have the shape types it
     gives and the fill of fill_types, under which prgm costs least by
-    cost_model, with its other tensors formatted as bindings says, by
-    coordinate descent: each alias in turn tries every product of the options
-    its levels allow, re-choosing protocols only for the queries which touch
-    it, for two sweeps or until none changes. Each starts from the first
-    allowed option of each level which filters.
+    cost_model, with its other tensors formatted as bindings says, and the cost
+    of prgm with those formats, once choose_protocols chooses its protocols.
+    The formats are found by coordinate descent: each alias in turn prices every
+    product of the options its levels allow, as alias_costs prices them, for
+    two sweeps or until none changes. Each starts from the first allowed option
+    of each level which filters.
     """
     allowed = {
         alias: [
@@ -118,25 +119,34 @@ def optimize_formats(
     }
 
     bindings = {**bindings, **formats}
-    _, costs = choose_protocols(prgm, bindings, stats, stats_factory, cost_model)
+    # Every format prices the same loops over the same stats.
+    cache: dict = {}
+    _, costs = choose_protocols(
+        prgm, bindings, stats, stats_factory, cost_model, cache=cache
+    )
     # A second sweep lets each alias answer the formats chosen after it.
     for _ in range(2):
         changed = False
         for alias, levels in allowed.items():
             best_fmt, best_costs = bindings[alias], costs
-            for kinds in product(*levels):
-                fmt = ftype_of(alias, kinds)
-                if fmt == bindings[alias]:
-                    continue
-                _, costs_2 = choose_protocols(
-                    prgm,
-                    {**bindings, alias: fmt},
-                    stats,
-                    stats_factory,
-                    cost_model,
-                    only={alias},
-                    costs=costs,
-                )
+            candidates = {
+                kinds: fmt
+                for kinds in product(*levels)
+                if (fmt := ftype_of(alias, kinds)) != bindings[alias]
+            }
+            priced = alias_costs(
+                prgm,
+                bindings,
+                stats,
+                stats_factory,
+                cost_model,
+                alias,
+                candidates,
+                costs,
+                cache,
+            )
+            for kinds, fmt in candidates.items():
+                costs_2 = priced[kinds]
                 if sum(costs_2) < sum(best_costs):
                     best_fmt, best_costs = fmt, costs_2
             if best_fmt != bindings[alias]:
@@ -144,7 +154,7 @@ def optimize_formats(
                 changed = True
         if not changed:
             break
-    return {alias: bindings[alias] for alias in stored}
+    return {alias: bindings[alias] for alias in stored}, sum(costs)
 
 
 TS = TypeVar("TS", bound=TensorStats)
@@ -301,7 +311,7 @@ class CostFormatter(LogicFormatter):
     ) -> dict[lgc.Alias, TensorFType]:
         """The format of each alias of stored, whose levels have the shape
         types it gives, from the stats before prgm."""
-        return optimize_formats(
+        formats, _ = optimize_formats(
             prgm,
             bindings,
             stats,
@@ -311,6 +321,7 @@ class CostFormatter(LogicFormatter):
             self.cost_model,
             self.options,
         )
+        return formats
 
     def lower(
         self,

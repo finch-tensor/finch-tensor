@@ -17,6 +17,7 @@ from finch.autoschedule.cost_models import (
     SparseListLevelOption,
 )
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
+from finch.autoschedule.tensor_stats.memo_stats import MemoStatsFactory
 from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
     Aggregate,
@@ -170,9 +171,15 @@ def test_features_match_exact_stats_of_the_tensors(rng, program, fields, protoco
     a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
     tensors = {a: random_tensor(rng, fields[0]), b: random_tensor(rng, fields[1])}
     kronecker, exact = KroneckerStatsFactory(BITS), ExactStatsFactory()
+    # The fitting pipeline memoizes the Kronecker stats, which counts the same.
+    memo = MemoStatsFactory(KroneckerStatsFactory(BITS))
     stats: dict[str, dict[Alias, TensorStats]] = {
         "kronecker": {
             tns: kronecker(tensor, idxs)
+            for (tns, tensor), idxs in zip(tensors.items(), fields, strict=True)
+        },
+        "memo": {
+            tns: memo(tensor, idxs)
             for (tns, tensor), idxs in zip(tensors.items(), fields, strict=True)
         },
         "exact": {
@@ -188,7 +195,11 @@ def test_features_match_exact_stats_of_the_tensors(rng, program, fields, protoco
     }
     plan = program(protocols)
     for basis in (PigeonBasis(), ProtocolBasis(), STORAGE_BASIS):
+        expected = basis.get_features(plan, formats, stats["exact"], exact)
         np.testing.assert_array_equal(
             basis.get_features(plan, formats, stats["kronecker"], kronecker),
-            basis.get_features(plan, formats, stats["exact"], exact),
+            expected,
+        )
+        np.testing.assert_array_equal(
+            basis.get_features(plan, formats, stats["memo"], memo), expected
         )

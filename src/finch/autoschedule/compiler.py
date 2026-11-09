@@ -92,6 +92,12 @@ class PointwiseContext:
                 return ntn.Literal(val)
             case lgc.FillTable(lgc.Alias() as var):
                 return ntn.FillValue(self.ctx.slots[var.unfused])
+            case lgc.DimensionTable(lgc.Alias() as var, lgc.Literal(r)):
+                dim = self.ctx.shapes[var.unfused][r]
+                assert dim is not None
+                if dim.result_type != ftypes.intp:
+                    return ntn.Call(ntn.Literal(ffuncs.astype(ftypes.intp)), (dim,))
+                return dim
             case lgc.Relabel(arg, idxs):
                 return self(
                     arg,

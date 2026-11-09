@@ -566,7 +566,7 @@ def defer(arr: Any) -> LazyTensor | tuple[Any, ...]:
 
 
 def full(
-    shape: int | tuple[int, ...],
+    shape: int | np.integer | tuple[int, ...],
     fill_value: bool | complex | LazyTensor,
     *,
     dtype: Any | None = None,
@@ -594,7 +594,7 @@ def full(
 
     - out (array): an array where every element is equal to fill_value.
     """
-    shape = (shape,) if isinstance(shape, int) else tuple(shape)
+    shape = (int(shape),) if isinstance(shape, (int, np.integer)) else tuple(shape)
     if isinstance(fill_value, LazyTensor):
         # The value may be a zero-dimensional tensor, such as a dynamic fill.
         if dtype is not None:
@@ -626,19 +626,25 @@ def linspace(start, stop, /, num, *, dtype=None, endpoint=True, device=None):
     )
 
 
-def zeros(shape: int | tuple[int, ...], *, dtype=None, device=None) -> LazyTensor:
+def zeros(
+    shape: int | np.integer | tuple[int, ...], *, dtype=None, device=None
+) -> LazyTensor:
     return full(
         shape, 0, dtype=dtype if dtype is not None else np.float64, device=device
     )
 
 
-def ones(shape: int | tuple[int, ...], *, dtype=None, device=None) -> LazyTensor:
+def ones(
+    shape: int | np.integer | tuple[int, ...], *, dtype=None, device=None
+) -> LazyTensor:
     return full(
         shape, 1, dtype=dtype if dtype is not None else np.float64, device=device
     )
 
 
-def empty(shape: int | tuple[int, ...], *, dtype=None, device=None) -> LazyTensor:
+def empty(
+    shape: int | np.integer | tuple[int, ...], *, dtype=None, device=None
+) -> LazyTensor:
     return full(
         shape, 0, dtype=dtype if dtype is not None else np.float64, device=device
     )
@@ -1927,6 +1933,10 @@ def eigvalsh(x, /, *, k=None, rtol=None, atol=None):
 
 def lu(x, /, *, permute_l=False, p_indices=False):
     _eager_only("lu")
+
+
+def lstsq(x1, x2, /, *, rcond=None):
+    _eager_only("lstsq")
 
 
 def matrix_rank(x, /, *, rtol=None, atol=None):
