@@ -3,6 +3,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import cast
 
+import numpy as np
+
 from finch.algebra import (
     FinchOperator,
     ffuncs,
@@ -19,6 +21,7 @@ from finch.autoschedule.util import push_relabels
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    DimensionTable,
     Field,
     FillTable,
     HardAlias,
@@ -231,6 +234,8 @@ class FactorCacheEvaluator(UnvalidatedForm, LogicEvaluator):
                     return Table(Literal(self._ref(results[alias])), idxs)
                 case FillTable(Alias() as alias):
                     return Literal(results[alias].fill_value)
+                case DimensionTable(Alias() as alias, Literal(r)):
+                    return Literal(np.intp(results[alias].shape[r]))
             return None
 
         factored = self.capture.last_prgm

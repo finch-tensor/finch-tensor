@@ -1008,13 +1008,13 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
         (
             ffuncs.logical_and,
             (True, True, False),
-            "Finch.and(true,true,false)",
+            "Finch.logical_and(true,true,false)",
             False,
         ),
         (
             ffuncs.logical_or,
             (False, False, True),
-            "Finch.or(false,false,true)",
+            "Finch.logical_or(false,false,true)",
             True,
         ),
     ],
