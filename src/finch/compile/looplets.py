@@ -134,7 +134,6 @@ class StepperPass(LoopletPass):
         ext: SymbolicExtent,
         body,
     ) -> None:
-
         def stepper_body(ctx, node: ntn.NotationNode):
             match node:
                 case ntn.Access(
