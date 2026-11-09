@@ -495,6 +495,42 @@ def level_reads(
                     yield ProtocolChoice(prefix, table, depth, options)
 
 
+def rescans_a_root(
+    loops: tuple[Field, ...],
+    reads: Sequence[ProtocolChoice],
+    protocols: Sequence[Protocol],
+) -> bool:
+    """
+    Whether reading reads with protocols at the last of loops, within the
+    others, steps through the root level of a table, such as a vector, which
+    has the same entries at every execution of the loop, where a sparse level
+    of another read, whose fiber the enclosing loops choose, could lead the
+    loop instead. A walk steps through the root again at every execution, and
+    so does a gallop of it beside a walk, which ends no phase, or beside no
+    other gallop; a gallop leapfrogging with that of another read doesn't.
+    The length of the root is exact while DC stats bound the other fibers by
+    the largest, so the model may price stepping through it below following
+    it, which looks up only where the others lead. Reads whose protocols the
+    program gives are not among reads.
+    """
+    roots, leads = [], []
+    for read, protocol in zip(reads, protocols, strict=True):
+        level = read.alias.nfused + read.depth
+        above = read.table.idxs[:level]
+        if read.table.idxs[level] != loops[-1]:
+            continue
+        if not above:
+            roots.append(protocol)
+        elif read.option.filters and set(above) <= set(loops):
+            leads.append(protocol)
+    leapfrogs = Gallop() in leads and Walk() not in protocols
+    return (
+        len(loops) > 1
+        and bool(leads)
+        and any(p == Walk() or (p == Gallop() and not leapfrogs) for p in roots)
+    )
+
+
 def level_accesses(
     prefix: Prefix, formats: Mapping[Alias, Sequence[LevelOption]]
 ) -> Iterator[ProtocolChoice]:
@@ -584,25 +620,54 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
             distinct = spaces.located(visited, component.fields)
         else:
             distinct = spaces.located(spaces.stepped(table), component.fields)
+            arg = loop_arg(prefix.expr)
+            galloped, walks = [], False
+            for node in dict.fromkeys(PostOrderDFS(arg)):
+                match node:
+                    case Table(Alias() as tns, idxs) if (
+                        spaces.idx in idxs[tns.nfused :]
+                    ):
+                        match spaces.protocol(node):
+                            case Gallop():
+                                galloped.append(node)
+                            case Follow():
+                                pass
+                            case _:
+                                walks = True
             match component.protocol:
+                case Walk() if not galloped:
+                    # With no gallop to lead it, the loop merges its walks,
+                    # skipping a fiber only where they have no entries as the
+                    # expression combines them, and otherwise stepping through
+                    # every entry of each, not only those the others share.
+                    stats_factory = machine.stats_factory
+                    visits = spaces.count(
+                        stats_factory.mapjoin(
+                            ffuncs.and_,
+                            spaces.exec_space,
+                            stats_factory.support(spaces.walked(arg)),
+                            spaces.project(machine(table), (spaces.idx,)),
+                        )
+                    )
                 case Walk():
                     visits = spaces.walk(table)
                 case Gallop():
-                    # A gallop jumps at most once for each visit the loop would
-                    # make if the level were dense, and for each step of the
-                    # smallest walk among the gallops.
-                    dense = loop_spaces(
-                        replace(prefix, expr=followed(prefix.expr, table)), machine
+                    # Gallops leapfrog: each phase ends at the furthest next
+                    # entry among them and the others seek to it, so they jump
+                    # once for each step of the smallest. A walk doesn't end a
+                    # phase, it is stepped within those of the gallops, so
+                    # beside one they jump through every entry of the smallest
+                    # in the fibers entered. Without one, they jump at most once
+                    # for each visit the loop would make if the level were dense.
+                    visits = min(
+                        (spaces.walk(node) for node in galloped),
+                        default=spaces.walk(table),
                     )
-                    galloped = []
-                    for node in dict.fromkeys(PostOrderDFS(loop_arg(prefix.expr))):
-                        match node:
-                            case Table() if spaces.protocol(node) == Gallop():
-                                galloped.append(node)
-                    smallest = min(
-                        (spaces.walk(node) for node in galloped), default=0.0
-                    )
-                    visits = min(dense.count(dense.visited()), smallest)
+                    if not walks:
+                        dense = loop_spaces(
+                            replace(prefix, expr=followed(prefix.expr, table)), machine
+                        )
+                        visits = min(dense.count(dense.visited()), visits)
         return np.array(
             [
                 [

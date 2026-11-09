@@ -279,6 +279,27 @@ class LoopSpaces(Generic[NS]):
                 return protocols[idxs.index(self.idx)]
         return DefaultProtocol()
 
+    def walked(self, node: LogicExpression) -> NS | None:
+        """
+        Where the walks of node at the loop have fibers with entries, over
+        parent, combined as node combines them, or None where it walks
+        nothing. A merge of walks skips a fiber only where this is empty:
+        under a product, wherever one walked fiber is; under a sum, only where
+        all are.
+        """
+        match node:
+            case MapJoin(Literal(op), args):
+                parts = [part for arg in args if (part := self.walked(arg)) is not None]
+                return self.stats_factory.mapjoin(op, *parts) if parts else None
+            case Table(Alias() as tns, idxs) if self.idx in idxs[
+                tns.nfused :
+            ] and self.protocol(node) not in (Follow(), Gallop()):
+                stat = self.nest.stats[Table(tns, idxs)]
+                projected = self.project(stat)
+                projected.fill_type = stat.fill_type
+                return projected
+        return None
+
     def extent(self, stat: NS, fields) -> float:
         """The points of stat over fields, spanning all of those it lacks."""
         count = stat.estimate_non_fill_values()
@@ -616,9 +637,21 @@ def loop_basis(classes: WriteClasses = write_class) -> Basis[Prefix]:
 
 def loop_cost_model(data: Mapping[str, Any]) -> CostModel[Prefix]:
     """The loop model of data, which fit_physical_data wrote, whose writes are
-    classed by its region cutoff if it was tuned."""
+    classed by its region cutoff if it was tuned. The fit times each loop order
+    without the copies concordize adds, so a table read out of the order it is
+    stored in costs, besides, TRANSPOSE_COST for each of its entries."""
     basis = loop_basis(WriteClasses(data.get("region_cutoff", write_class.region)))
-    return CostModel(basis, np.zeros(basis.n_features)).from_json(data)
+    fitted = CostModel(basis, np.zeros(basis.n_features)).from_json(data)
+    return CostModel(
+        Concat(basis, TransposeBasis()),
+        [*fitted.coefficients, TRANSPOSE_COST, TRANSPOSE_COST],
+    )
+
+
+# The seconds a copy takes for each entry it transposes into a hash level:
+# 3.4e-8 for the 270k edges of a label of G-CARE AIDS, 8.5e-8 for the 6M of
+# YouTube.
+TRANSPOSE_COST = 5e-8
 
 
 # The loop model, which the loop orderers price with. Its coefficients are

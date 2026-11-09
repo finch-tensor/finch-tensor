@@ -51,6 +51,7 @@ from .protocol_cost_models import (
     nnz_after,
     read_options,
     read_protocols,
+    rescans_a_root,
     write_protocols,
 )
 
@@ -100,6 +101,7 @@ __all__ = [
     "prefixes",
     "read_options",
     "read_protocols",
+    "rescans_a_root",
     "write_class",
     "write_protocols",
 ]

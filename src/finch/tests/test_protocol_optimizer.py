@@ -1,3 +1,5 @@
+import pytest
+
 import numpy as np
 
 import finch as fl
@@ -278,10 +280,10 @@ def test_optimize_protocols_chooses_the_cheaper_read():
     sparse = fl.asarray(np.array([0, 0, 0, 0, 5, 0, 0, 0, 0, 0.0]))
     full = fl.asarray(np.ones(10))
     stats: dict[Alias, TensorStats] = {x: sf(sparse, (i,)), y: sf(full, (i,))}
-    # Walking y steps through every entry for the one entry of x, so y is
-    # galloped, or followed by a hash, which can't gallop.
+    # Walking y, or galloping it beside the walk of x, steps through every entry
+    # of y for the one entry of x, so y is followed, as it is by a hash.
     out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf, SIMPLE)
-    assert read_protocols(out, x, y) == [(Walk(),), (Gallop(),)]
+    assert read_protocols(out, x, y) == [(Walk(),), (Follow(),)]
     out = optimize_protocols(plan, {x: LIST, y: HASH}, stats, sf, SIMPLE)
     assert read_protocols(out, x, y) == [(Walk(),), (Follow(),)]
     # Tensors of the same density are walked together.
@@ -307,7 +309,7 @@ def test_optimize_protocols_keeps_the_protocols_a_program_gives():
     # Only the read without a protocol is chosen.
     plan = product_plan(x, y, c, i, ((Walk(),), ()))
     out = optimize_protocols(plan, {x: LIST, y: LIST}, stats, sf, SIMPLE)
-    assert read_protocols(out, x, y) == [(Walk(),), (Gallop(),)]
+    assert read_protocols(out, x, y) == [(Walk(),), (Follow(),)]
 
 
 def test_optimize_protocols_only_follows_levels_read_out_of_order():
@@ -408,6 +410,48 @@ def test_optimize_protocols_prices_a_follow_by_its_lookups():
     assert [protos[0] for protos in read_protocols(out, x, y)] == [Walk(), Walk()]
 
 
+def test_a_root_within_other_loops_is_not_stepped_through_again():
+    # c[] = sum_ij A[i, j] v[j] under (i, j): v is the same at every i, so
+    # walking it, or galloping it beside a walk or alone, steps through all of
+    # it again for each row of A, whether or not the row is followed. A model
+    # which prices walks cheaply would do that; v is followed instead, or
+    # galloped with the row, which leapfrogs.
+    sf = DCStatsFactory()
+    i, j = Field("i"), Field("j")
+    a, v, c = HardAlias("a"), HardAlias("v"), HardAlias("c")
+    stats: dict[Alias, TensorStats] = {
+        a: sf(fl.asarray(np.eye(8)), (i, j)),
+        v: sf(fl.asarray(np.ones(8)), (j,)),
+    }
+    walks = CostModel(
+        PROTOCOL_BASIS,
+        [
+            {"walk.visits": 1.0, "follow.visits": 100.0, "gallop.visits": 100.0}.get(
+                name.partition(".")[2], 0.0
+            )
+            for name in PROTOCOL_BASIS.feature_names
+        ],
+    )
+    expr = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(v, (j,)))),
+        (i, j),
+    )
+    plan = Plan((fuse_loop_order(Query(Table(c, ()), expr), (i, j)), Produces((c,))))
+
+    def protocols(row):
+        fmt = fiber_tensor(dense(row(element(0.0))))
+        out = optimize_protocols(plan, {a: fmt, v: LIST}, stats, sf, walks)
+        [(_, row_j), (vec_j,)] = read_protocols(out, a, v)
+        return vec_j, row_j
+
+    vec_j, row_j = protocols(lambda lvl: sparse_list(lvl, ftype(np.intp)))
+    assert vec_j == Follow() or (vec_j, row_j) == (Gallop(), Gallop())
+    # A dense row can't restrict the loop, so v may lead it.
+    assert protocols(lambda lvl: dense(lvl))[0] == Walk()
+
+
 def test_a_dense_level_above_is_entered_at_every_slot():
     sf = ExactStatsFactory()
     i, j = Field("i"), Field("j")
@@ -502,6 +546,52 @@ def test_a_dense_tensor_never_filters_the_loops_within_it():
     ) == {x: [6, 6], y: [6, 10]}
 
 
+@pytest.mark.parametrize(
+    "op, expected",
+    [
+        # A sum enters every row either has entries in, and steps through
+        # every entry of each there: all 12 of x and all 40 of y.
+        (ffuncs.add, {"x": 12, "y": 40}),
+        # A product skips a row where either has none, so enters the 2 rows
+        # both have, but steps through every entry of each there, though
+        # their columns never meet: 6 of x and 10 of y, not none.
+        (ffuncs.mul, {"x": 6, "y": 10}),
+    ],
+)
+def test_a_merge_of_walks_steps_through_every_entry_it_enters(op, expected):
+    sf = ExactStatsFactory()
+    i, j = Field("i"), Field("j")
+    x, y, c = HardAlias("x"), HardAlias("y"), HardAlias("c")
+    # x has 3 entries in each of rows 0-3, and y 5 in each of rows 2-9, in
+    # columns x has none in.
+    n = 10
+    xd, yd = np.zeros((n, n)), np.zeros((n, n))
+    xd[:4, :3] = 1.0
+    yd[2:, 5:] = 1.0
+    stats: dict[Alias, TensorStats] = {
+        x: sf(fl.asarray(xd), (i, j)),
+        y: sf(fl.asarray(yd), (i, j)),
+    }
+    expr = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(op), (Table(x, (i, j)), Table(y, (i, j)))),
+        (j,),
+    )
+    plan = Plan((fuse_loop_order(Query(Table(c, (i,)), expr), (i, j)), Produces((c,))))
+    lst = SparseListLevelOption()
+    basis = ProtocolBasis()
+    names = basis.feature_names
+    machine = StatsMachine(sf, dict(stats))
+    visits = {}
+    for component in basis.components(plan, {x: [lst, lst], y: [lst, lst]}, machine):
+        match component:
+            case ProtocolChoice(prefix=Prefix(prefix=(_, _))) as access:
+                row = basis.get_component_features(access, machine)[0]
+                visits[access.alias.name] = row[names.index("sparse_list.walk.visits")]
+    assert visits == expected
+
+
 def test_cost_protocolizer_states_the_protocols_it_chooses():
     loader = asm.AssemblyInterpreter()
     sf = DCStatsFactory()
@@ -521,7 +611,7 @@ def test_cost_protocolizer_states_the_protocols_it_chooses():
         cost_model=SIMPLE,
     )
     formatter(plan, {var: tns.ftype for var, tns in bindings.items()}, stats, sf)
-    assert read_protocols(capture.last_prgm, x, y) == [(Walk(),), (Gallop(),)]
+    assert read_protocols(capture.last_prgm, x, y) == [(Walk(),), (Follow(),)]
     program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
     bindings[c] = capture.last_bindings[c].construct((10,))
     (result,) = NotationCompiler(loader)(program).main(
