@@ -1,6 +1,6 @@
 Compiling MLIR code:
 module {
-  func.func @main(%_A_15: !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, i64)>, %_A_16: !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, i64)>, %_A_7_ws_86: !llvm.ptr, %_A_7: !llvm.ptr, %_ret: !llvm.ptr) attributes {llvm.emit_c_interface} {
+  func.func @main(%_A_15: !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, i64)>, %_A_16: !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, i64)>, %_A_7_ws: !llvm.ptr, %_A_7: !llvm.ptr, %_ret: !llvm.ptr) attributes {llvm.emit_c_interface} {
     %v = llvm.extractvalue %_A_15[0] : !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, i64)>
     %v_2 = llvm.getelementptr %v[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, i64, i64)>
     %v_3 = llvm.load %v_2 : !llvm.ptr -> !llvm.ptr
@@ -77,7 +77,7 @@ module {
     %v_72 = llvm.getelementptr %v_39[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, i64, i64)>
     %v_73 = llvm.load %v_72 : !llvm.ptr -> i64
     %v_74 = arith.index_cast %v_73 : i64 to index
-    %v_75 = llvm.getelementptr %_A_7_ws_86[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+    %v_75 = llvm.getelementptr %_A_7_ws[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
     %v_76 = llvm.load %v_75 : !llvm.ptr -> !llvm.ptr
     %v_77 = llvm.getelementptr %v_76[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
     %v_78 = llvm.load %v_77 : !llvm.ptr -> !llvm.ptr
@@ -93,19 +93,19 @@ module {
     %v_88 = builtin.unrealized_conversion_cast %v_87 : memref<?xf64> to !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     %v_89 = llvm.alloca %v_14 x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> : (i64) -> !llvm.ptr
     llvm.store %v_88, %v_89 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.ptr
-    %v_90 = llvm.getelementptr %_A_7_ws_86[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+    %v_90 = llvm.getelementptr %_A_7_ws[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
     %v_91 = llvm.load %v_90 : !llvm.ptr -> !llvm.struct<(i64, i64)>
     %v_92 = llvm.extractvalue %v_91[0] : !llvm.struct<(i64, i64)>
     %v_93 = arith.index_cast %v_92 : i64 to index
-    %v_94 = llvm.getelementptr %_A_7_ws_86[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+    %v_94 = llvm.getelementptr %_A_7_ws[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
     %v_95 = llvm.load %v_94 : !llvm.ptr -> !llvm.struct<(i64, i64)>
     %v_96 = llvm.extractvalue %v_95[1] : !llvm.struct<(i64, i64)>
     %v_97 = arith.index_cast %v_96 : i64 to index
-    %v_98 = llvm.getelementptr %_A_7_ws_86[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+    %v_98 = llvm.getelementptr %_A_7_ws[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
     %v_99 = llvm.load %v_98 : !llvm.ptr -> !llvm.struct<(i64, i64)>
     %v_100 = llvm.extractvalue %v_99[0] : !llvm.struct<(i64, i64)>
     %v_101 = arith.index_cast %v_100 : i64 to index
-    %v_102 = llvm.getelementptr %_A_7_ws_86[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+    %v_102 = llvm.getelementptr %_A_7_ws[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
     %v_103 = llvm.load %v_102 : !llvm.ptr -> !llvm.struct<(i64, i64)>
     %v_104 = llvm.extractvalue %v_103[1] : !llvm.struct<(i64, i64)>
     %v_105 = arith.index_cast %v_104 : i64 to index
@@ -146,13 +146,13 @@ module {
     %v_139 = llvm.insertvalue %v_138, %v_137[0] : !llvm.struct<(i64, i64)>
     %v_140 = arith.index_cast %v_63 : index to i64
     %v_141 = llvm.insertvalue %v_140, %v_139[1] : !llvm.struct<(i64, i64)>
-    %v_142 = llvm.getelementptr %_A_7_ws_86[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+    %v_142 = llvm.getelementptr %_A_7_ws[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
     llvm.store %v_141, %v_142 : !llvm.struct<(i64, i64)>, !llvm.ptr
-    %v_143 = llvm.getelementptr %_A_7_ws_86[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+    %v_143 = llvm.getelementptr %_A_7_ws[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
     %v_144 = llvm.load %v_143 : !llvm.ptr -> !llvm.struct<(i64, i64)>
     %v_145 = llvm.extractvalue %v_144[0] : !llvm.struct<(i64, i64)>
     %v_146 = arith.index_cast %v_145 : i64 to index
-    %v_147 = llvm.getelementptr %_A_7_ws_86[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+    %v_147 = llvm.getelementptr %_A_7_ws[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
     %v_148 = llvm.load %v_147 : !llvm.ptr -> !llvm.struct<(i64, i64)>
     %v_149 = llvm.extractvalue %v_148[1] : !llvm.struct<(i64, i64)>
     %v_150 = arith.index_cast %v_149 : i64 to index
@@ -162,13 +162,13 @@ module {
     %v_154 = arith.constant 1 : index
     %v_155 = arith.index_cast %v_154 : index to i64
     %v_156 = llvm.insertvalue %v_155, %v_153[1] : !llvm.struct<(i64, i64)>
-    %v_157 = llvm.getelementptr %_A_7_ws_86[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+    %v_157 = llvm.getelementptr %_A_7_ws[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
     llvm.store %v_156, %v_157 : !llvm.struct<(i64, i64)>, !llvm.ptr
-    %v_158 = llvm.getelementptr %_A_7_ws_86[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+    %v_158 = llvm.getelementptr %_A_7_ws[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
     %v_159 = llvm.load %v_158 : !llvm.ptr -> !llvm.struct<(i64, i64)>
     %v_160 = llvm.extractvalue %v_159[0] : !llvm.struct<(i64, i64)>
     %v_161 = arith.index_cast %v_160 : i64 to index
-    %v_162 = llvm.getelementptr %_A_7_ws_86[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+    %v_162 = llvm.getelementptr %_A_7_ws[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.ptr, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
     %v_163 = llvm.load %v_162 : !llvm.ptr -> !llvm.struct<(i64, i64)>
     %v_164 = llvm.extractvalue %v_163[1] : !llvm.struct<(i64, i64)>
     %v_165 = arith.index_cast %v_164 : i64 to index
