@@ -8,17 +8,32 @@ import numpy as np
 
 import finch.interface as fl_interface
 from finch.algebra import ffuncs
-from finch.autoschedule import INTERPRET_NOTATION_GALLEY
+from finch.autoschedule import (
+    INTERPRET_NOTATION_GALLEY,
+    CompilerFormLowerer,
+    DefaultLogicFormatter,
+    DefaultLoopOrderer,
+    LogicCompiler,
+    LogicExecutor,
+    LogicNormalizer,
+    with_default_scheduler,
+)
+from finch.autoschedule.factorizer.galley_factorizer.galley_optimize import (
+    GalleyLogicFactorizer,
+)
 from finch.finch_logic import (
     Aggregate,
     Field,
     HardAlias,
     Literal,
+    LogicSimplify,
+    MapJoin,
     Plan,
     Produces,
     Query,
     Table,
 )
+from finch.finch_notation import NotationInterpreter
 from finch.tensor import BufferizedNDArray
 
 
@@ -526,3 +541,119 @@ def test_aggregate_over_no_indices_keeps_init(op, init, expected):
     )
     (result,) = INTERPRET_NOTATION_GALLEY(plan, {A: BufferizedNDArray.from_numpy(data)})
     assert np.allclose(result.to_numpy(), expected(data))
+
+
+@pytest.mark.parametrize(
+    "op, init, dtype, reduce",
+    [
+        (ffuncs.add, 0.0, np.float64, np.sum),
+        (ffuncs.max, -np.inf, np.float64, np.max),
+        (ffuncs.or_, False, np.bool_, np.any),
+    ],
+)
+def test_split_push_over_two_indices(op, init, dtype, reduce):
+    # op_{i,j} op(a[i,j], b[i,j]) splits each index across a and b. The fields
+    # are normalized to `i` and `i_2`, and the split copies of `i` were named
+    # `i_1` and `i_2`, so the copy over b replaced `i_2` and `i` was not reduced.
+    i, j = Field("i"), Field("j")
+    A, B, Y = HardAlias("A"), HardAlias("B"), HardAlias("Y")
+    plan = Plan(
+        (
+            Query(
+                Table(Y, ()),
+                Aggregate(
+                    Literal(op),
+                    Literal(init),
+                    MapJoin(Literal(op), (Table(A, (i, j)), Table(B, (i, j)))),
+                    (i, j),
+                ),
+            ),
+            Produces((Y,)),
+        )
+    )
+    a = (np.arange(12).reshape(4, 3) % 5 == 1).astype(dtype)
+    b = (np.arange(12).reshape(4, 3) % 7 == 2).astype(dtype)
+    (y,) = INTERPRET_NOTATION_GALLEY(
+        plan, {A: BufferizedNDArray.from_numpy(a), B: BufferizedNDArray.from_numpy(b)}
+    )
+    assert y.to_numpy() == reduce(np.vectorize(op)(a, b))
+
+
+def _cached_galley():
+    # A Galley pipeline which, like the compiled ones, reuses a kernel across
+    # calls whose tensors have the same formats but different sizes.
+    return LogicNormalizer(
+        LogicExecutor(
+            GalleyLogicFactorizer(
+                LogicSimplify(
+                    DefaultLoopOrderer(
+                        DefaultLogicFormatter(
+                            CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+                        )
+                    )
+                )
+            ),
+            cache=True,
+        )
+    )
+
+
+def test_cached_repeat_reads_the_size_of_each_call():
+    # sum_j (a[i] + b[j]) splits into a[i] * |j| + sum_j b[j]. The factor |j|
+    # must be read when the kernel runs, since a cached kernel is reused
+    # across sizes; it was the size seen while planning.
+    ctx = _cached_galley()
+    a = np.array([1.0, 2.0, 3.0])
+    for m in [2, 5, 0, 2]:
+        b = np.arange(1.0, m + 1)
+        with with_default_scheduler(ctx):
+            out = fl_interface.einop(
+                "y[i] += a[i] + b[j]",
+                a=fl_interface.asarray(a),
+                b=fl_interface.asarray(b),
+            )
+        np.testing.assert_array_equal(
+            np.array(out), (a[:, None] + b[None, :]).sum(axis=1)
+        )
+
+
+@pytest.mark.parametrize(
+    "op, init",
+    [
+        (ffuncs.max, -np.inf),
+        (ffuncs.min, np.inf),
+        (ffuncs.choose(0.0), 0.0),
+    ],
+)
+def test_cached_idempotent_repeat(op, init):
+    # op_j op(a[i], b[j]) splits into op_j a[i] and op_j b[j]. Reducing n copies
+    # of a[i] by an idempotent op is a[i], unless n is 0, which leaves the init.
+    i, j = Field("i"), Field("j")
+    A, B, Y = HardAlias("A"), HardAlias("B"), HardAlias("Y")
+    plan = Plan(
+        (
+            Query(
+                Table(Y, (i,)),
+                Aggregate(
+                    Literal(op),
+                    Literal(init),
+                    MapJoin(Literal(op), (Table(A, (i,)), Table(B, (j,)))),
+                    (j,),
+                ),
+            ),
+            Produces((Y,)),
+        )
+    )
+    ctx = _cached_galley()
+    a = np.array([1.0, -2.0, 3.0])
+    for m in [2, 0, 3]:
+        # b is all fill for choose, so that the choice is a[i].
+        b = np.zeros(m) if init == 0.0 else np.arange(m) - 1.0
+        (y,) = ctx(
+            plan,
+            {A: BufferizedNDArray.from_numpy(a), B: BufferizedNDArray.from_numpy(b)},
+        )
+        expected = np.full(3, init)
+        for x in [a, *b]:
+            expected = np.vectorize(op)(expected, x) if m else expected
+        np.testing.assert_array_equal(y.to_numpy(), expected)

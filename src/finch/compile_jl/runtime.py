@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 
 from finch.algebra import Tensor, TensorFType
-from finch.algebra.fill import DynamicFillFType
+from finch.algebra.fill import DynamicFillFType, is_static
 from finch.tensor import BufferizedNDArray, FiberTensorFType
 from finch.tensor.np_wrapper import NumPyWrapper
 from finch.tensor.override_tensor import OverrideTensor
@@ -112,6 +112,16 @@ class JuliaOwnedTensor(OverrideTensor):
 
     def _as_tensor(self) -> Tensor:
         return jl_tensor_to_python(self.raw_julia_obj)
+
+    @property
+    def fill_value(self) -> Any:
+        if is_static(self.ftype.fill_type):
+            return self.ftype.fill_type.value
+        # A dynamic fill is not in the ftype, but the Julia storage holds a
+        # concrete one. Pinned storage writes every entry, so its fill is
+        # never observed, and unpinned storage holds the tensor's own fill;
+        # either way it is a valid fill for the stored values.
+        return self._as_tensor().fill_value
 
     def item(self):
         if not self._shape:
