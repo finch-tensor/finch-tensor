@@ -9,7 +9,7 @@ kind of each level.
 import json
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -30,7 +30,6 @@ from finch.finch_logic import (
     Gallop,
     Laminate,
     Literal,
-    LogicExpression,
     LogicStatement,
     Plan,
     Protocol,
@@ -40,7 +39,7 @@ from finch.finch_logic import (
     Table,
     Walk,
 )
-from finch.symbolic import PostOrderDFS, PostWalk, Rewrite
+from finch.symbolic import PostOrderDFS
 from finch.tensor import (
     DenseLevelFType,
     ElementLevelFType,
@@ -341,19 +340,6 @@ def allowed_options(
     return [option for option in options if protocols <= set(option.protocols)]
 
 
-def followed(expr: LogicExpression, table: Table) -> LogicExpression:
-    """expr, where each table of the tensor and fields of table follows every
-    field it reads, as dense levels are read."""
-
-    def read(node):
-        match node:
-            case Table(tns, idxs, _) if (tns, idxs) == (table.tns, table.idxs):
-                return Table(tns, idxs, (Follow(),) * len(idxs))
-        return None
-
-    return Rewrite(PostWalk(read))(expr)
-
-
 # bindings name no position type, so positions are intp.
 POS_SIZE = np_dtype(ftypes.intp).itemsize
 
@@ -621,19 +607,14 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
         else:
             distinct = spaces.located(spaces.stepped(table), component.fields)
             arg = loop_arg(prefix.expr)
-            galloped, walks = [], False
+            galloped = []
             for node in dict.fromkeys(PostOrderDFS(arg)):
                 match node:
                     case Table(Alias() as tns, idxs) if (
                         spaces.idx in idxs[tns.nfused :]
+                        and spaces.protocol(node) == Gallop()
                     ):
-                        match spaces.protocol(node):
-                            case Gallop():
-                                galloped.append(node)
-                            case Follow():
-                                pass
-                            case _:
-                                walks = True
+                        galloped.append(node)
             match component.protocol:
                 case Walk() if not galloped:
                     # With no gallop to lead it, the loop merges its walks,
@@ -652,22 +633,11 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
                 case Walk():
                     visits = spaces.walk(table)
                 case Gallop():
-                    # Gallops leapfrog: each phase ends at the furthest next
-                    # entry among them and the others seek to it, so they jump
-                    # once for each step of the smallest. A walk doesn't end a
-                    # phase, it is stepped within those of the gallops, so
-                    # beside one they jump through every entry of the smallest
-                    # in the fibers entered. Without one, they jump at most once
-                    # for each visit the loop would make if the level were dense.
-                    visits = min(
-                        (spaces.walk(node) for node in galloped),
-                        default=spaces.walk(table),
-                    )
-                    if not walks:
-                        dense = loop_spaces(
-                            replace(prefix, expr=followed(prefix.expr, table)), machine
-                        )
-                        visits = min(dense.count(dense.visited()), visits)
+                    # A gallop jumps once for each entry of the smallest support
+                    # among the arguments galloped at the loop, in the fibers it
+                    # enters: gallops leapfrog, and walks are stepped within
+                    # their phases.
+                    visits = min(spaces.walk(node) for node in galloped)
         return np.array(
             [
                 [
