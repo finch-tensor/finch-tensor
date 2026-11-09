@@ -1,4 +1,5 @@
 import math
+from typing import Any
 
 import pytest
 
@@ -442,7 +443,7 @@ def test_galley_format_cost_prices_the_formats_a_galley_formatter_chooses():
     b_data[np.arange(n), rng.integers(0, n, n)] = 1.0
     a, b, c, ws = (HardAlias(name) for name in ("a", "b", "c", "ws"))
     sf = DCStatsFactory()
-    stats: dict[Alias, TensorStats] = {
+    stats: dict[Alias, DCStats] = {
         a: sf(fl.asarray(a_data), (t, j)),
         b: sf(fl.asarray(b_data), (j, i)),
     }
@@ -472,7 +473,7 @@ def test_galley_format_cost_prices_the_formats_a_galley_formatter_chooses():
 
 
 def test_compile_julia_galley_prices_workspaces_with_galley_formats():
-    stage = default_schedulers.COMPILE_JULIA_GALLEY
+    stage: Any = default_schedulers.COMPILE_JULIA_GALLEY
     while not isinstance(stage, LogicWorkspacer):
         stage = stage.ctx
     assert stage.format_cost is galley_format_cost

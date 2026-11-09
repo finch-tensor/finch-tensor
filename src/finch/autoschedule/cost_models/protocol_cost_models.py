@@ -622,11 +622,14 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
                     # expression combines them, and otherwise stepping through
                     # every entry of each, not only those the others share.
                     stats_factory = machine.stats_factory
+                    walked = spaces.walked(arg)
+                    # The table of the access is among the walks.
+                    assert walked is not None
                     visits = spaces.count(
                         stats_factory.mapjoin(
                             ffuncs.and_,
                             spaces.exec_space,
-                            stats_factory.support(spaces.walked(arg)),
+                            stats_factory.support(walked),
                             spaces.project(machine(table), (spaces.idx,)),
                         )
                     )
