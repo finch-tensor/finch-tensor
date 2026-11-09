@@ -8,6 +8,7 @@ kind of each level.
 
 import json
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,6 +29,7 @@ from finch.finch_logic import (
     Follow,
     Fuse,
     Gallop,
+    HardAlias,
     Laminate,
     Literal,
     LogicStatement,
@@ -39,7 +41,7 @@ from finch.finch_logic import (
     Table,
     Walk,
 )
-from finch.symbolic import PostOrderDFS
+from finch.symbolic import PostOrderDFS, PostWalk, Rewrite
 from finch.tensor import (
     DenseLevelFType,
     ElementLevelFType,
@@ -689,13 +691,54 @@ class ProtocolBasis(ByKind[ProtocolChoice, str]):
         )
 
 
+def written(prefix: Prefix, machine: StatsMachine[NS]) -> NS:
+    """
+    The stats of where the query of prefix writes its output: those of its
+    expression, with each table whose levels from the last which filters down
+    don't filter spanning their fields wholly, as the formats of prefix give
+    them. A read of such a level finds a value at every slot, so the query
+    writes wherever it reads one, whatever the value.
+    """
+    formats = prefix.formats or {}
+    stats_factory = machine.stats_factory
+    bindings = OrderedDict(machine.bindings)
+
+    def span(node):
+        match node:
+            case Table(Alias() as tns, idxs) if tns.unfused in formats:
+                # The element level, the last option, has no field.
+                levels = zip(idxs[tns.nfused :], formats[tns.unfused][:-1], strict=True)
+                dense: list[Field] = []
+                for idx, option in levels:
+                    dense = [*dense, idx] if not option.filters else []
+                if dense:
+                    stat = machine(Table(tns, idxs))
+                    kept = restrict(stats_factory, stat, set(idxs) - set(dense))
+                    spanned = stats_factory.reorder(
+                        stats_factory.mapjoin(
+                            ffuncs.or_, stats_factory.support(stat), kept
+                        ),
+                        idxs,
+                    )
+                    spanned.fill_type = stat.fill_type
+                    alias = HardAlias(f"{tns.name}[{','.join(map(str, idxs))}]")
+                    bindings[alias] = spanned
+                    return Table(alias, idxs)
+        return None
+
+    expr = Rewrite(PostWalk(span))(prefix.expr)
+    if expr == prefix.expr:
+        return machine(expr)
+    return StatsMachine(stats_factory, bindings)(expr)
+
+
 class LevelBasis(Basis[ProtocolChoice], LoopOrderedForm):
     """
     A basis whose components are the accesses, as AccessBasis lists them, and
     whose rows are the storage features of option at the accesses which write
-    a level of it: the level stores what the query writes, entered at the
-    fibers the access enters. The tensors a query reads are already stored, so
-    a read costs no storage.
+    a level of it: the level stores what the query writes, as written gives
+    it, entered at the fibers the access enters. The tensors a query reads are
+    already stored, so a read costs no storage.
     """
 
     def __init__(self, option: LevelOption):
@@ -726,7 +769,7 @@ class LevelBasis(Basis[ProtocolChoice], LoopOrderedForm):
             return np.zeros((1, self.n_features))
         stats_factory = machine.stats_factory
         idxs = component.table.idxs
-        stats = machine(component.prefix.expr)
+        stats = written(component.prefix, machine)
         if any(idx not in idxs for idx in stats.index_order):
             stats = restrict(stats_factory, stats, idxs)
         stats = stats_factory.reorder(stats, idxs)
