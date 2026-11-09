@@ -13,16 +13,16 @@
 # --resume, DIR's programs are kept rather than generated, and the jobs are
 # added to DIR/jobs.txt. Options before DIR are this script's; those after it
 # are those of the generator of the stage, generate_protocol_data for the
-# protocol and transpose stages, and generate_loop_data and
-# generate_factorize_data for the loop and factorize stages.
+# protocol stage, and generate_loop_data and generate_factorize_data for the
+# loop and factorize stages.
 #
 # --stage may be given more than once, for stages which each fit a model
 # that later ones use, such as --stage protocol --stage loop --stage factorize,
 # the models the physical optimizers use. Each stage then goes to DIR/STAGE,
 # and is generated at once, but timed only once the stages whose models it
 # chooses with have fitted them, which it takes as its --model, over those
-# given: the transpose and loop stages choose with the protocol model, and
-# the factorize stage with that and the loop model. The loop fit tunes the
+# given: the loop stage chooses with the protocol model, and the factorize
+# stage with that and the loop model. The loop fit tunes the
 # region cutoff of its classes of writes. The generator options are given to
 # each stage.
 set -euo pipefail
@@ -123,7 +123,7 @@ record() {
 # physical_bases.py does. The protocol stage gives every choice.
 uses() {
   case $1 in
-    transpose | loop) echo protocol ;;
+    loop) echo protocol ;;
     factorize) echo protocol loop ;;
   esac
 }
