@@ -180,18 +180,17 @@ def tune_cutoff(raw, runtimes, examples, seed) -> WriteClasses:
     """
     The region cutoff of WriteClasses under which models of the loop basis,
     fitted to raw, the rows of TUNING_BASIS of each variant, have the least
-    cross_validated_regret. The classes change only where the cutoff passes
-    the scattered region of some row, so it is tried between each two regions,
-    at their geometric mean, and past the largest, where no row is above it.
+    cross_validated_regret. The cutoff is tried on a grid of half powers of
+    two, between the power of two sizes of the regions, up to the largest
+    region, and past it, where no row is above it.
     """
     runtimes = np.asarray(runtimes)
     stacked = np.concatenate(raw)
     starts = np.cumsum([0, *(len(rows) for rows in raw[:-1])])
-    regions = np.unique(
-        stacked[:, TUNING_BASIS.feature_names.index("scattered_region")]
-    )
+    regions = stacked[:, TUNING_BASIS.feature_names.index("scattered_region")]
+    top = math.ceil(math.log2(max(regions.max(), 1.0)))
     best, best_score = WriteClasses(math.inf), math.inf
-    for cutoff in [*np.sqrt(regions[:-1] * regions[1:]), math.inf]:
+    for cutoff in [*2.0 ** (np.arange(top) + 0.5), math.inf]:
         classes = WriteClasses(float(cutoff))
         sums = np.add.reduceat(stratified(stacked, classes), starts, axis=0)
         score = cross_validated_regret(
