@@ -495,6 +495,42 @@ def level_reads(
                     yield ProtocolChoice(prefix, table, depth, options)
 
 
+def rescans_a_root(
+    loops: tuple[Field, ...],
+    reads: Sequence[ProtocolChoice],
+    protocols: Sequence[Protocol],
+) -> bool:
+    """
+    Whether reading reads with protocols at the last of loops, within the
+    others, steps through the root level of a table, such as a vector, which
+    has the same entries at every execution of the loop, where a sparse level
+    of another read, whose fiber the enclosing loops choose, could lead the
+    loop instead. A walk steps through the root again at every execution, and
+    so does a gallop of it beside a walk, which ends no phase, or beside no
+    other gallop; a gallop leapfrogging with that of another read doesn't.
+    The length of the root is exact while DC stats bound the other fibers by
+    the largest, so the model may price stepping through it below following
+    it, which looks up only where the others lead. Reads whose protocols the
+    program gives are not among reads.
+    """
+    roots, leads = [], []
+    for read, protocol in zip(reads, protocols, strict=True):
+        level = read.alias.nfused + read.depth
+        above = read.table.idxs[:level]
+        if read.table.idxs[level] != loops[-1]:
+            continue
+        if not above:
+            roots.append(protocol)
+        elif read.option.filters and set(above) <= set(loops):
+            leads.append(protocol)
+    leapfrogs = Gallop() in leads and Walk() not in protocols
+    return (
+        len(loops) > 1
+        and bool(leads)
+        and any(p == Walk() or (p == Gallop() and not leapfrogs) for p in roots)
+    )
+
+
 def level_accesses(
     prefix: Prefix, formats: Mapping[Alias, Sequence[LevelOption]]
 ) -> Iterator[ProtocolChoice]:
