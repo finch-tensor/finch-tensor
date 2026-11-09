@@ -21,6 +21,7 @@ from finch.algebra import (
     ffuncs,
     fixpoint_type,
     ftype,
+    ftypes,
     is_dynamic,
     promote_type,
     return_type,
@@ -904,6 +905,50 @@ class FillTable(LogicTree, LogicExpression):
         return cls(tns)
 
 
+@dataclass(eq=True, frozen=True)
+class DimensionTable(LogicTree, LogicExpression):
+    """
+    Represents a logical AST expression for the size of dimension `r` of the
+    tensor `tns`, as a zero-dimensional tensor. Like `FillTable`, its value is
+    only known once `tns` is bound, so a kernel may be reused across sizes.
+
+    Attributes:
+        tns: The alias of the tensor whose dimension is taken.
+        r: The literal position of the dimension.
+    """
+
+    tns: Alias
+    r: Literal
+
+    def fields(self) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return ()
+
+    def dimmap(
+        self, op: Callable, dim_bindings: dict[Alias, tuple[T | None, ...]]
+    ) -> tuple[T | None, ...]:
+        return ()
+
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        h: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        # A size is a runtime value which kernels must not specialize on.
+        return h(DynamicFill(None, ftypes.intp))
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.tns, self.r]
+
+    @classmethod
+    def from_children(cls, tns, r):
+        return cls(tns, r)
+
+
 def fill_expression(ex: LogicExpression) -> LogicExpression:
     """
     A zero-dimensional expression for the fill value of `ex`, made of the fill
@@ -915,7 +960,7 @@ def fill_expression(ex: LogicExpression) -> LogicExpression:
         case Table(Literal(tns), _):
             # The fill value of a literal tensor is compile-time data too.
             return Literal(tns.fill_value)
-        case Literal() | FillTable():
+        case Literal() | FillTable() | DimensionTable():
             return ex
         case MapJoin(op, args):
             return MapJoin(op, tuple(fill_expression(arg) for arg in args))
@@ -928,7 +973,7 @@ def fill_expression(ex: LogicExpression) -> LogicExpression:
 def is_fill_expression(ex: LogicNode) -> bool:
     """Whether `ex` is made of literals and fill values, as `fill_expression`."""
     match ex:
-        case Literal() | FillTable():
+        case Literal() | FillTable() | DimensionTable():
             return True
         case MapJoin(Literal(), args):
             return all(is_fill_expression(arg) for arg in args)
@@ -1300,6 +1345,8 @@ class LogicPrinterContext(Context):
                 return f"Relabel({arg}, {idxs_e})"
             case FillTable(tns):
                 return f"FillTable({self(tns)})"
+            case DimensionTable(tns, r):
+                return f"DimensionTable({self(tns)}, {self(r)})"
             case Reorder(arg, idxs):
                 idxs_e = ", ".join([self(idx) for idx in idxs])
                 arg = self(arg)

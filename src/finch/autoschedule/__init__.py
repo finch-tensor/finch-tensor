@@ -42,13 +42,14 @@ from .formatter.formatter import (
 from .formatter.smart_formatter import FDFormatter, SmartFormatter
 from .loop_orderer.loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
-from .protocolize import (
+from .protocolizer import (
     CostProtocolizer,
     LogicProtocolizer,
     optimize_protocols,
     protocolize,
 )
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
+from .workspacer import DefaultLogicWorkspacer, LogicWorkspacer
 
 __all__ = [
     "COMPILE_JULIA",
@@ -68,6 +69,7 @@ __all__ = [
     "CostProtocolizer",
     "DefaultLogicFactorizer",
     "DefaultLogicFormatter",
+    "DefaultLogicWorkspacer",
     "DefaultLoopOrderer",
     "FDFormatter",
     "Field",
@@ -80,6 +82,7 @@ __all__ = [
     "LogicNormalizer",
     "LogicNotationLowerer",
     "LogicProtocolizer",
+    "LogicWorkspacer",
     "MapJoin",
     "NotationGenerator",
     "Plan",

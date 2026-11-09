@@ -8,6 +8,7 @@ from finch.algebra.utils import intersect, is_subsequence, setdiff, with_subsequ
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    DimensionTable,
     Extrude,
     Field,
     FillTable,
@@ -100,7 +101,7 @@ def push_relabels(root):
                 return Reorder(Relabel(arg, idxs_4), idxs_2)
             case Relabel(Table(arg, _, protocols), idxs):
                 return Table(arg, idxs, protocols)
-            case Relabel(Literal() | FillTable() as scalar, _):
+            case Relabel(Literal() | FillTable() | DimensionTable() as scalar, _):
                 return scalar
 
     return Rewrite(PreWalk(Fixpoint(rule_1)))(root)  # ignore[type-arg]

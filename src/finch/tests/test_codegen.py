@@ -1128,7 +1128,7 @@ def mlir_kernel_under_test(caplog) -> str:
         and record.message.startswith("Compiling MLIR code:\n")
     ]
     assert kernels, "no MLIR kernel was compiled"
-    return re.sub(r"%(_A_\d+|__A|_eye|__eye)(?:_\d+)+", r"%\1", kernels[-1])
+    return re.sub(r"%(_A_\d+_ws|_A_\d+|__A|_eye|__eye)(?:_\d+)+", r"%\1", kernels[-1])
 
 
 @mlir_backend
