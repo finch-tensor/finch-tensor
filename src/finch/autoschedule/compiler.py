@@ -262,7 +262,17 @@ class NotationContext:
             ntn.Update(ntn.Literal(op), tuple(map(lower_protocol, protocols))),
             tuple(loops[idx] for idx in stored),
         )
-        body = ntn.Increment(lhs, PointwiseContext(self)(arg, loops))
+        match arg:
+            case lgc.MapJoin(lgc.Literal(ffuncs._DropFill() as drop), (value,)):
+                # A value marked to drop its fill is written only where it isn't.
+                rhs = PointwiseContext(self)(value, loops)
+                fill = ntn.Literal(drop.value)
+                body: ntn.NotationStatement = ntn.If(
+                    ntn.Call(ntn.Literal(ffuncs.ne), (rhs, fill)),
+                    ntn.Increment(lhs, rhs),
+                )
+            case _:
+                body = ntn.Increment(lhs, PointwiseContext(self)(arg, loops))
         return ntn.Block((*reset, body)) if reset else body
 
     def fused_extent(
