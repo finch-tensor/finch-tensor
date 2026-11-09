@@ -276,7 +276,9 @@ def test_models_with_a_tuned_cutoff_class_writes_by_it(tmp_path):
     path.write_text(json.dumps(saved))
     model = parse_models([f"loop={path}"])["loop"]
     match model.basis:
-        case Affine(basis=Concat(bases=(_, Stratify(classify=classify)))):
+        case Concat(
+            bases=(Affine(basis=Concat(bases=(_, Stratify(classify=classify)))), _)
+        ):
             assert classify == classes
         case other:
             raise AssertionError(f"Expected a stratified loop basis, got {other}")
