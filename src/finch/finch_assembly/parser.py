@@ -9,6 +9,9 @@ The extension is not yet available on VS Code marketplace. You can find
 installation file here: https://github.com/finch-tensor/vscode-finch-assembly/releases
 """
 
+from collections.abc import Callable
+from typing import Any
+
 import numpy as np
 
 from lark import Lark, Token, Tree
@@ -50,12 +53,11 @@ assembly_parser = Lark(
     attribute: reference "." CNAME
     access: reference "[" access_expr "]"
     call: CNAME "(" expr ("," expr)* ")"
-    ?expr: reference | INT | DECIMAL | access | scansearch | bin_op | call | expr INFIX_OP expr
+    ?expr: reference | INT | DECIMAL | access | bin_op | call | expr INFIX_OP expr
     ?lhs: reference | access
     assign: lhs "=" expr
     increment: lhs INFIX_OP "=" expr
     resize: "resize" "(" reference "," expr ")"
-    scansearch: "scansearch" "(" CNAME "," expr "," expr "," expr ")"
     bin_op: OP "(" expr "," expr ")"
     for_loop: "for" "(" CNAME "in" access_expr ":" access_expr ")" _NEWLINE+ block _NEWLINE+ "end"
     while_loop: "while" "(" expr ")" _NEWLINE+ block _NEWLINE+ "end"
@@ -75,6 +77,7 @@ _OPS = {
     ">=": ffuncs.ge,
     "==": ffuncs.eq,
     "!=": ffuncs.ne,
+    ">>": ffuncs.rshift,
     "min": ffuncs.min,
     "max": ffuncs.max,
     "add": ffuncs.add,
@@ -84,7 +87,9 @@ _OPS = {
 
 
 def parse_assembly(
-    code: str, vars: dict[str, asm.AssemblyExpression], position_type: type = np.intp
+    code: str,
+    vars: dict[str, asm.AssemblyExpression],
+    position_type: Callable[[Any], Any] = np.intp,
 ) -> asm.Block:
     """
     Parse Finch Assembly code and convert it to assembly node objects.
@@ -158,12 +163,15 @@ def parse_assembly(
                 return asm.Resize(ctx(arr), ctx(size))
             case Tree("attribute", [obj, Token("CNAME", name)]):
                 return asm.GetAttr(ctx(obj), asm.Literal(name))
+            case Tree("call", [Token("CNAME", name), *args]) if (
+                name not in vars and name in _OPS
+            ):
+                # Within an index, `add(a, b)` parses as a call rather than an OP.
+                return asm.Call(
+                    asm.Literal(_OPS[name]), tuple(ctx(arg) for arg in args)
+                )
             case Tree("call", [op, *args]):
                 return asm.Call(ctx(op), tuple(ctx(arg) for arg in args))
-            case Tree("scansearch", [arr, x, lo, hi]):
-                return asm.Call(
-                    asm.Literal(ffuncs.scansearch), (ctx(arr), ctx(x), ctx(lo), ctx(hi))
-                )
             case Tree("bin_op", [op, expr1, expr2]):
                 return asm.Call(asm.Literal(ctx(op)), (ctx(expr1), ctx(expr2)))
             case Tree("assign", [lhs, expr]):

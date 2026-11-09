@@ -4,7 +4,13 @@ import math
 from abc import ABC, abstractmethod
 from typing import Any
 
-from .fill import AbstractFill, is_dynamic
+from .fill import (
+    AbstractFillFType,
+    DynamicFill,
+    DynamicFillFType,
+    StaticFill,
+    StaticFillFType,
+)
 from .ftypes import (
     CallableFType,
     FDTypeOrdered,
@@ -92,9 +98,14 @@ def is_idempotent(op: FinchOperatorFType) -> bool:
 
 
 def _specializable(val: Any) -> tuple[bool, Any]:
-    if isinstance(val, AbstractFill):
-        return not is_dynamic(val), val.value
-    return True, val
+    # A fill, or the fill of a format, may only be specialized on when static.
+    match val:
+        case StaticFill() | StaticFillFType():
+            return True, val.value
+        case DynamicFill() | DynamicFillFType():
+            return False, None
+        case _:
+            return True, val
 
 
 def is_identity(op: FinchOperatorFType, val: Any) -> bool:
@@ -133,24 +144,23 @@ def init_value(op: FinchOperatorFType, arg: FType) -> Any:
     return op.init_value(arg)
 
 
-def fixpoint_type(op: CallableFType, z: Any, t: FType) -> FType:
+def fixpoint_type(op: CallableFType, z: AbstractFillFType, t: FType) -> FType:
     """
     Determines the fixpoint type after repeated calling the given operation.
 
     Args:
         op: The operation to evaluate.
-        z: The initial value.
+        z: The fill format of the initial value.
         t: The type to evaluate against.
 
     Returns:
         The fixpoint type.
     """
     s = set()
-    z_type = ftype(z)
-    r = z_type
+    r = z.element_type
     while r not in s:
         s.add(r)
-        r = return_type(op, z_type, t)
+        r = return_type(op, r, t)
     return r
 
 

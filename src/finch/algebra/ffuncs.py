@@ -1,4 +1,5 @@
 import builtins
+import cmath
 import math
 import operator
 from dataclasses import dataclass
@@ -16,11 +17,12 @@ from .algebra import (
 )
 from .fill import (
     AbstractFill,
+    AbstractFillFType,
     DynamicFill,
     DynamicFillError,
     StaticFill,
     as_fill,
-    is_dynamic,
+    is_static,
 )
 from .ftypes import (
     FDType,
@@ -1470,6 +1472,11 @@ class _Same(FinchOperator):
             res = rsame_method(a)
             if res is not NotImplemented:
                 return res
+        if isinstance(a, tuple) and isinstance(b, tuple):
+            # Tuples are scalars, which are the same when all their fields are.
+            return len(a) == len(b) and all(
+                builtins.bool(self(x, y)) for x, y in zip(a, b, strict=True)
+            )
         try:
             return np.logical_or(
                 np.equal(a, b), np.logical_and(np.isnan(a), np.isnan(b))
@@ -1488,15 +1495,65 @@ class _Same(FinchOperator):
 same = _Same()
 
 
-def samehash(a: Any):
-    samehash_method = getattr(a, "__samehash__", None)
-    if samehash_method is not None:
-        res = samehash_method()
-        if res is not NotImplemented:
-            return res
-    if np.all(same(a, a)) and not np.array_equal(a, a):
-        return ("nan", ftype(a))
-    return a
+class _CanonicalFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return canonical
+
+    arity = 1
+
+    def return_type(self, a: FType) -> FType:  # type: ignore[override]
+        return a
+
+
+# NumPy has no complex NaN constant, so this one stands in for `np.nan`.
+_numpy_complex_nan = np.complex128(complex(np.nan, np.nan))
+
+
+class _Canonical(FinchOperator):
+    """
+    canonical(x) represents every value which is `same` as x, so
+    `hash(canonical(x))` is a hash consistent with `same`. NaNs hash by identity,
+    so each kind of NaN is one object: one complex NaN for NumPy complex values,
+    `cmath.nanj` for Python complex values, `np.nan` for NumPy floats and
+    `math.nan` for Python floats. -0.0 is 0.0, and other values keep their type.
+    Tuples are scalars, whose fields are made canonical. Override with
+    `__canonical__`, alongside `__same__`.
+    """
+
+    def __call__(self, a: Any):
+        canonical_method = getattr(a, "__canonical__", None)
+        if canonical_method is not None:
+            res = canonical_method()
+            if res is not NotImplemented:
+                return res
+        match a:
+            case tuple():
+                return tuple(self(x) for x in a)
+            # NumPy floats subclass Python floats, so they are matched first.
+            case np.complexfloating() if np.isnan(a):
+                return _numpy_complex_nan
+            case complex() if cmath.isnan(a):
+                return cmath.nanj
+            case np.floating() if np.isnan(a):
+                return np.nan
+            case float() if math.isnan(a):
+                return math.nan
+            case float() | complex() | np.floating() | np.complexfloating():
+                # Adding zero turns -0.0 into 0.0 and leaves other values alone.
+                return a + type(a)(0)
+            case _:
+                return a
+
+    def __repr__(self) -> str:
+        return "canonical"
+
+    @property
+    def ftype(self):
+        return _CanonicalFType()
+
+
+canonical = _Canonical()
 
 
 class _NotSameFType(ComparisonFinchOperatorFType):
@@ -2244,7 +2301,7 @@ sign = _Sign()
 
 @dataclass(unsafe_hash=True)
 class _InitWriteFType(ImmutableStructFType, FinchOperatorFType):
-    fill: AbstractFill
+    fill_type: AbstractFillFType
 
     @property
     def struct_name(self):
@@ -2252,7 +2309,7 @@ class _InitWriteFType(ImmutableStructFType, FinchOperatorFType):
 
     @property
     def struct_fields(self):
-        return [("value", self.fill.ftype)]
+        return [("value", self.fill_type.element_type)]
 
     def __call__(self, value):
         if isinstance(value, _InitWrite) and value.ftype == self:
@@ -2261,13 +2318,15 @@ class _InitWriteFType(ImmutableStructFType, FinchOperatorFType):
 
     def from_fields(self, value):
         fill = (
-            DynamicFill(value, self.fill.ftype) if is_dynamic(self.fill) else self.fill
+            StaticFill(self.fill_type.value)
+            if is_static(self.fill_type)
+            else DynamicFill(value, self.fill_type.element_type)
         )
         return _InitWrite(fill)
 
     def is_identity(self, val):
-        return not is_dynamic(self.fill) and builtins.bool(
-            np.all(same(val, self.fill.value))
+        return is_static(self.fill_type) and builtins.bool(
+            same(val, self.fill_type.value)
         )
 
     def return_type(self, *args: FType) -> FType:
@@ -2288,8 +2347,8 @@ class _InitWrite(FinchOperator):
     field; pass such operators through callable expressions in compiled code.
     """
 
-    def __init__(self, value):
-        self.fill = as_fill(value)
+    def __init__(self, fill: AbstractFill):
+        self.fill = fill
 
     @property
     def value(self):
@@ -2297,7 +2356,7 @@ class _InitWrite(FinchOperator):
 
     @property
     def ftype(self):
-        return _InitWriteFType(self.fill)
+        return _InitWriteFType(self.fill.ftype)
 
     def __eq__(self, other):
         return (
@@ -2317,7 +2376,8 @@ class _InitWrite(FinchOperator):
 
 
 def init_write(value):
-    return _InitWrite(value)
+    # The value may be raw, which is a static fill.
+    return _InitWrite(as_fill(value))
 
 
 class _OverwriteFType(SingletonOperatorFType):
@@ -2382,7 +2442,7 @@ first_arg = _FirstArg()
 
 @dataclass(unsafe_hash=True)
 class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
-    fill: AbstractFill
+    fill_type: AbstractFillFType
 
     @property
     def struct_name(self):
@@ -2390,13 +2450,13 @@ class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
 
     @property
     def struct_fields(self):
-        return [("fill_value", self.fill.ftype)]
+        return [("fill_value", self.fill_type.element_type)]
 
     def from_fields(self, fill_value):
         fill = (
-            DynamicFill(fill_value, self.fill.ftype)
-            if is_dynamic(self.fill)
-            else self.fill
+            StaticFill(self.fill_type.value)
+            if is_static(self.fill_type)
+            else DynamicFill(fill_value, self.fill_type.element_type)
         )
         return _Choose(fill)
 
@@ -2406,7 +2466,7 @@ class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
 
     def return_type(self, *args: FType) -> FType:
         if not args:
-            return self.fill.ftype
+            return self.fill_type.element_type
         result_arg = args[0]
         assert isinstance(result_arg, FDType)
         result: FDType = result_arg
@@ -2416,20 +2476,20 @@ class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
         return result
 
     def is_identity(self, val: Any) -> builtins.bool:
-        return not is_dynamic(self.fill) and builtins.bool(
-            np.all(same(val, self.fill.value))
+        return is_static(self.fill_type) and builtins.bool(
+            same(val, self.fill_type.value)
         )
 
     def init_value(self, type_: FType) -> Any:
         assert isinstance(type_, FDType)
-        if is_dynamic(self.fill):
-            raise DynamicFillError("A dynamic choose has no static initial value")
-        return type_(self.fill.value)
+        if is_static(self.fill_type):
+            return type_(self.fill_type.value)
+        raise DynamicFillError("A dynamic choose has no static initial value")
 
 
 class _Choose(FinchOperator):
-    def __init__(self, fill_value):
-        self.fill = as_fill(fill_value)
+    def __init__(self, fill: AbstractFill):
+        self.fill = fill
 
     @property
     def fill_value(self):
@@ -2439,11 +2499,11 @@ class _Choose(FinchOperator):
         return (
             isinstance(other, _Choose)
             and self.fill == other.fill
-            and builtins.bool(np.all(same(self.fill_value, other.fill_value)))
+            and builtins.bool(same(self.fill_value, other.fill_value))
         )
 
     def __hash__(self):
-        return hash((type(self), self.fill, samehash(self.fill_value)))
+        return hash((type(self), self.fill, canonical(self.fill_value)))
 
     def __call__(self, *args: Any) -> Any:
         for arg in args:
@@ -2456,11 +2516,12 @@ class _Choose(FinchOperator):
 
     @property
     def ftype(self):
-        return _ChooseFType(self.fill)
+        return _ChooseFType(self.fill.ftype)
 
 
 def choose(fill_value):
-    return _Choose(fill_value)
+    # The value may be raw, which is a static fill.
+    return _Choose(as_fill(fill_value))
 
 
 class _IdentityFType(SingletonOperatorFType):
@@ -3077,66 +3138,6 @@ def root_scaled_negative_power(exponent: float):
     return _RootScaledNegativePower(exponent)
 
 
-class _ScansearchFType(SingletonOperatorFType):
-    @property
-    def operator(self):
-        return scansearch
-
-    arity = 4
-
-    def return_type(self, arr: FType, x: FType, lo: FType, hi: FType) -> FType:  # type: ignore[override]
-        return hi
-
-
-class _Scansearch(FinchOperator):
-    """
-    Scansearch is a search operator that performs a scan search on a sorted array.
-
-    It takes an array `arr`, a value `x`, and search bounds `lo` and `hi`, and returns
-    the index of the smallest element in `arr` that is greater than or equal to `x`.
-    If all elements in `arr` are less than `x`, it returns `hi`.
-    """
-
-    @staticmethod
-    def _func(
-        arr: np.ndarray, x: np.integer, lo: np.integer, hi: np.integer
-    ) -> np.integer:
-        dtype = np.array(lo).dtype.type
-        u = dtype(1)
-        d = dtype(1)
-        p = lo
-
-        # searching for binary search bounds
-        while p < hi and arr[p] < x:
-            d <<= 0x01
-            p += d
-        lo = p - d
-        hi = builtins.min(p, hi) + u  # type: ignore[call-overload]
-
-        # binary searching within those bounds
-        while lo < hi - u:
-            m = lo + ((hi - lo) >> 0x01)
-            if arr[m] < x:
-                lo = m
-            else:
-                hi = m
-
-        return hi
-
-    def __call__(self, *args, **kwargs):
-        return self._func(*args, **kwargs)
-
-    def __repr__(self) -> str:
-        return "scansearch"
-
-    @property
-    def ftype(self):
-        return _ScansearchFType()
-
-
-scansearch = _Scansearch()
-
-
 class _ResizeIfSmallerFType(SingletonOperatorFType):
     @property
     def operator(self):
@@ -3205,6 +3206,7 @@ __all__ = [
     "atan",
     "atan2",
     "atanh",
+    "canonical",
     "ceil",
     "choose",
     "clip",
@@ -3275,11 +3277,9 @@ __all__ = [
     "round",
     "rshift",
     "same",
-    "samehash",
     "scaled_negative_power",
     "scaled_power",
     "scaled_square",
-    "scansearch",
     "sign",
     "signbit",
     "sin",

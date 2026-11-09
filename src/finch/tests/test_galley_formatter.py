@@ -5,9 +5,10 @@ from finch import ffuncs
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.formatter import GalleyFormatter
 from finch.autoschedule.tensor_stats import DCStatsFactory
+from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -18,7 +19,7 @@ from finch.finch_logic import (
 from finch.tensor.level import ElementLevelFType
 
 i, j = Field("i"), Field("j")
-A, B = Alias("A"), Alias("B")
+A, B = HardAlias("A"), HardAlias("B")
 
 
 def level_ftypes(tensor_ftype):
@@ -39,7 +40,9 @@ def format_query(rhs, array, idxs=None):
     stats_factory = DCStatsFactory()
     capture = LogicCapture()
     GalleyFormatter(capture).lower(
-        Plan((Query(Table(B, idxs), rhs), Produces((B,)))),
+        Plan(
+            (fuse_loop_order(Query(Table(B, idxs), rhs), rhs.fields()), Produces((B,)))
+        ),
         {A: tensor.ftype},
         {A: stats_factory(tensor, (i, j))},
         stats_factory,

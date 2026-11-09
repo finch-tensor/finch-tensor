@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, overload
+from typing import Any, TypeVar, overload
 
 import numpy as np
 
@@ -15,6 +17,7 @@ from finch.algebra import (
     TensorFType,
     ffuncs,
     ftype,
+    is_static,
 )
 from finch.algebra.algebra import FinchOperator, SingletonOperatorFType
 from finch.codegen.numba_codegen import NumbaNAryOperator
@@ -41,8 +44,10 @@ from .stages import NotationLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_ASSEMBLY)
 
+FT = TypeVar("FT", bound=FType)
 
-class FinchTensorFType(TensorFType, ABC):
+
+class FinchTensorFType(TensorFType[FT], ABC):
     @abstractmethod
     def get_child_type(self, attr: str) -> FType:
         """Return the type of a logical child level."""
@@ -76,8 +81,15 @@ class FinchTensorFType(TensorFType, ABC):
     @abstractmethod
     def lower_declare(self, ctx, tns, init, op, shape):
         """
-        Declare a tensor.
+        Resize a tensor to `shape` and initialize it. A tensor with a dynamic
+        fill takes `init` as its fill.
         """
+
+    def lower_fill(self, ctx, obj):
+        """
+        Lower the fill value of a tensor.
+        """
+        raise NotImplementedError(f"Cannot lower the fill value of a {self}")
 
     @abstractmethod
     def lower_freeze(self, ctx, tns, op):
@@ -98,8 +110,74 @@ class FinchTensorFType(TensorFType, ABC):
         """
 
 
+@dataclass(eq=True, frozen=True)
+class ExtentFType(ImmutableStructFType):
+    start_t: FType
+    end_t: FType
+
+    def __repr__(self):
+        return f"ExtentFType(start={self.start_t}, end={self.end_t})"
+
+    @property
+    def struct_name(self):
+        return "Extent"
+
+    @property
+    def struct_fields(self):
+        return [("start", self.start_t), ("end", self.end_t)]
+
+    def from_fields(self, start, end) -> Extent:
+        return Extent(start, end)
+
+    def __call__(self, val):
+        match val:
+            case Extent():
+                return val
+        raise TypeError(f"Cannot convert {val!r} to {self.struct_name}")
+
+    def lower_loop(
+        self,
+        ctx: AssemblyContext,
+        idx: ntn.Variable,
+        ext: SymbolicExtent,
+        body: ntn.NotationExpression,
+    ):
+        """
+        Lower a loop with the given index and body.
+        This is used to compile the loop into assembly.
+        """
+        lower_looplets(ctx, idx, ext, body)
+        return
+
+    def default_loop(self, ctx, idx, ext: SymbolicExtent, body):
+        def assert_lowered(node):
+            match node:
+                case ntn.Access(_, _, (j, *_)):
+                    if j == idx:
+                        raise FinchCompileError(
+                            node, f"Access with {j} should have been lowered already"
+                        )
+            return
+
+        for node in PostOrderDFS(body):
+            assert_lowered(node)
+
+        ctx_2 = ctx.scope()
+        ctx_2(body)
+        body_3 = asm.Block(ctx_2.emit())
+        ctx.exec(
+            asm.ForLoop(
+                ctx(idx),
+                ctx(ext.get_start()),
+                ctx(ext.get_end()),
+                body_3,
+            )
+        )
+        return
+
+
 @dataclass(frozen=True)
-class Extent(FTyped):
+class Extent(FTyped[ExtentFType]):
     """
     A class to represent the extent of a loop variable. This is used to define
     the start and end values of a loop.
@@ -198,7 +276,7 @@ class FinchCompileError(Exception):  # TODO: Let's move it to `exceptions` dir?
 
 
 @dataclass(frozen=True)
-class SymbolicExtent(FTyped):
+class SymbolicExtent(FTyped[ExtentFType]):
     start_sym: ntn.NotationExpression
     end_sym: ntn.NotationExpression
 
@@ -209,6 +287,8 @@ class SymbolicExtent(FTyped):
                 op.result_type, _MakeExtentFType
             ):
                 return SymbolicExtent(start, end)
+            case ntn.Literal(Extent(start, end)):
+                return SymbolicExtent(ntn.Literal(start), ntn.Literal(end))
             case _:
                 raise Exception(node)
 
@@ -232,13 +312,13 @@ class SymbolicExtent(FTyped):
     def get_measure(self):
         return ntn.Call(ntn.Literal(ffuncs.sub), (self.end_sym, self.start_sym))
 
-    def bound_below(self, size) -> "SymbolicExtent":
+    def bound_below(self, size) -> SymbolicExtent:
         return self._bound_ext(size, ffuncs.max)
 
-    def bound_above(self, size) -> "SymbolicExtent":
+    def bound_above(self, size) -> SymbolicExtent:
         return self._bound_ext(size, ffuncs.min)
 
-    def _bound_ext(self, size, func) -> "SymbolicExtent":
+    def _bound_ext(self, size, func) -> SymbolicExtent:
         return SymbolicExtent(
             self.start_sym,
             ntn.Cached(
@@ -256,69 +336,6 @@ class SymbolicExtent(FTyped):
     @property
     def ftype(self):
         return ExtentFType(self.start_sym.result_type, self.end_sym.result_type)
-
-
-@dataclass(eq=True, frozen=True)
-class ExtentFType(ImmutableStructFType):
-    start_t: FType
-    end_t: FType
-
-    def __repr__(self):
-        return f"ExtentFType(start={self.start_t}, end={self.end_t})"
-
-    @property
-    def struct_name(self):
-        return "Extent"
-
-    @property
-    def struct_fields(self):
-        return [("start", self.start_t), ("end", self.end_t)]
-
-    def from_fields(self, start, end) -> "Extent":
-        return Extent(start, end)
-
-    def __call__(self, *args):
-        raise TypeError(f"{self.struct_name} is not callable")
-
-    def lower_loop(
-        self,
-        ctx: "AssemblyContext",
-        idx: ntn.Variable,
-        ext: SymbolicExtent,
-        body: ntn.NotationExpression,
-    ):
-        """
-        Lower a loop with the given index and body.
-        This is used to compile the loop into assembly.
-        """
-        lower_looplets(ctx, idx, ext, body)
-        return
-
-    def default_loop(self, ctx, idx, ext: SymbolicExtent, body):
-        def assert_lowered(node):
-            match node:
-                case ntn.Access(_, _, (j, *_)):
-                    if j == idx:
-                        raise FinchCompileError(
-                            node, f"Access with {j} should have been lowered already"
-                        )
-            return
-
-        for node in PostOrderDFS(body):
-            assert_lowered(node)
-
-        ctx_2 = ctx.scope()
-        ctx_2(body)
-        body_3 = asm.Block(ctx_2.emit())
-        ctx.exec(
-            asm.ForLoop(
-                ctx(idx),
-                ctx(ext.get_start()),
-                ctx(ext.get_end()),
-                body_3,
-            )
-        )
-        return
 
 
 @dataclass(eq=True)
@@ -352,6 +369,7 @@ class NotationCompiler(UnvalidatedForm, NotationLoader):
             ctx_transforms = (LowerPackedStructSlots(),)
         self.ctx_transforms = ctx_transforms
         self.ctx_lower: NotationLowerer = ctx_lower
+        self.mode = ctx_lower.mode
 
     def lower(self, prgm: ntn.Module) -> AssemblyLibrary:
         asm_code = self.ctx_lower(prgm)
@@ -423,9 +441,10 @@ class AssemblyContext(Context):
             pos_t = fields["pos"]
         elif "val" in fields and hasattr(fields["val"], "length_type"):
             pos_t = fields["val"].length_type
-        elif getattr(type_, "shape_type", None) == ():
+        elif getattr(type_, "shape_type", None) == () or "val" not in fields:
             # 0-d tensors store their value directly rather than in a
-            # positioned buffer; the cursor position is unused.
+            # positioned buffer, and pattern tensors store no values; the
+            # cursor position is unused.
             pos_t = np.intp
         else:
             raise TypeError(f"Cannot create an assembly cursor for {type_}")
@@ -532,6 +551,9 @@ class AssemblyContext(Context):
         node.
         """
         match prgm:
+            case ntn.Assert(exp):
+                self.exec(asm.Assert(self(exp)))
+                return None
             case ntn.Literal(value):
                 return asm.Literal(value)
             case ntn.Value(expr, _):
@@ -619,14 +641,45 @@ class AssemblyContext(Context):
                 assert isinstance(r, int)
                 tns = self.resolve(tns)
                 return tns.result_type.lower_dim(self, tns, r)
+            case ntn.FillValue(tns):
+                tns = self.resolve(tns)
+                return tns.result_type.lower_fill(self, tns)
             case ntn.Cached(arg, _):
                 return self(arg)
             case ntn.Declare(tns, init, op, shape):
                 self._thaw_tensor(tns.name, op)
                 tns = self.resolve(tns)
+                # A declaration may change a dynamic fill, but not a static one.
+                fill = tns.result_type.fill_type
+                if is_static(fill) and not (
+                    isinstance(init, ntn.Literal)
+                    and bool(ffuncs.same(init.val, fill.value))
+                ):
+                    raise ValueError(
+                        f"Declaring {tns} with {init} would change its static "
+                        f"fill {fill.value!r}"
+                    )
+                # Evaluate initializers and shapes before changing tensor fields.
                 init_e = self(init)
+                match init_e:
+                    case asm.Literal() | asm.Variable():
+                        pass
+                    case _:
+                        var = asm.Variable(self.freshen("init"), init_e.result_type)
+                        self.exec(asm.Assign(var, init_e))
+                        init_e = var
                 op_e = self(op)
-                shape_e = [self(s) for s in shape]
+                shape_e = []
+                for dim in shape:
+                    dim_e = self(dim)
+                    match dim_e:
+                        case asm.Literal() | asm.Variable():
+                            pass
+                        case _:
+                            var = asm.Variable(self.freshen("dim"), dim_e.result_type)
+                            self.exec(asm.Assign(var, dim_e))
+                            dim_e = var
+                    shape_e.append(dim_e)
                 return tns.result_type.lower_declare(self, tns, init_e, op_e, shape_e)
             case ntn.Freeze(tns, op):
                 self._freeze_tensor(tns.name, op)
@@ -689,7 +742,7 @@ class AssemblyContext(Context):
                 raise Exception(f"{other} not recognized.")
 
 
-def get_undeclared_slots(prgm):
+def get_undeclared_slots(prgm: ntn.NotationNode) -> set[str]:
     undeclared = set()
     for node in PostOrderDFS(prgm):
         match node:
@@ -727,7 +780,7 @@ def instantiate(ctx, prgm):
 
 
 def lower_looplets(
-    ctx: "AssemblyContext",
+    ctx: AssemblyContext,
     idx: ntn.Variable,
     ext: SymbolicExtent,
     body: ntn.NotationExpression,
@@ -742,6 +795,11 @@ def lower_looplets(
         match node:
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
+                    match mode:
+                        case ntn.Read((proto, *_)) | ntn.Update(_, (proto, *_)):
+                            pass
+                        case _:
+                            proto = ntn.DefaultProtocol()
                     tns = ctx_2.resolve(tns)
                     key = (tns, mode)
                     if key in unfurled:
@@ -764,12 +822,12 @@ def lower_looplets(
                                 )
                             )
                         )
-                    match tns:
-                        case ntn.Full(val, (_, *shape)) if mode == ntn.Read():
+                    match tns, mode:
+                        case ntn.Full(val, (_, *shape)), ntn.Read():
                             tns_2 = looplets.Run(ntn.Full(val, tuple(shape)))
                         case _:
                             tns_2 = tns.result_type.unfurl(
-                                ctx_2, tns, ext, mode, proto=None
+                                ctx_2, tns, ext, mode, proto=proto
                             )
                     unfurled[key] = ntn.Looplet(tns_2, tns.result_type)
                     return ntn.Access(unfurled[key], mode, (j, *idxs))
@@ -792,20 +850,24 @@ class LoopletPass(ABC):
         assert isinstance(other, LoopletPass)
         return self.priority < other.priority
 
-    def combine_with(self, other: "LoopletPass"):
+    def combine_with(self, other: LoopletPass):
         return max(self, other)
 
 
 class DefaultPass(LoopletPass):
+    """Lower the remaining loop after all tensor looplets have been handled."""
+
     @property
     def priority(self):
         return float("-inf")
 
-    def __call__(self, ctx: "LoopletContext", idx, ext: SymbolicExtent, body):
-        """
-        Default pass that does nothing. This is used when no other pass is selected.
-        """
-        ext.ftype.default_loop(ctx.ctx, idx, ext, body)
+    def __call__(self, ctx: LoopletContext, idx, ext: SymbolicExtent, body):
+        if ext.is_sym_point():
+            if ext.get_start() != idx:
+                ctx.exec(asm.Assign(ctx.ctx(idx), ctx.ctx(ext.get_start())))
+            ctx.ctx(body)
+        else:
+            ext.ftype.default_loop(ctx.ctx, idx, ext, body)
 
 
 class LoopletContext(Context):

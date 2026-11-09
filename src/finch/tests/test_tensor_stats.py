@@ -1,3 +1,4 @@
+import gc
 import math
 from collections import OrderedDict
 
@@ -7,10 +8,14 @@ import numpy as np
 
 import finch as ft
 from finch import ffuncs
-from finch.algebra import TensorFType, TupleFType, ftype
-from finch.algebra.fill import StaticFill
+from finch.algebra import (
+    DynamicFillFType,
+    StaticFillFType,
+    TensorFType,
+    TupleFType,
+    ftype,
+)
 from finch.autoschedule.capture import LogicCapture
-from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
 from finch.autoschedule.formatter.smart_formatter import FDFormatter, SmartFormatter
 from finch.autoschedule.tensor_stats import (
     DC,
@@ -27,15 +32,18 @@ from finch.autoschedule.tensor_stats import (
     LPStats,
     LPStatsFactory,
     SamplingStatsFactory,
+    StatsInterpreter,
     UniformStatsFactory,
     VPStatsFactory,
 )
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
-from finch.autoschedule.tensor_stats.sampling_stats import _duj1
+from finch.autoschedule.tensor_stats.memo_stats import MemoStatsFactory
 from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    Fuse,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -43,37 +51,65 @@ from finch.finch_logic import (
     Query,
     Table,
 )
+from finch.symbolic import PostOrderDFS
 from finch.tensor.traits import Dense as DenseProperty
 
 
 # ------------------- SamplingStats tests ---------------------------
-def test_sampling_reuses_random_masks():
+def sampling_sketch_array(tensor):
+    from finch.compile_jl.runtime import JuliaOwnedTensor
+
+    match tensor:
+        case JuliaOwnedTensor():
+            from finch.compile_jl.julia import jl
+
+            return jl.Array(tensor.raw_julia_obj).to_numpy().transpose()
+        case _:
+            return np.asarray(tensor)
+
+
+def test_sampling_reuses_random_seeds():
     i, j, k = Field("i"), Field("j"), Field("k")
-    factory = SamplingStatsFactory(sample_prob=0.5)
+    factory = SamplingStatsFactory()
     factory._rng = np.random.default_rng(42)
     first = factory(ft.FillTensor((5, 7), np.intp(0)), (i, j))
-    mask_i = factory._get_mask(i, 5)
+    mask_i = factory._get_mask(i, 5, 0.5)
     assert isinstance(mask_i, ft.RandomMaskTensor)
     assert mask_i.element_type == ftype(np.intp)
 
-    second = factory(ft.FillTensor((5, 1 << 40), np.intp(0)), (i, k))
-    assert factory._get_mask(i, 5) is mask_i
-    assert first.masks_ref is second.masks_ref is factory._masks
-    assert len(factory._masks) == 3
-    assert factory._get_mask(k, 1 << 40).shape == (1 << 40,)
-    assert factory._get_mask(j, 7).ftype != mask_i.ftype
-    assert factory._get_mask(i, 6) is not mask_i
+    second = factory(ft.FillTensor((5, 11), np.intp(0)), (i, k))
+    repeated_mask = factory._get_mask(i, 5, 0.5)
+    assert repeated_mask is not mask_i
+    assert [repeated_mask[idx].item() for idx in range(5)] == [
+        mask_i[idx].item() for idx in range(5)
+    ]
+    expected_rng = np.random.default_rng(42)
+    assert list(factory._seeds.values()) == [
+        int(expected_rng.integers(0, 1 << 64, dtype=np.uint64)) for _ in range(3)
+    ]
+    assert first.seeds_ref is second.seeds_ref is factory._seeds
+    assert len(factory._seeds) == 3
+    assert factory._get_mask(k, 1 << 40, 0.5).shape == (1 << 40,)
+    assert factory._get_mask(j, 7, 0.5).ftype != mask_i.ftype
+    factory._get_mask(i, 6, 0.5)
+    assert (i, 6) in factory._seeds
+    factory._get_mask(j, 5, 0.5)
+    assert factory._seeds[i, 5] != factory._seeds[j, 5]
 
 
 @pytest.mark.parametrize("shape", [(12, 9), (0, 5)])
 @pytest.mark.parametrize("sample_prob", [0.0, 0.5, 1.0])
 def test_sampling_random_mask_scan_and_coverage(shape, sample_prob):
     i, j = Field("i"), Field("j")
-    factory = SamplingStatsFactory(sample_prob=sample_prob)
+    factory = SamplingStatsFactory()
     factory._rng = np.random.default_rng(42)
-    stats = factory(ft.asarray(np.ones(shape)), (i, j))
+    stats = factory(ft.asarray(np.ones(shape)), (i, j), [sample_prob] * 2)
+    assert stats.sample_probs == [sample_prob, sample_prob]
     expected_count = math.prod(
-        sum(factory._get_mask(field, size)[idx].item() for idx in range(size))
+        sum(
+            factory._get_mask(field, size, sample_prob)[idx].item()
+            for idx in range(size)
+        )
         for field, size in zip((i, j), shape, strict=True)
     )
     assert stats.scan(needs_freq=True) == (
@@ -86,20 +122,252 @@ def test_sampling_random_mask_scan_and_coverage(shape, sample_prob):
     assert stats.coverage_correction() == pytest.approx(expected_coverage)
 
 
+@pytest.mark.parametrize(
+    "operation", ["tensor", "join", "union", "aggregate", "relabel", "reorder"]
+)
+def test_sampling_materializes_each_step(operation):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory()
+    data = np.array([[1, 0, 1], [0, 1, 0]], dtype=np.intp)
+    stats = factory(ft.asarray(data), (i, j))
+    expected = data.copy()
+    fields = (i, j)
+
+    match operation:
+        case "join":
+            stats = factory.mapjoin(ffuncs.mul, stats, stats)
+        case "union":
+            stats = factory.mapjoin(ffuncs.add, stats, stats)
+        case "aggregate":
+            stats = factory.aggregate(ffuncs.add, 0, (j,), stats)
+            expected = expected.sum(axis=1)
+            fields = (i,)
+        case "relabel":
+            fields = (Field("row"), Field("col"))
+            stats = factory.relabel(stats, fields)
+        case "reorder":
+            fields = (j, i)
+            stats = factory.reorder(stats, fields)
+            expected = expected.T
+
+    assert stats.sample_probs == [1.0] * len(fields)
+
+    # Read the stored tensor directly, without evaluating another logic plan.
+    match stats.sketch:
+        case Table(Literal(tensor), indices):
+            assert indices == fields
+            np.testing.assert_array_equal(sampling_sketch_array(tensor), expected)
+        case _:
+            pytest.fail("Sampling step left a deferred sketch")
+
+
+@pytest.mark.parametrize("sample_probs", [[0.25, 0.75], [0.0, 1.0], [1.0, 0.0]])
+def test_sampling_per_dimension_masks(sample_probs):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory(estimator="silly")
+    factory._rng = np.random.default_rng(42)
+    stats = factory(ft.asarray(np.ones((12, 9))), (i, j), sample_probs)
+    rows, cols = (
+        np.array(
+            [
+                ft.RandomMaskTensor(
+                    size, prob, seed=factory._seeds[field, size], dtype=np.intp
+                )[idx].item()
+                for idx in range(size)
+            ]
+        )
+        for field, size, prob in zip((i, j), (12, 9), sample_probs, strict=True)
+    )
+    expected = rows[:, None] * cols[None, :]
+    match stats.sketch:
+        case Table(Literal(tensor), _):
+            np.testing.assert_array_equal(sampling_sketch_array(tensor), expected)
+        case _:
+            pytest.fail("Sampling step left a deferred sketch")
+    count = expected.sum()
+    assert stats.coverage_correction() == pytest.approx(108 if count else 0)
+    prob = math.prod(sample_probs)
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        min(108, count / prob) if prob else 0
+    )
+    assert not hasattr(stats, "sample_prob")
+
+
+def test_sampling_propagates_per_dimension_probs():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    factory = SamplingStatsFactory()
+    stats = factory(ft.asarray(np.ones((3, 4))), (i, j), [0.25, 0.75])
+    other = factory(ft.asarray(np.ones((4, 5))), (j, k), [0.75, 0.5])
+    for op in (ffuncs.mul, ffuncs.add):
+        joined = factory.mapjoin(op, stats, other)
+        assert dict(zip(joined.index_order, joined.sample_probs, strict=True)) == {
+            i: 0.25,
+            j: 0.75,
+            k: 0.5,
+        }
+    assert factory.reorder(stats, (j, i)).sample_probs == [0.75, 0.25]
+    relabeled = factory.relabel(stats, (j, k))
+    assert relabeled.sample_probs == [0.25, 0.75]
+    assert relabeled.sample_probs is not stats.sample_probs
+    reduced = factory.aggregate(ffuncs.add, 0, (j,), stats)
+    assert reduced.sample_probs == [0.25]
+    assert reduced.remainder_size == 4.0
+    assert reduced.remainder_prob == 0.75
+    scalar = factory.aggregate(ffuncs.add, 0, (i,), reduced)
+    assert scalar.sample_probs == []
+    assert scalar.remainder_size == 12.0
+    assert scalar.remainder_prob == 0.25 * 0.75
+    for transformed in (
+        factory.copy(reduced),
+        factory.relabel(reduced, (k,)),
+        factory.reorder(reduced, (i,)),
+        factory.aggregate(ffuncs.add, 0, (), reduced),
+    ):
+        assert transformed.remainder_size == reduced.remainder_size
+        assert transformed.remainder_prob == reduced.remainder_prob
+
+
+@pytest.mark.parametrize("op", [ffuncs.mul, ffuncs.add])
+def test_sampling_combines_reduced_sizes_and_probs(op):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory()
+    first = factory(ft.asarray(np.ones((3, 4))), (i, j), [1.0, 0.75])
+    second_factory = SamplingStatsFactory()
+    second = second_factory(ft.asarray(np.ones((3, 5))), (i, j), [1.0, 0.25])
+    left = factory.aggregate(ffuncs.add, 0, (j,), first)
+    right = second_factory.aggregate(ffuncs.add, 0, (j,), second)
+    combined = factory.mapjoin(op, left, right)
+    assert combined.remainder_size == 4.0 * 5.0
+    assert combined.remainder_prob == 0.75 * 0.25
+
+    # Reusing the old name for a live axis must not resample the reduced axis.
+    live = factory(ft.asarray(np.ones(6)), (j,), [0.125])
+    result = factory.mapjoin(op, left, live)
+    assert result.sample_probs == [1.0, 0.125]
+    assert result.remainder_prob == 0.75
+    assert result.remainder_size == 4.0
+
+
+@pytest.mark.parametrize("op", [ffuncs.mul, ffuncs.add])
+def test_sampling_aligns_shared_dimension_probs(op):
+    i = Field("i")
+    factory = SamplingStatsFactory()
+    first = factory(ft.asarray(np.ones(4)), (i,), [0.25])
+    second = factory(ft.asarray(np.ones(4)), (i,), [0.75])
+    combined = factory.mapjoin(op, first, second)
+    assert combined.sample_probs == [0.25]
+    assert combined.scan(needs_freq=False) == first.scan(needs_freq=False)
+    assert second.sample_probs == [0.75]
+
+
+@pytest.mark.parametrize(
+    "data,budget",
+    [
+        (np.ones((4, 40)), 20),
+        (np.eye(16), 4),
+        (np.pad(np.ones((2, 4)), ((0, 38), (0, 0))), 3),
+        (np.ones((3, 4, 5)), 3),
+        (np.ones((1, 12)), 1),
+    ],
+)
+def test_sampling_remask_largest_projection(data, budget):
+    fields = tuple(Field(f"i_{dim}") for dim in range(data.ndim))
+    factory = SamplingStatsFactory(sample_nnz=data.size)
+    factory._rng = np.random.default_rng(42)
+    original = factory(ft.asarray(data), fields)
+    assert original.sample_probs == [1.0] * data.ndim
+    original_count = original.scan(needs_freq=False)[1]
+    factory.sample_nnz = budget
+    sampled = factory.remask(original)
+
+    expected = (data != 0).astype(np.intp)
+    probs = [1.0] * data.ndim
+    while np.count_nonzero(expected) > budget:
+        sizes = [
+            np.count_nonzero(
+                np.any(
+                    expected,
+                    axis=tuple(axis for axis in range(data.ndim) if axis != dim),
+                )
+            )
+            for dim in range(data.ndim)
+        ]
+        dim = int(np.argmax(sizes))
+        probs[dim] *= 0.5
+        size = data.shape[dim]
+        mask = ft.RandomMaskTensor(
+            size, probs[dim], seed=factory._seeds[fields[dim], size], dtype=np.intp
+        )
+        values = np.array([mask[idx].item() for idx in range(size)])
+        shape = [1] * data.ndim
+        shape[dim] = size
+        expected *= values.reshape(shape)
+
+    assert sampled.sample_probs == probs
+    match sampled.sketch:
+        case Table(Literal(tensor), _):
+            np.testing.assert_array_equal(sampling_sketch_array(tensor), expected)
+        case _:
+            pytest.fail("remask left a deferred sketch")
+    assert sampled.scan(needs_freq=False)[1] == np.count_nonzero(expected)
+    assert original.sample_probs == [1.0] * data.ndim
+    assert original.scan(needs_freq=False)[1] == original_count
+    assert factory.remask(sampled) is sampled
+    automatic_factory = SamplingStatsFactory(sample_nnz=budget)
+    automatic_factory._rng = np.random.default_rng(42)
+    automatic = automatic_factory(ft.asarray(data), fields)
+    assert automatic.sample_probs == probs
+    assert automatic.scan(needs_freq=False)[1] == np.count_nonzero(expected)
+
+
+@pytest.mark.parametrize("shape", [(), (0,), (0, 5), (2, 3)])
+def test_sampling_remask_under_budget(shape):
+    fields = tuple(Field(f"i_{dim}") for dim in range(len(shape)))
+    factory = SamplingStatsFactory(sample_nnz=6)
+    stats = factory(ft.asarray(np.ones(shape)), fields)
+    assert stats.sample_probs == [1.0] * len(shape)
+    assert stats.scan(needs_freq=False)[1] == math.prod(shape)
+
+
+@pytest.mark.parametrize("op", [ffuncs.mul, ffuncs.add])
+def test_sampling_bounds_each_sketch(op):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory(sample_nnz=12)
+    factory._rng = np.random.default_rng(42)
+    first = factory(ft.asarray(np.ones(10)), (i,))
+    second = factory(ft.asarray(np.ones(10)), (j,))
+    combined = factory.mapjoin(op, first, second)
+    reduced = factory.aggregate(ffuncs.add, 0, (j,), combined)
+    for stats in (first, second, combined, reduced):
+        assert stats.scan(needs_freq=False)[1] <= 12
+    assert min(combined.sample_probs) < 1.0
+
+
+def test_sampling_budget_counts_positions_not_multiplicities():
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory(sample_nnz=100)
+    stats = factory(ft.asarray(np.ones((2, 20))), (i, j))
+    reduced = factory.aggregate(ffuncs.add, 0, (j,), stats)
+    factory.sample_nnz = 2
+    sampled = factory.remask(reduced)
+    assert sampled.sample_probs == [1.0]
+    assert sampled.scan(needs_freq=False)[:2] == (40.0, 2.0)
+
+
+@pytest.mark.parametrize("budget", [0, -1])
+def test_sampling_requires_positive_budget(budget):
+    with pytest.raises(ValueError, match="sample_nnz must be positive"):
+        SamplingStatsFactory(sample_nnz=budget)
+
+
 def test_sampling_from_tensor():
     i, j = Field("i"), Field("j")
     data = np.eye(20)
     arr = ft.asarray(data)
     node = Table(Literal(arr), (i, j))
-    stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1.0),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-    assert stats.remainder_dims == set()
-    assert stats.remainder_dim_sizes == {}
+    stats = StatsInterpreter(SamplingStatsFactory())(node, OrderedDict())
+    assert stats.remainder_size == 1.0
+    assert stats.remainder_prob == 1.0
     assert stats.estimate_non_fill_values() == pytest.approx(20.0, abs=1.0)
 
 
@@ -111,29 +379,8 @@ def test_sampling_mapjoin_join():
     ta = Table(Literal(ft.asarray(data_a)), (i, k))
     tb = Table(Literal(ft.asarray(data_b)), (k, j))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
-    stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
-        node=node_mul,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    stats = StatsInterpreter(SamplingStatsFactory())(node_mul, OrderedDict())
     assert stats.estimate_non_fill_values() == pytest.approx(20.0, abs=1.0)
 
 
@@ -145,29 +392,8 @@ def test_sampling_mapjoin_elementwise():
     data_b[10:, :] = 1.0
     ta = Table(Literal(ft.asarray(data_a)), (i, j))
     tb = Table(Literal(ft.asarray(data_b)), (i, j))
-    cache = {}
-    insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
     node_mapjoin_elem = MapJoin(Literal(ffuncs.add), (ta, tb))
-    stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1.0),
-        node=node_mapjoin_elem,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    stats = StatsInterpreter(SamplingStatsFactory())(node_mapjoin_elem, OrderedDict())
 
     assert stats.estimate_non_fill_values() == pytest.approx(
         float(np.count_nonzero(data_a + data_b)), abs=1.0
@@ -187,29 +413,8 @@ def test_sampling_mapjoin_broadcast():
     ta = Table(Literal(ft.asarray(data_a)), (i, k))
     tb = Table(Literal(ft.asarray(data_b)), (k, j))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
-    stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
-        node=node_mul,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    stats = StatsInterpreter(SamplingStatsFactory())(node_mul, OrderedDict())
 
     true_nnz = float(np.count_nonzero(data_a[:, :, None] * data_b[None, :, :]))
     assert stats.estimate_non_fill_values() == pytest.approx(true_nnz, abs=1.0)
@@ -228,17 +433,11 @@ def test_sampling_aggregate():
         arg=MapJoin(Literal(ffuncs.mul), (ta, tb)),
         idxs=(k,),
     )
-    stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(SamplingStatsFactory())(node, OrderedDict())
 
     assert stats.index_order == (i, j)
-    assert k in stats.remainder_dims
-    assert stats.remainder_dim_sizes[k] == 20.0
+    assert stats.remainder_size == 20.0
+    assert stats.remainder_prob == 1.0
     assert stats.estimate_non_fill_values() == pytest.approx(20.0, abs=1.0)
 
 
@@ -246,16 +445,8 @@ def test_sampling_relabel():
     i, j = Field("i"), Field("j")
     data = np.eye(5)
     node = Table(Literal(ft.asarray(data)), (i, j))
-    stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1.0),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-    relabled = SamplingStatsFactory(sample_prob=1.0).relabel(
-        stats, (Field("row"), Field("col"))
-    )
+    stats = StatsInterpreter(SamplingStatsFactory())(node, OrderedDict())
+    relabled = SamplingStatsFactory().relabel(stats, (Field("row"), Field("col")))
 
     assert relabled.index_order == (Field("row"), Field("col"))
     assert relabled.estimate_non_fill_values() == pytest.approx(
@@ -267,67 +458,12 @@ def test_sampling_reorder():
     i, j = Field("i"), Field("j")
     data = np.eye(5)
     node = Table(Literal(ft.asarray(data)), (i, j))
-    stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1.0),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-    reordered = SamplingStatsFactory(sample_prob=1.0).reorder(stats, (j, i))
+    stats = StatsInterpreter(SamplingStatsFactory())(node, OrderedDict())
+    reordered = SamplingStatsFactory().reorder(stats, (j, i))
     assert reordered.index_order == (j, i)
     assert reordered.estimate_non_fill_values() == pytest.approx(
         stats.estimate_non_fill_values(), abs=1.0
     )
-
-
-def test_stats_estimator_isolated():
-    # more generalised example ?
-
-    # A = np.eye(100)
-    A = np.zeros((10, 10))
-    A[0, :] = 1.0
-    A[2, :3] = 1.0
-    A[4, 5] = 1.0
-    A[6, :7] = 1.0
-    A[8, ::2] = 1.0
-    rows, cols = np.nonzero(A)
-    true_D = len(np.unique(rows))
-    N = len(rows)  # [0,0,0...10times,2,2,2,....] = total nnz overall
-
-    print(f"Non-zero rows : {np.unique(rows)}")
-    print(f"True D :{true_D}")
-    print(f"Total nnz N : {N}")
-
-    # sampling
-    rng = np.random.default_rng(42)
-    q = 0.5
-    n_trials = 10000
-    estimates = []
-
-    for _ in range(n_trials):
-        mask = rng.random(N) < q
-        sample = rows[mask]
-
-        if len(sample) == 0:
-            continue
-
-        # frequencies
-        _, counts = np.unique(sample, return_counts=True)
-        d_n = float(len(counts))  # how many rows contribute
-        f_1 = float(
-            np.sum(counts == 1)
-        )  # how many rows have only one contributing element
-        n = float(len(sample))  # how many total nnz -> sum of frequencies
-
-        estimates.append(_duj1(d_n, f_1, q, n))
-
-    mean_est = np.mean(estimates)
-    error = abs(mean_est - true_D) / true_D * 100
-
-    print(f"True D:{true_D}")
-    print(f"Estimated D:{mean_est}")
-    print(f"Error:{error:.1f}%")
 
 
 def _overwrite_def(stat, base: BaseTensorStats):
@@ -338,7 +474,7 @@ def _overwrite_def(stat, base: BaseTensorStats):
     """
     stat.index_order = base.index_order
     stat.dim_sizes = base.dim_sizes
-    stat.fill_value = base.fill_value
+    stat.fill_type = base.fill_type
     return stat
 
 
@@ -394,23 +530,22 @@ def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
             super().__init__(loader)
             self.output_stats = []
 
-        def get_tensor_ftype(self, fill_value, shape_type, stats) -> TensorFType:
+        def get_tensor_ftype(
+            self, fill_type, shape_type, stats, over=()
+        ) -> TensorFType:
             self.output_stats.append(stats)
-            fill_ftype = ftype(
-                fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
-            )
             return ft.BufferizedNDArrayFType(
-                buffer_type=ft.NumpyBufferFType(fill_ftype),
+                buffer_type=ft.NumpyBufferFType(fill_type.element_type),
                 ndim=len(shape_type),
                 dimension_type=TupleFType.from_tuple(shape_type),
-                fill_value=fill_value,
+                fill_type=fill_type,
             )
 
     i, j = Field("i"), Field("j")
-    A, B = Alias("A"), Alias("B")
+    A, B = HardAlias("A"), HardAlias("B")
     tensor = ft.FillTensor((2, 3), 0)
     stats_factory = FDStatsFactory()
-    stats = {A: stats_factory(tensor, (i, j))}
+    stats: dict[Alias, FDStats] = {A: stats_factory(tensor, (i, j))}
     capture = LogicCapture()
     formatter = RecordingSmartFormatter(capture)
     prgm = Plan(
@@ -434,10 +569,10 @@ def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
 
 def test_fd_formatter_uses_dense_levels_for_dense_properties():
     i, j = Field("i"), Field("j")
-    A, B = Alias("A"), Alias("B")
+    A, B = HardAlias("A"), HardAlias("B")
     tensor = ft.FillTensor((2, 3), 0)
     stats_factory = FDStatsFactory()
-    stats = {A: stats_factory(tensor, (i, j))}
+    stats: dict[Alias, FDStats] = {A: stats_factory(tensor, (i, j))}
     capture = LogicCapture()
     formatter = FDFormatter(capture)
     prgm = Plan(
@@ -467,11 +602,11 @@ def test_fd_formatter_uses_dense_levels_for_dense_properties():
 
 def test_fd_formatter_uses_sparse_hash_for_unknown_dense_properties():
     i, j = Field("i"), Field("j")
-    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, 0)
+    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, StaticFillFType(0))
     stats = FDStats(base, dense_props={frozenset({i})})
 
     ftype = FDFormatter().get_tensor_ftype(
-        StaticFill(0),
+        StaticFillFType(0),
         (ft.ftype(np.intp), ft.ftype(np.intp)),
         stats,
     )
@@ -484,14 +619,14 @@ def test_fd_formatter_uses_sparse_hash_for_unknown_dense_properties():
 
 def test_fd_formatter_requires_outer_fields_for_inner_dense_levels():
     i, j = Field("i"), Field("j")
-    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, 0)
+    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, StaticFillFType(0))
     stats = FDStats(
         base,
         dense_props={frozenset({i}), frozenset({j})},
     )
 
     ftype = FDFormatter().get_tensor_ftype(
-        StaticFill(0),
+        StaticFillFType(0),
         (ft.ftype(np.intp), ft.ftype(np.intp)),
         stats,
     )
@@ -517,7 +652,7 @@ def _format_stats(levels, shape, fields):
 
 def _fd_output_pattern(stats):
     ftype = FDFormatter().get_tensor_ftype(
-        stats.fill_value,
+        stats.fill_type,
         tuple(ft.intp for _ in stats.index_order),
         stats,
     )
@@ -586,10 +721,12 @@ def test_fd_stats_records_dense_projections_without_chasing():
     i, j = Field("i"), Field("j")
 
     class TensorFType:
+        fill_type = StaticFillFType(0)
         level_format_properties = [
             DenseProperty((0, 1)),
             DenseProperty((1,)),
         ]
+        shape_type = (ft.int64, ft.int64)
 
     class Tensor:
         shape = (2, 3)
@@ -615,7 +752,7 @@ def test_exact_construction_snapshots_tensor():
     np.testing.assert_allclose(stats.get_embedding(), np.log2([2, 3, 4]))
 
 
-def test_exact_elementwise_mul():
+def test_exact_elementwise():
     i, j = Field("i"), Field("j")
     A = np.array([[1.0, 0.0], [0.0, 1.0]])
     B = np.array([[1.0, 1.0], [0.0, 0.0]])
@@ -623,39 +760,13 @@ def test_exact_elementwise_mul():
         Literal(ffuncs.mul),
         (Table(Literal(ft.asarray(A)), (i, j)), Table(Literal(ft.asarray(B)), (i, j))),
     )
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     assert stats.estimate_non_fill_values() == pytest.approx(
         float(np.count_nonzero(A * B))
     )
 
 
-def test_exact_elementwise_add():
-    i, j = Field("i"), Field("j")
-    A = np.array([[1.0, 0.0], [0.0, 1.0]])
-    B = np.array([[1.0, 1.0], [0.0, 0.0]])
-    node = MapJoin(
-        Literal(ffuncs.add),
-        (Table(Literal(ft.asarray(A)), (i, j)), Table(Literal(ft.asarray(B)), (i, j))),
-    )
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-    assert stats.estimate_non_fill_values() == pytest.approx(
-        float(np.count_nonzero(A + B))
-    )
-
-
-def test_exact_broadcast_mul():
+def test_exact_broadcast():
     i, j = Field("i"), Field("j")
     A = np.array([[1.0, 0.0], [0.0, 1.0]])
     b = np.array([1.0, 0.0])
@@ -663,39 +774,13 @@ def test_exact_broadcast_mul():
         Literal(ffuncs.mul),
         (Table(Literal(ft.asarray(A)), (i, j)), Table(Literal(ft.asarray(b)), (j,))),
     )
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     assert stats.estimate_non_fill_values() == pytest.approx(
         float(np.count_nonzero(A * b))
     )
 
 
-def test_exact_broadcast_add():
-    i, j = Field("i"), Field("j")
-    A = np.array([[1.0, 0.0], [0.0, 1.0]])
-    b = np.array([1.0, 0.0])
-    node = MapJoin(
-        Literal(ffuncs.add),
-        (Table(Literal(ft.asarray(A)), (i, j)), Table(Literal(ft.asarray(b)), (j,))),
-    )
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-    assert stats.estimate_non_fill_values() == pytest.approx(
-        float(np.count_nonzero(A + b))
-    )
-
-
-def test_exact_join_mul():
+def test_exact_join():
     i, j, k = Field("i"), Field("j"), Field("k")
     A = np.array([[1.0, 0.0], [0.0, 1.0]])
     B = np.array([[1.0, 0.0], [0.0, 1.0]])
@@ -703,74 +788,95 @@ def test_exact_join_mul():
         Literal(ffuncs.mul),
         (Table(Literal(ft.asarray(A)), (i, j)), Table(Literal(ft.asarray(B)), (j, k))),
     )
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     assert stats.estimate_non_fill_values() == pytest.approx(
         float(np.count_nonzero(A[:, :, None] * B[None, :, :]))
     )
 
 
-def test_exact_join_add():
-    i, j, k = Field("i"), Field("j"), Field("k")
-    A = np.array([[1.0, 0.0], [0.0, 1.0]])
-    B = np.array([[1.0, 0.0], [0.0, 1.0]])
-    node = MapJoin(
-        Literal(ffuncs.add),
-        (Table(Literal(ft.asarray(A)), (i, j)), Table(Literal(ft.asarray(B)), (j, k))),
-    )
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-    assert stats.estimate_non_fill_values() == pytest.approx(
-        float(np.count_nonzero(A[:, :, None] + B[None, :, :]))
-    )
-
-
-def test_exact_semiring():
+@pytest.mark.parametrize(
+    "reduce_op, reduce_init, join_op, matrices, expected_fn",
+    [
+        pytest.param(
+            ffuncs.add,
+            0.0,
+            ffuncs.mul,
+            tuple(np.eye(3) for _ in range(4)),
+            lambda A, B, C, D: float(np.count_nonzero((A @ B) * (C @ D))),
+            id="add-mul",
+        ),
+        pytest.param(
+            ffuncs.max,
+            float("-inf"),
+            ffuncs.add,
+            tuple(np.eye(2) for _ in range(4)),
+            lambda A, B, C, D: float(
+                np.count_nonzero(
+                    np.max(A[:, :, None] + B[None, :, :], axis=1)
+                    + np.max(C[:, :, None] + D[None, :, :], axis=1)
+                )
+            ),
+            id="max-add",
+        ),
+        pytest.param(
+            ffuncs.or_,
+            False,
+            ffuncs.and_,
+            tuple(np.eye(2, dtype=bool) for _ in range(4)),
+            lambda A, B, C, D: float(
+                np.count_nonzero(
+                    np.any(A[:, :, None] & B[None, :, :], axis=1)
+                    & np.any(C[:, :, None] & D[None, :, :], axis=1)
+                )
+            ),
+            id="or-and",
+        ),
+        pytest.param(
+            ffuncs.max,
+            float("-inf"),
+            ffuncs.min,
+            tuple(np.eye(2) for _ in range(4)),
+            lambda A, B, C, D: float(
+                np.count_nonzero(
+                    np.isfinite(
+                        np.minimum(
+                            np.max(np.minimum(A[:, :, None], B[None, :, :]), axis=1),
+                            np.max(np.minimum(C[:, :, None], D[None, :, :]), axis=1),
+                        )
+                    )
+                )
+            ),
+            id="max-min",
+        ),
+    ],
+)
+def test_exact_semiring(reduce_op, reduce_init, join_op, matrices, expected_fn):
     i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
-    A = np.eye(3)
-    B = np.eye(3)
-    C = np.eye(3)
-    D = np.eye(3)
+    A, B, C, D = matrices
     A_, B_, C_, D_ = ft.asarray(A), ft.asarray(B), ft.asarray(C), ft.asarray(D)
 
     ab = Aggregate(
-        Literal(ffuncs.add),
-        Literal(0.0),
+        Literal(reduce_op),
+        Literal(reduce_init),
         MapJoin(
-            Literal(ffuncs.mul),
+            Literal(join_op),
             (Table(Literal(A_), (i, j)), Table(Literal(B_), (j, k))),
         ),
         (j,),
     )
     cd = Aggregate(
-        Literal(ffuncs.add),
-        Literal(0.0),
+        Literal(reduce_op),
+        Literal(reduce_init),
         MapJoin(
-            Literal(ffuncs.mul),
+            Literal(join_op),
             (Table(Literal(C_), (i, m)), Table(Literal(D_), (m, k))),
         ),
         (m,),
     )
-    node = MapJoin(Literal(ffuncs.mul), (ab, cd))
+    node = MapJoin(Literal(join_op), (ab, cd))
 
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-    expected = float(np.count_nonzero((A @ B) * (C @ D)))
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
+    expected = expected_fn(A, B, C, D)
     assert stats.estimate_non_fill_values() == pytest.approx(expected)
 
 
@@ -784,137 +890,8 @@ def test_exact_semiring_tropical():
         Table(Literal(A_), (i, j)),
         (j,),
     )
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     expected = float(np.count_nonzero(np.isfinite(np.min(A, axis=1))))
-    assert stats.estimate_non_fill_values() == pytest.approx(expected)
-
-
-def test_exact_semiring_maxplus():
-    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
-    A = np.eye(2)
-    B = np.eye(2)
-    C = np.eye(2)
-    D = np.eye(2)
-    A_, B_, C_, D_ = ft.asarray(A), ft.asarray(B), ft.asarray(C), ft.asarray(D)
-
-    ab = Aggregate(
-        Literal(ffuncs.max),
-        Literal(float("-inf")),
-        MapJoin(
-            Literal(ffuncs.add),
-            (Table(Literal(A_), (i, j)), Table(Literal(B_), (j, k))),
-        ),
-        (j,),
-    )
-    cd = Aggregate(
-        Literal(ffuncs.max),
-        Literal(float("-inf")),
-        MapJoin(
-            Literal(ffuncs.add),
-            (Table(Literal(C_), (i, m)), Table(Literal(D_), (m, k))),
-        ),
-        (m,),
-    )
-    node = MapJoin(Literal(ffuncs.add), (ab, cd))
-
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-    AB = np.max(A[:, :, None] + B[None, :, :], axis=1)
-    CD = np.max(C[:, :, None] + D[None, :, :], axis=1)
-    expected = float(np.count_nonzero(AB + CD))
-    assert stats.estimate_non_fill_values() == pytest.approx(expected)
-
-
-def test_exact_semiring_boolean():
-    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
-    A = np.eye(2, dtype=bool)
-    B = np.eye(2, dtype=bool)
-    C = np.eye(2, dtype=bool)
-    D = np.eye(2, dtype=bool)
-    A_, B_, C_, D_ = ft.asarray(A), ft.asarray(B), ft.asarray(C), ft.asarray(D)
-
-    ab = Aggregate(
-        Literal(ffuncs.or_),
-        Literal(False),
-        MapJoin(
-            Literal(ffuncs.and_),
-            (Table(Literal(A_), (i, j)), Table(Literal(B_), (j, k))),
-        ),
-        (j,),
-    )
-    cd = Aggregate(
-        Literal(ffuncs.or_),
-        Literal(False),
-        MapJoin(
-            Literal(ffuncs.and_),
-            (Table(Literal(C_), (i, m)), Table(Literal(D_), (m, k))),
-        ),
-        (m,),
-    )
-    node = MapJoin(Literal(ffuncs.and_), (ab, cd))
-
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-    AB = np.any(A[:, :, None].astype(bool) & B[None, :, :].astype(bool), axis=1)
-    CD = np.any(C[:, :, None].astype(bool) & D[None, :, :].astype(bool), axis=1)
-    expected = float(np.count_nonzero(AB & CD))
-    assert stats.estimate_non_fill_values() == pytest.approx(expected)
-
-
-def test_exact_semiring_maxmin():
-    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
-    A = np.eye(2)
-    B = np.eye(2)
-    C = np.eye(2)
-    D = np.eye(2)
-    A_, B_, C_, D_ = ft.asarray(A), ft.asarray(B), ft.asarray(C), ft.asarray(D)
-
-    ab = Aggregate(
-        Literal(ffuncs.max),
-        Literal(float("-inf")),
-        MapJoin(
-            Literal(ffuncs.min),
-            (Table(Literal(A_), (i, j)), Table(Literal(B_), (j, k))),
-        ),
-        (j,),
-    )
-    cd = Aggregate(
-        Literal(ffuncs.max),
-        Literal(float("-inf")),
-        MapJoin(
-            Literal(ffuncs.min),
-            (Table(Literal(C_), (i, m)), Table(Literal(D_), (m, k))),
-        ),
-        (m,),
-    )
-    node = MapJoin(Literal(ffuncs.min), (ab, cd))
-
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-    AB = np.max(np.minimum(A[:, :, None], B[None, :, :]), axis=1)
-    CD = np.max(np.minimum(C[:, :, None], D[None, :, :]), axis=1)
-    expected = float(np.count_nonzero(np.isfinite(np.minimum(AB, CD))))
     assert stats.estimate_non_fill_values() == pytest.approx(expected)
 
 
@@ -922,13 +899,7 @@ def test_exact_relabel():
     i, j = Field("i"), Field("j")
     data = np.array([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]])
     node = Table(Literal(ft.asarray(data)), (i, j))
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     row, col = Field("row"), Field("col")
     relabeled = ExactStatsFactory().relabel(stats, (row, col))
 
@@ -941,13 +912,7 @@ def test_exact_reorder():
     i, j = Field("i"), Field("j")
     data = np.array([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]])
     node = Table(Literal(ft.asarray(data)), (i, j))
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     reordered = ExactStatsFactory().reorder(stats, (j, i))
 
     assert reordered.index_order == (j, i)
@@ -959,13 +924,7 @@ def test_exact_embedding():
     i, j = Field("i"), Field("j")
     data = np.array([[1.0, 0.0], [0.0, 1.0]])
     node = Table(Literal(ft.asarray(data)), (i, j))
-    stats = insert_statistics(
-        stats_factory=ExactStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
     emb = stats.get_embedding()
 
     assert emb.shape == (3,)
@@ -980,6 +939,111 @@ def test_exact_embedding():
     assert emb_r[2] == pytest.approx(emb[2])
 
 
+# ─────────────────────────────── MemoStats tests ────────────────────────────────
+
+
+def _random_sparse(rng, *shape):
+    return (rng.random(shape) < 0.3) * (rng.random(shape) + 1.0)
+
+
+@pytest.mark.parametrize(
+    "inner", [ExactStatsFactory, DCStatsFactory, UniformStatsFactory]
+)
+def test_memo_matches_inner(inner):
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
+    rng = np.random.default_rng(0)
+    A, B, C, D = (ft.asarray(_random_sparse(rng, 4, 4)) for _ in range(4))
+    ab = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(
+            Literal(ffuncs.mul), (Table(Literal(A), (i, j)), Table(Literal(B), (j, k)))
+        ),
+        (j,),
+    )
+    cd = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(
+            Literal(ffuncs.mul), (Table(Literal(C), (i, m)), Table(Literal(D), (m, k)))
+        ),
+        (m,),
+    )
+    node = MapJoin(Literal(ffuncs.add), (ab, cd))
+
+    expected = StatsInterpreter(inner())(node, OrderedDict())
+    stats = StatsInterpreter(MemoStatsFactory(inner()))(node, OrderedDict())
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        expected.estimate_non_fill_values()
+    )
+    assert stats.estimate_non_fill_values((i,)) == pytest.approx(
+        expected.estimate_non_fill_values((i,))
+    )
+
+
+def test_memo_computes_each_expression_once():
+    class CountingFactory(ExactStatsFactory):
+        def __init__(self):
+            super().__init__()
+            self.aggregates = 0
+
+        def aggregate(self, *args):
+            self.aggregates += 1
+            return super().aggregate(*args)
+
+    i, j, k, m = Field("i"), Field("j"), Field("k"), Field("m")
+    A, B, C = np.ones((2, 10)), np.ones((10, 3)), np.ones((3, 4))
+    inner = CountingFactory()
+    factory = MemoStatsFactory(inner)
+    a = factory(ft.asarray(A), (i, j))
+    b = factory(ft.asarray(B), (j, k))
+    c = factory(ft.asarray(C), (k, m))
+
+    def matmul(x, y, idx):
+        return factory.aggregate(
+            ffuncs.add, None, (idx,), factory.mapjoin(ffuncs.mul, x, y)
+        )
+
+    ab_c = matmul(matmul(a, b, j), c, k)
+    assert inner.aggregates == 2
+    again = matmul(matmul(a, b, j), c, k)
+    assert inner.aggregates == 2
+    assert again.inner is ab_c.inner
+    assert ab_c.estimate_non_fill_values() == np.count_nonzero(A @ B @ C)
+
+
+def test_memo_computes_each_estimate_once():
+    i, j = Field("i"), Field("j")
+    factory = MemoStatsFactory()
+    stats = factory(ft.asarray(np.eye(4)), (i, j))
+    again = factory.relabel(stats, (i, j))
+    calls = []
+    estimate = again.inner.estimate_non_fill_values
+
+    def counting(over=()):
+        calls.append(frozenset(over))
+        return estimate(over)
+
+    again.inner.estimate_non_fill_values = counting
+    for _ in range(3):
+        assert factory.relabel(stats, (i, j)).estimate_non_fill_values((j, i)) == 1
+    assert again.estimate_non_fill_values((i, j)) == 1
+    assert calls == [frozenset({i, j})]
+
+
+def test_memo_leaf_cache_is_weak():
+    factory = MemoStatsFactory()
+    tensor = ft.asarray(np.eye(3))
+    stats = factory(tensor, (Field("i"), Field("j")))
+    relabeled = factory(tensor, (Field("k"), Field("l")))
+    assert len(factory.leaves) == 1
+    assert relabeled.estimate_non_fill_values() == 3
+
+    del tensor, stats, relabeled
+    gc.collect()
+    assert not factory.leaves
+
+
 # ─────────────────────────────── DummyStats tests ────────────────────────────────
 
 
@@ -987,18 +1051,12 @@ def test_dummy_from_tensor_and_getters():
     data = np.zeros((2, 3))
     node = Table(Literal(ft.asarray(data)), (Field("i"), Field("j")))
 
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DummyStatsFactory())(node, OrderedDict())
 
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
-    assert stats.fill_value.value == 0
+    assert stats.fill_type == StaticFillFType(np.float64(0))
 
 
 def test_dummy_mapjoin_same_axes():
@@ -1006,28 +1064,8 @@ def test_dummy_mapjoin_same_axes():
     ta = Table(Literal(ft.asarray(np.ones((4, 5)))), (i, j))
     tb = Table(Literal(ft.asarray(np.ones((4, 5)))), (i, j))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=MapJoin(Literal(ffuncs.add), (ta, tb)),
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
+    stats = StatsInterpreter(DummyStatsFactory())(
+        MapJoin(Literal(ffuncs.add), (ta, tb)), OrderedDict()
     )
 
     assert stats.index_order == (i, j)
@@ -1040,32 +1078,12 @@ def test_dummy_mapjoin_non_same_axes():
     ta = Table(Literal(ft.asarray(np.ones((4, 5)))), (i, j))
     tb = Table(Literal(ft.asarray(np.ones((5, 3)))), (j, k))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=MapJoin(Literal(ffuncs.mul), (ta, tb)),
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
+    stats = StatsInterpreter(DummyStatsFactory())(
+        MapJoin(Literal(ffuncs.mul), (ta, tb)), OrderedDict()
     )
 
     assert set(stats.index_order) == {i, j, k}
-    assert stats.fill_value.value == 0.0
+    assert stats.fill_type == StaticFillFType(np.float64(0.0))
 
 
 def test_dummy_aggregate():
@@ -1075,13 +1093,7 @@ def test_dummy_aggregate():
     node_sum = Aggregate(
         op=Literal(ffuncs.add), init=Literal(0.0), arg=table, idxs=(j,)
     )
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=node_sum,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DummyStatsFactory())(node_sum, OrderedDict())
 
     assert stats.index_order == (i,)
     assert stats.get_dim_size(i) == 10.0
@@ -1090,13 +1102,7 @@ def test_dummy_aggregate():
 def test_dummy_copy():
     node = Table(Literal(ft.asarray(np.eye(10))), (Field("i"), Field("j")))
 
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DummyStatsFactory())(node, OrderedDict())
     copy = DummyStatsFactory().copy(stats)
 
     assert copy.dim_sizes == stats.dim_sizes
@@ -1107,13 +1113,7 @@ def test_dummy_copy():
 def test_dummy_relabel():
     node = Table(Literal(ft.asarray(np.eye(10))), (Field("i"), Field("j")))
 
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DummyStatsFactory())(node, OrderedDict())
     relabeled = DummyStatsFactory().relabel(stats, (Field("m"), Field("n")))
 
     assert relabeled.get_dim_size(Field("m")) == stats.get_dim_size(Field("i"))
@@ -1123,13 +1123,7 @@ def test_dummy_relabel():
 def test_dummy_reorder():
     node = Table(Literal(ft.asarray(np.eye(10))), (Field("i"), Field("j")))
 
-    stats = insert_statistics(
-        stats_factory=DummyStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DummyStatsFactory())(node, OrderedDict())
     reordered = DummyStatsFactory().reorder(stats, (Field("j"), Field("i")))
 
     assert reordered.get_dim_size(Field("i")) == stats.get_dim_size(Field("i"))
@@ -1146,17 +1140,11 @@ def test_vp_from_tensor_and_getters():
     arr = ft.asarray(data)
 
     node = Table(Literal(arr), (Field("i"), Field("j")))
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(VPStatsFactory())(node, OrderedDict())
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
-    assert stats.fill_value.value == 0
+    assert stats.fill_type == StaticFillFType(np.float64(0))
     assert stats.estimate_non_fill_values() == 2.0
 
 
@@ -1179,13 +1167,7 @@ def test_vp_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
     arr = ft.asarray(data)
     node = Table(Literal(arr), axes)
 
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(VPStatsFactory())(node, OrderedDict())
 
     assert stats.index_order == tuple(axes)
     assert stats.estimate_non_fill_values() == expected_nnz
@@ -1199,30 +1181,8 @@ def test_vp_mapjoin_join():
     ta = Table(Literal(ft.asarray(data_a)), (i, k))
     tb = Table(Literal(ft.asarray(data_b)), (k, j))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=node_mul,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    stats = StatsInterpreter(VPStatsFactory())(node_mul, OrderedDict())
     assert stats.estimate_non_fill_values() == pytest.approx(10.0)
 
 
@@ -1236,28 +1196,8 @@ def test_vp_mapjoin_elementwise():
     ta = Table(Literal(ft.asarray(data_a)), (i, j))
     tb = Table(Literal(ft.asarray(data_b)), (i, j))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=MapJoin(Literal(ffuncs.add), (ta, tb)),
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
+    stats = StatsInterpreter(VPStatsFactory())(
+        MapJoin(Literal(ffuncs.add), (ta, tb)), OrderedDict()
     )
     assert stats.estimate_non_fill_values() == pytest.approx(100.0)
 
@@ -1277,28 +1217,8 @@ def test_vp_mapjoin_broadcast():
     ta = Table(Literal(ft.asarray(data_a)), (i, j))
     tb = Table(Literal(ft.asarray(data_b)), (j, k))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=MapJoin(Literal(ffuncs.add), (ta, tb)),
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
+    stats = StatsInterpreter(VPStatsFactory())(
+        MapJoin(Literal(ffuncs.add), (ta, tb)), OrderedDict()
     )
     assert stats.estimate_non_fill_values() == pytest.approx(2 * 3 + 4 * 3)
     assert stats.V[i] == pytest.approx(4.0)
@@ -1317,13 +1237,7 @@ def test_vp_aggregate():
         arg=table,
         idxs=(j,),
     )
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=node_sum,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(VPStatsFactory())(node_sum, OrderedDict())
     assert stats.index_order == (i,)
     assert stats.get_dim_size(i) == 10.0
     assert stats.estimate_non_fill_values() == pytest.approx(10.0)
@@ -1333,13 +1247,7 @@ def test_vp_copy():
     data = np.eye(10)
     arr = ft.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(VPStatsFactory())(node, OrderedDict())
     copy = VPStatsFactory().copy(stats)
     assert copy.nnz == stats.nnz
     assert copy.V == stats.V
@@ -1350,13 +1258,7 @@ def test_vp_relabel():
     data = np.eye(10)
     arr = ft.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(VPStatsFactory())(node, OrderedDict())
     relabeled = VPStatsFactory().relabel(stats, (Field("row"), Field("col")))
     assert relabeled.index_order == (Field("row"), Field("col"))
     assert relabeled.nnz == stats.nnz
@@ -1370,53 +1272,10 @@ def test_vp_reorder():
     data = np.eye(10)
     arr = ft.asarray(data)
     node = Table(Literal(arr), (Field("i"), Field("j")))
-    stats = insert_statistics(
-        stats_factory=VPStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(VPStatsFactory())(node, OrderedDict())
     reordered = VPStatsFactory().reorder(stats, (Field("j"), Field("i")))
     assert reordered.index_order == (Field("j"), Field("i"))
     assert reordered.nnz == stats.nnz
-
-
-# ─────────────────────────────── UniformStats tests ─────────────────────────────
-
-
-# ─────────────────────────────── Test Embeddings ───────────────────────────────
-
-
-def test_embeddings():
-    data = np.zeros((20, 20))
-    data[0:10, 0:10] = 1.0
-    data[10:20, 10:20] = 1.0
-
-    arr = ft.asarray(data)
-    fields = (Field("i"), Field("j"))
-
-    print("\n" + "=" * 80)
-    ds = DenseStatsFactory()(arr, fields)
-    ds_emb = ds.get_embedding()
-    print(f"DenseStats Embeddings : {ds_emb}")
-
-    us = UniformStatsFactory()(arr, fields)
-    us_emb = us.get_embedding()
-    print(f"UniformStats Embeddings : {us_emb}")
-
-    dc_stats = DCStatsFactory()(arr, fields)
-    dc_emb = dc_stats.get_embedding()
-    print(f"DCStats Embeddings: {dc_emb}")
-
-    blocks_per_dim = {Field("i"): 2, Field("j"): 2}
-    bs = BlockedStatsFactory(UniformStatsFactory(), blocks_per_dim=blocks_per_dim)(
-        arr, fields
-    )
-    bs_emb = bs.get_embedding()
-    print(f"BlockedStats Embeddings: {bs_emb}")
-
-    print("=" * 80)
 
 
 # ─────────────────────────────── UniformStats tests ─────────────────────────────
@@ -1429,17 +1288,11 @@ def test_uniform_from_tensor_and_getters():
     arr = ft.asarray(data)
 
     node = Table(Literal(arr), (Field("i"), Field("j")))
-    stats = insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(UniformStatsFactory())(node, OrderedDict())
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
-    assert stats.fill_value.value == 0
+    assert stats.fill_type == StaticFillFType(np.float64(0))
     assert stats.estimate_non_fill_values() == 2.0
 
 
@@ -1460,13 +1313,7 @@ def test_uniform_estimate_non_fill_values(shape, nnz_indices, expected_nnz):
     arr = ft.asarray(data)
     node = Table(Literal(arr), axes)
 
-    stats = insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(UniformStatsFactory())(node, OrderedDict())
 
     assert stats.index_order == tuple(axes)
     assert stats.estimate_non_fill_values() == expected_nnz
@@ -1481,43 +1328,15 @@ def test_uniform_mapjoin_mul_and_add():
     ta = Table(Literal(ft.asarray(data_a)), (Field("i"), Field("j")))
     tb = Table(Literal(ft.asarray(data_b)), (Field("i"), Field("j")))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
     # P(a)*P(b) = 0.5 * 0.5 = 0.25 -> 0.25 * 100 = 25 nnz
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
-    us_mul = insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=node_mul,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    us_mul = StatsInterpreter(UniformStatsFactory())(node_mul, OrderedDict())
     assert us_mul.estimate_non_fill_values() == pytest.approx(25.0)
-    assert us_mul.fill_value.value == 0.0
+    assert us_mul.fill_type == StaticFillFType(np.float64(0.0))
 
     # 1 - (1-P(a))(1-P(b)) = 1 - (1-0.5)*(1-0.5) =0.75 -> 0.75 * 100 = 75 nnz
     node_add = MapJoin(Literal(ffuncs.add), (ta, tb))
-    us_add = insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=node_add,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    us_add = StatsInterpreter(UniformStatsFactory())(node_add, OrderedDict())
 
     assert us_add.estimate_non_fill_values() == pytest.approx(75.0)
 
@@ -1531,13 +1350,7 @@ def test_uniform_aggregate():
         arg=table,
         idxs=(Field("j"),),
     )
-    us_agg = insert_statistics(
-        stats_factory=UniformStatsFactory(),
-        node=node_sum,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    us_agg = StatsInterpreter(UniformStatsFactory())(node_sum, OrderedDict())
     # p=0.1 in our example as only diagonal elements are non zero so 10/100 = 0.1
     expected_prob = 1 - math.pow(1.0 - 0.1, 10)
     # post squashing we have just 10 rows left so new vol = 10x1 = 10
@@ -1559,7 +1372,33 @@ def test_uniform_aggregate():
         ((), ()),
     ],
 )
-def test_blocked_uniform_grid(shape, counts, fill_value):
+def test_blocked_uniform_grid(shape, counts, fill_value, monkeypatch):
+    from finch.autoschedule import default_schedulers
+
+    scheduler = default_schedulers.NON_RECURSIVE_STANDARD_SCHEDULER
+
+    def check_loop_order(plan):
+        for query in plan.bodies[:-1]:
+            loop_order = []
+            while isinstance(query, Fuse):
+                loop_order.append(query.idx)
+                query = query.body
+            match query:
+                case Query(_, Aggregate()):
+                    for node in PostOrderDFS(query):
+                        match node:
+                            case Table(_, idxs):
+                                assert (
+                                    tuple(idx for idx in loop_order if idx in idxs)
+                                    == idxs
+                                )
+                case _:
+                    pytest.fail("Expected a loop-ordered statistics query")
+        return scheduler(plan)
+
+    monkeypatch.setattr(
+        default_schedulers, "NON_RECURSIVE_STANDARD_SCHEDULER", check_loop_order
+    )
     fields = tuple(Field(f"x{axis}") for axis in range(len(shape)))
     data = np.full(shape, fill_value)
     data.flat[::3] = fill_value + 1
@@ -1706,25 +1545,6 @@ def test_blocked_stats_reorder_drop_two_index():
     assert reordered.estimate_non_fill_values() == bs.estimate_non_fill_values()
 
 
-def get_structured_example(M, K, matrix_type):
-    if matrix_type == "diagonal":
-        return np.eye(M, K, dtype=np.float64)
-    if matrix_type == "tridiagonal":
-        A = np.eye(M, K, k=0) + np.eye(M, K, k=1) + np.eye(M, K, k=-1)
-        return (A > 0).astype(np.float64)
-    if matrix_type == "banded":
-        bw = 5
-        rows, cols = np.indices((M, K))
-        return (np.abs(rows - cols) <= bw).astype(np.float64)
-    if matrix_type == "triangular":
-        return np.triu(np.ones((M, K), dtype=np.float64))
-    if matrix_type == "striped":
-        A = np.zeros((M, K), dtype=np.float64)
-        A[:, ::5] = 1.0
-        return A
-    return np.zeros((M, K), dtype=np.float64)
-
-
 # ─────────────────────────── BaseTensorStats def tests ───────────────────────────
 
 
@@ -1732,14 +1552,43 @@ def test_copy_and_getters():
     td = BaseTensorStats.from_fields(
         index_order=(Field("i"), Field("j")),
         dim_sizes={Field("i"): 2.0, Field("j"): 3.0},
-        fill_value=42,
+        fill_type=StaticFillFType(42),
     )
     td_copy = td.copy()
     assert td_copy is not td
     assert td_copy.index_order == (Field("i"), Field("j"))
     assert td_copy.dim_sizes == {Field("i"): 2.0, Field("j"): 3.0}
     assert td_copy.get_dim_size(Field("j")) == 3.0
-    assert td_copy.fill_value.value == 42
+    assert td_copy.fill_type == StaticFillFType(42)
+
+
+def test_defs_propagate_dimension_types():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a = BaseTensorStats.from_fields(
+        (i, j),
+        {i: 2.0, j: 3.0},
+        StaticFillFType(np.float64(0.0)),
+        {i: ft.int32, j: ft.int64},
+    )
+    b = BaseTensorStats.from_fields(
+        (j, k),
+        {j: 3.0, k: 4.0},
+        StaticFillFType(np.float64(0.0)),
+        {j: ft.int32, k: ft.int64},
+    )
+    joined = BaseTensorStatsFactory._mapjoin_defs(ffuncs.mul, a, b)
+    reduced = BaseTensorStatsFactory.aggregate_def(ffuncs.add, 0.0, (j,), joined)
+    relabeled = BaseTensorStatsFactory.relabel_def(a, (k, i))
+    reordered = BaseTensorStatsFactory.reorder_def(a, (j, k, i))
+
+    assert a.element_type == ft.float64
+    assert joined.shape_type == (ft.int32, ft.int64, ft.int64)
+    assert reduced.shape_type == (ft.int32, ft.int64)
+    assert relabeled.shape_type == (ft.int32, ft.int64)
+    # A broadcast dimension has no type.
+    assert reordered.shape_type == (ft.int64, None, ft.int32)
+    tensor = ft.asarray(np.ones((2, 3)))
+    assert DCStatsFactory()(tensor, (i, j)).shape_type == ftype(tensor).shape_type
 
 
 @pytest.mark.parametrize(
@@ -1752,7 +1601,7 @@ def test_copy_and_getters():
 def test_reorder_def(orig_axes, new_axes):
     dim_sizes = {axis: float(i + 1) for i, axis in enumerate(orig_axes)}
     td = BaseTensorStats.from_fields(
-        index_order=orig_axes, dim_sizes=dim_sizes, fill_value=0
+        index_order=orig_axes, dim_sizes=dim_sizes, fill_type=StaticFillFType(0)
     )
     td2 = BaseTensorStatsFactory.reorder_def(td, tuple(new_axes))
     assert td2.index_order == tuple(new_axes)
@@ -1800,11 +1649,16 @@ def test_reorder_def(orig_axes, new_axes):
     ],
 )
 def test_base_mapjoin(defs, func, expected_axes, expected_dims, expected_fill):
-    objs = [BaseTensorStats.from_fields(ax, dims, fv) for (ax, dims, fv) in defs]
+    objs = [
+        BaseTensorStats.from_fields(ax, dims, StaticFillFType(fv))
+        for (ax, dims, fv) in defs
+    ]
     out = BaseTensorStatsFactory._mapjoin_defs(func, *objs)
     assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
-    assert out.fill_value.value == expected_fill
+    # No rule can act on the combined fill, so the format only records its
+    # element type.
+    assert out.fill_type == DynamicFillFType(ftype(expected_fill))
 
 
 @pytest.mark.parametrize(
@@ -1872,7 +1726,7 @@ def test_base_mapjoin(defs, func, expected_axes, expected_dims, expected_fill):
             (Field("j"),),
             (Field("i"),),
             {Field("i"): 2.0},
-            8.0,
+            np.float64(8.0),
         ),
         # idempotent op: reduce entire axis → empty shape
         (
@@ -1898,13 +1752,15 @@ def test_base_aggregate(
     expected_fill,
 ):
     base = BaseTensorStats.from_fields(
-        index_order=index_order, dim_sizes=dim_sizes, fill_value=fill_value
+        index_order=index_order,
+        dim_sizes=dim_sizes,
+        fill_type=StaticFillFType(fill_value),
     )
     out = BaseTensorStatsFactory.aggregate_def(op_func, None, reduce_fields, base)
 
     assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
-    assert out.fill_value.value == expected_fill
+    assert out.fill_type == StaticFillFType(expected_fill)
 
 
 # ─────────────────────────────── DenseStats tests ─────────────────────────────
@@ -1913,17 +1769,11 @@ def test_base_aggregate(
 def test_from_tensor_and_getters():
     arr = ft.asarray(np.zeros((2, 3)))
     node = Table(Literal(arr), (Field("i"), Field("j")))
-    stats = insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DenseStatsFactory())(node, OrderedDict())
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
-    assert stats.fill_value.value == 0
+    assert stats.fill_type == StaticFillFType(np.float64(0))
 
 
 @pytest.mark.parametrize(
@@ -1941,13 +1791,7 @@ def test_estimate_non_fill_values(shape, expected):
     node = Table(Literal(arr), axes)
     # node = Table(Literal(arr), tuple(Field(a) for a in axes))
 
-    stats = insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DenseStatsFactory())(node, OrderedDict())
 
     assert stats.index_order == tuple(axes)
     assert stats.estimate_non_fill_values() == expected
@@ -1958,59 +1802,26 @@ def test_mapjoin_mul_and_add():
     tb = Table(Literal(ft.asarray(np.ones((3, 4)))), (Field("j"), Field("k")))
     ta2 = Table(Literal(ft.asarray(2 * np.ones((2, 3)))), (Field("i"), Field("j")))
 
-    cache = {}
-    insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=ta2,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    cache[ta].fill_value = 1
-    cache[tb].fill_value = 1
-    cache[ta2].fill_value = 2
-    node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
-    dsm = insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=node_mul,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    factory = DenseStatsFactory()
+    sa, sb, sa2 = (StatsInterpreter(factory)(t, OrderedDict()) for t in (ta, tb, ta2))
+    sa.fill_type = StaticFillFType(1)
+    sb.fill_type = StaticFillFType(1)
+    sa2.fill_type = StaticFillFType(2)
+    dsm = factory.mapjoin(ffuncs.mul, sa, sb)
 
     assert dsm.index_order == (Field("i"), Field("j"), Field("k"))
     assert dsm.get_dim_size(Field("i")) == 2.0
     assert dsm.get_dim_size(Field("j")) == 3.0
     assert dsm.get_dim_size(Field("k")) == 4.0
-    assert dsm.fill_value.value == 1.0
+    assert dsm.fill_type == StaticFillFType(1)
 
-    node_add = MapJoin(Literal(ffuncs.add), (ta, ta2))
-    ds_sum = insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=node_add,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    ds_sum = factory.mapjoin(ffuncs.add, sa, sa2)
 
     assert ds_sum.index_order == (Field("i"), Field("j"))
     assert ds_sum.get_dim_size(Field("i")) == 2.0
     assert ds_sum.get_dim_size(Field("j")) == 3.0
-    assert ds_sum.fill_value.value == 1.0 + 2.0
+    # No rule can act on the summed fill, so the format only records its type.
+    assert ds_sum.fill_type == DynamicFillFType(ftype(1 + 2))
 
 
 def test_aggregate():
@@ -2018,13 +1829,7 @@ def test_aggregate():
         Literal(ft.asarray(np.ones((2, 3)))),
         (Field("i"), Field("j")),
     )
-    dsa = insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=table,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    dsa = StatsInterpreter(DenseStatsFactory())(table, OrderedDict())
 
     node_add = Aggregate(
         op=Literal(ffuncs.add),
@@ -2033,30 +1838,18 @@ def test_aggregate():
         idxs=(Field("j"),),
     )
 
-    ds_agg = insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=node_add,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    ds_agg = StatsInterpreter(DenseStatsFactory())(node_add, OrderedDict())
 
     assert ds_agg.index_order == (Field("i"),)
     assert ds_agg.get_dim_size(Field("i")) == 2.0
-    assert ds_agg.fill_value == dsa.fill_value
+    assert ds_agg.fill_type == dsa.fill_type
 
 
 def test_relabel_dense_stats():
     arr = ft.asarray(np.zeros((2, 3)))
     table = Table(Literal(arr), (Field("i"), Field("j")))
 
-    stats = insert_statistics(
-        stats_factory=DenseStatsFactory(),
-        node=table,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DenseStatsFactory())(table, OrderedDict())
 
     new_stats = DenseStatsFactory().relabel(stats, (Field("row"), Field("col")))
 
@@ -2066,7 +1859,7 @@ def test_relabel_dense_stats():
 
     assert new_stats.get_dim_size(Field("col")) == 3.0
 
-    assert new_stats.fill_value == stats.fill_value
+    assert new_stats.fill_type == stats.fill_type
 
     with pytest.raises(ValueError):
         DenseStatsFactory().relabel(stats, (Field("x"), Field("y"), Field("z")))
@@ -2086,13 +1879,7 @@ def test_dc_stats_scalar(tensor, fields, expected_dcs):
         Literal(ft.asarray(tensor)),
         tuple(fields),
     )
-    stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DCStatsFactory())(node, OrderedDict())
     assert stats.dcs == expected_dcs
 
 
@@ -2122,13 +1909,7 @@ def test_dc_stats_vector(tensor, fields, expected_dcs):
         Literal(tensor),
         tuple(fields),
     )
-    stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DCStatsFactory())(node, OrderedDict())
     assert stats.dcs == expected_dcs
 
 
@@ -2173,13 +1954,7 @@ def test_dc_stats_matrix(tensor, fields, expected_dcs):
         Literal(tensor),
         tuple(fields),
     )
-    stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DCStatsFactory())(node, OrderedDict())
     assert stats.dcs == expected_dcs
 
 
@@ -2251,124 +2026,15 @@ def test_dc_stats_3d(tensor, fields, expected_dcs):
         Literal(tensor),
         tuple(fields),
     )
-    stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    stats = StatsInterpreter(DCStatsFactory())(node, OrderedDict())
     assert stats.dcs == expected_dcs
 
 
 @pytest.mark.parametrize(
-    "tensor, fields, expected_dcs",
+    "fields, dims, dcs, expected_nnz",
     [
-        (
-            ft.asarray(np.ones((2, 2, 2, 2), dtype=int)),
-            [Field("i"), Field("j"), Field("k"), Field("l")],
-            {
-                DC(
-                    frozenset(),
-                    frozenset([Field("i"), Field("j"), Field("k"), Field("l")]),
-                    16.0,
-                ),
-                DC(frozenset(), frozenset([Field("i")]), 2.0),
-                DC(frozenset(), frozenset([Field("j")]), 2.0),
-                DC(frozenset(), frozenset([Field("k")]), 2.0),
-                DC(frozenset(), frozenset([Field("l")]), 2.0),
-                DC(
-                    frozenset([Field("i")]),
-                    frozenset([Field("i"), Field("j"), Field("k"), Field("l")]),
-                    8.0,
-                ),
-                DC(
-                    frozenset([Field("j")]),
-                    frozenset([Field("i"), Field("j"), Field("k"), Field("l")]),
-                    8.0,
-                ),
-                DC(
-                    frozenset([Field("k")]),
-                    frozenset([Field("i"), Field("j"), Field("k"), Field("l")]),
-                    8.0,
-                ),
-                DC(
-                    frozenset([Field("l")]),
-                    frozenset([Field("i"), Field("j"), Field("k"), Field("l")]),
-                    8.0,
-                ),
-            },
-        ),
-        (
-            ft.asarray(
-                np.array(
-                    [
-                        [
-                            [[1, 0], [0, 0]],
-                            [[0, 0], [0, 1]],
-                        ],
-                        [
-                            [[0, 0], [1, 0]],
-                            [[0, 0], [0, 0]],
-                        ],
-                    ],
-                    dtype=int,
-                )
-            ),
-            [Field("i"), Field("j"), Field("k"), Field("l")],
-            {
-                DC(
-                    frozenset(),
-                    frozenset([Field("i"), Field("j"), Field("k"), Field("l")]),
-                    3.0,
-                ),
-                DC(frozenset(), frozenset([Field("i")]), 2.0),
-                DC(frozenset(), frozenset([Field("j")]), 2.0),
-                DC(frozenset(), frozenset([Field("k")]), 2.0),
-                DC(frozenset(), frozenset([Field("l")]), 2.0),
-                DC(
-                    frozenset([Field("i")]),
-                    frozenset([Field("i"), Field("j"), Field("k"), Field("l")]),
-                    2.0,
-                ),
-                DC(
-                    frozenset([Field("j")]),
-                    frozenset([Field("i"), Field("j"), Field("k"), Field("l")]),
-                    2.0,
-                ),
-                DC(
-                    frozenset([Field("k")]),
-                    frozenset([Field("i"), Field("j"), Field("k"), Field("l")]),
-                    2.0,
-                ),
-                DC(
-                    frozenset([Field("l")]),
-                    frozenset([Field("i"), Field("j"), Field("k"), Field("l")]),
-                    2.0,
-                ),
-            },
-        ),
-    ],
-)
-def test_dc_stats_4d(tensor, fields, expected_dcs):
-    node = Table(
-        Literal(tensor),
-        tuple(fields),
-    )
-    stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-    assert stats.dcs == expected_dcs
-
-
-@pytest.mark.parametrize(
-    "dims, dcs, expected_nnz",
-    [
-        (
+        pytest.param(
+            (Field("i"), Field("j")),
             {Field("i"): 1000, Field("j"): 1000},
             [
                 DC(frozenset([Field("i")]), frozenset([Field("j")]), 5),
@@ -2376,71 +2042,20 @@ def test_dc_stats_4d(tensor, fields, expected_dcs):
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 50),
             ],
             50,
+            id="single-tensor",
         ),
-    ],
-)
-def test_single_tensor_card(dims, dcs, expected_nnz):
-    dims = {Field(k.name): v for k, v in dims.items()}
-    node = Table(
-        Literal(ft.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
-    )
-    stat = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-
-    _overwrite_def(
-        stat, BaseTensorStats.from_fields(frozenset([Field("i"), Field("j")]), dims, 0)
-    )
-    stat.dcs = set(dcs)
-
-    assert stat.estimate_non_fill_values() == expected_nnz
-
-
-@pytest.mark.parametrize(
-    "dims, dcs, expected_nnz",
-    [
-        (
+        pytest.param(
+            (Field("i"), Field("j"), Field("k")),
             {Field("i"): 1000, Field("j"): 1000, Field("k"): 1000},
             [
                 DC(frozenset([Field("j")]), frozenset([Field("k")]), 5),
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 50),
             ],
             50 * 5,
+            id="one-join",
         ),
-    ],
-)
-def test_1_join_dc_card(dims, dcs, expected_nnz):
-    dims = {Field(k.name): v for k, v in dims.items()}
-    node = Table(
-        Literal(ft.asarray(np.zeros((1, 1, 1), dtype=int))),
-        (Field("i"), Field("j"), Field("k")),
-    )
-    stat = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-
-    _overwrite_def(
-        stat,
-        BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0
-        ),
-    )
-    stat.dcs = set(dcs)
-    assert stat.estimate_non_fill_values() == expected_nnz
-
-
-@pytest.mark.parametrize(
-    "dims, dcs, expected_nnz",
-    [
-        (
+        pytest.param(
+            (Field("i"), Field("j"), Field("k"), Field("l")),
             {Field("i"): 1000, Field("j"): 1000, Field("k"): 1000, Field("l"): 1000},
             [
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 50),
@@ -2448,37 +2063,10 @@ def test_1_join_dc_card(dims, dcs, expected_nnz):
                 DC(frozenset([Field("k")]), frozenset([Field("l")]), 5),
             ],
             50 * 5 * 5,
+            id="two-join",
         ),
-    ],
-)
-def test_2_join_dc_card(dims, dcs, expected_nnz):
-    dims = {Field(k.name): v for k, v in dims.items()}
-    node = Table(
-        Literal(ft.asarray(np.zeros((1, 1, 1, 1), dtype=int))),
-        (Field("i"), Field("j"), Field("k"), Field("l")),
-    )
-    stat = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-
-    _overwrite_def(
-        stat,
-        BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k"), Field("l")]), dims, 0
-        ),
-    )
-    stat.dcs = set(dcs)
-    assert stat.estimate_non_fill_values() == expected_nnz
-
-
-@pytest.mark.parametrize(
-    "dims, dcs, expected_nnz",
-    [
-        (
+        pytest.param(
+            (Field("i"), Field("j"), Field("k")),
             {Field("i"): 1000, Field("j"): 1000, Field("k"): 1000},
             [
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 50),
@@ -2492,37 +2080,10 @@ def test_2_join_dc_card(dims, dcs, expected_nnz):
                 DC(frozenset([Field("k")]), frozenset([Field("i")]), 5),
             ],
             50 * 5,
+            id="triangle",
         ),
-    ],
-)
-def test_triangle_dc_card(dims, dcs, expected_nnz):
-    dims = {Field(k.name): v for k, v in dims.items()}
-    node = Table(
-        Literal(ft.asarray(np.zeros((1, 1, 1), dtype=int))),
-        (Field("i"), Field("j"), Field("k")),
-    )
-    stat = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
-
-    _overwrite_def(
-        stat,
-        BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0
-        ),
-    )
-    stat.dcs = set(dcs)
-    assert stat.estimate_non_fill_values() == expected_nnz
-
-
-@pytest.mark.parametrize(
-    "dims, dcs, expected_nnz",
-    [
-        (
+        pytest.param(
+            (Field("i"), Field("j"), Field("k")),
             {Field("i"): 1000, Field("j"): 1000, Field("k"): 1000},
             [
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 1),
@@ -2536,30 +2097,20 @@ def test_triangle_dc_card(dims, dcs, expected_nnz):
                 DC(frozenset([Field("k")]), frozenset([Field("i")]), 5),
             ],
             1 * 5,
+            id="triangle-small",
         ),
     ],
 )
-def test_triangle_small_dc_card(dims, dcs, expected_nnz):
-    dims = {Field(k.name): v for k, v in dims.items()}
-    node = Table(
-        Literal(ft.asarray(np.zeros((1, 1, 1), dtype=int))),
-        (Field("i"), Field("j"), Field("k")),
-    )
-    stat = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+def test_dc_card_estimate(fields, dims, dcs, expected_nnz):
+    node = Table(Literal(ft.asarray(np.zeros((1,) * len(fields), dtype=int))), fields)
+    stat = StatsInterpreter(DCStatsFactory())(node, OrderedDict())
 
     _overwrite_def(
         stat,
-        BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0
-        ),
+        BaseTensorStats.from_fields(frozenset(fields), dims, StaticFillFType(0)),
     )
     stat.dcs = set(dcs)
+
     assert stat.estimate_non_fill_values() == expected_nnz
 
 
@@ -2606,14 +2157,13 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
     stats_objs = []
     for dcs in dcs_list:
         node = Table(Literal(ft.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
-        s = insert_statistics(
-            stats_factory=DCStatsFactory(),
-            node=node,
-            bindings=OrderedDict(),
-            replace=False,
-            cache={},
+        s = StatsInterpreter(DCStatsFactory())(node, OrderedDict())
+        _overwrite_def(
+            s,
+            BaseTensorStats.from_fields(
+                frozenset({Field("i")}), dims, StaticFillFType(0)
+            ),
         )
-        _overwrite_def(s, BaseTensorStats.from_fields(frozenset({Field("i")}), dims, 0))
         s.dcs = set(dcs)
         stats_objs.append(s)
 
@@ -2691,24 +2241,12 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
 )
 def test_merge_dc_union(new_dims, inputs, expected_dcs):
     new_dims = {Field(k.name): v for k, v in new_dims.items()}
-    cache = {}
     stats_objs = []
     for idx_set, dcs in inputs:
-        fields = tuple(sorted(idx_set, key=lambda f: f.name))
-        shape = (1,) * max(1, len(fields))
-        node = Table(Literal(ft.asarray(np.zeros(shape, dtype=int))), fields)
-
-        insert_statistics(
-            stats_factory=DCStatsFactory(),
-            node=node,
-            bindings=OrderedDict(),
-            replace=False,
-            cache=cache,
-        )
         field_idx_set = frozenset(idx_set)
         field_dims = {k: new_dims[k] for k in idx_set}
 
-        td = BaseTensorStats.from_fields(field_idx_set, field_dims, 0)
+        td = BaseTensorStats.from_fields(field_idx_set, field_dims, StaticFillFType(0))
         stats_objs.append(DCStats(td, dcs=set(dcs)))
 
     out = DCStatsFactory().mapjoin(ffuncs.add, *stats_objs)
@@ -2720,273 +2258,112 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
 
 
 @pytest.mark.parametrize(
-    "dims1, dcs1, dims2, dcs2, expected_nnz",
+    "fields1, dims1, dcs1, fields2, dims2, dcs2, expected_nnz",
     [
-        (
+        pytest.param(
+            (Field("i"),),
             {Field("i"): 1000},
             [DC(frozenset(), frozenset([Field("i")]), 1)],
+            (Field("i"),),
             {Field("i"): 1000},
             [DC(frozenset(), frozenset([Field("i")]), 1)],
             2,
+            id="1d",
         ),
-    ],
-)
-def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
-    cache = {}
-
-    node1 = Table(Literal(ft.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
-    s1 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node1,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    _overwrite_def(s1, BaseTensorStats.from_fields(frozenset({Field("i")}), dims1, 0))
-    s1.dcs = set(dcs1)
-
-    node2 = Table(Literal(ft.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
-    s2 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node2,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    _overwrite_def(s2, BaseTensorStats.from_fields(frozenset({Field("i")}), dims2, 0))
-    s2.dcs = set(dcs2)
-
-    parent = MapJoin(Literal(ffuncs.add), (node1, node2))
-    reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=parent,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
-
-@pytest.mark.parametrize(
-    "dims1, dcs1, dims2, dcs2, expected_nnz",
-    [
-        (
+        pytest.param(
+            (Field("i"), Field("j")),
             {Field("i"): 1000, Field("j"): 1000},
             [DC(frozenset(), frozenset([Field("i"), Field("j")]), 1)],
+            (Field("i"), Field("j")),
             {Field("i"): 1000, Field("j"): 1000},
             [DC(frozenset(), frozenset([Field("i"), Field("j")]), 1)],
             2,
+            id="2d-same-fields",
         ),
-    ],
-)
-def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
-    cache = {}
-
-    node1 = Table(
-        Literal(ft.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
-    )
-    s1 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node1,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    _overwrite_def(
-        s1, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims1, 0)
-    )
-    s1.dcs = set(dcs1)
-
-    node2 = Table(
-        Literal(ft.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
-    )
-    s2 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node2,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    _overwrite_def(
-        s2, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims2, 0)
-    )
-    s2.dcs = set(dcs2)
-
-    parent = MapJoin(Literal(ffuncs.add), (node1, node2))
-    reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=parent,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
-
-@pytest.mark.parametrize(
-    "dims1, dcs1, dims2, dcs2, expected_nnz",
-    [
-        (
+        pytest.param(
+            (Field("i"),),
             {Field("i"): 1000},
             [DC(frozenset(), frozenset([Field("i")]), 5)],
+            (Field("j"),),
             {Field("j"): 100},
             [DC(frozenset(), frozenset([Field("j")]), 10)],
             10 * 1000 + 5 * 100,
+            id="2d-disjoint-fields",
         ),
-    ],
-)
-def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
-    cache = {}
-
-    node1 = Table(Literal(ft.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
-    s1 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node1,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    _overwrite_def(s1, BaseTensorStats.from_fields(frozenset({Field("i")}), dims1, 0))
-    s1.dcs = set(dcs1)
-
-    node2 = Table(Literal(ft.asarray(np.zeros((1,), dtype=int))), (Field("j"),))
-    s2 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node2,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    _overwrite_def(s2, BaseTensorStats.from_fields(frozenset({Field("j")}), dims2, 0))
-    s2.dcs = set(dcs2)
-
-    parent = MapJoin(Literal(ffuncs.add), (node1, node2))
-    reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=parent,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
-
-@pytest.mark.parametrize(
-    "dims1, dcs1, dims2, dcs2, expected_nnz",
-    [
-        (
+        pytest.param(
+            (Field("i"), Field("j")),
             {Field("i"): 1000, Field("j"): 100},
             [DC(frozenset(), frozenset([Field("i"), Field("j")]), 5)],
+            (Field("j"), Field("k")),
             {Field("j"): 100, Field("k"): 1000},
             [DC(frozenset(), frozenset([Field("j"), Field("k")]), 10)],
             10 * 1000 + 5 * 1000,
+            id="3d-overlapping-field",
         ),
     ],
 )
-def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
-    dims1 = {Field(k.name): v for k, v in dims1.items()}
-    dims2 = {Field(k.name): v for k, v in dims2.items()}
-    cache = {}
-
+def test_disjunction_dc_card(fields1, dims1, dcs1, fields2, dims2, dcs2, expected_nnz):
     node1 = Table(
-        Literal(ft.asarray(np.zeros((1, 1), dtype=int))),
-        (Field("i"), Field("j")),
+        Literal(ft.asarray(np.zeros((1,) * len(fields1), dtype=int))), fields1
     )
-    s1 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node1,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    s1 = StatsInterpreter(DCStatsFactory())(node1, OrderedDict())
     _overwrite_def(
-        s1, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims1, 0)
+        s1,
+        BaseTensorStats.from_fields(frozenset(fields1), dims1, StaticFillFType(0)),
     )
     s1.dcs = set(dcs1)
 
     node2 = Table(
-        Literal(ft.asarray(np.zeros((1, 1), dtype=int))),
-        (Field("j"), Field("k")),
+        Literal(ft.asarray(np.zeros((1,) * len(fields2), dtype=int))), fields2
     )
-    s2 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node2,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    s2 = StatsInterpreter(DCStatsFactory())(node2, OrderedDict())
     _overwrite_def(
-        s2, BaseTensorStats.from_fields(frozenset({Field("j"), Field("k")}), dims2, 0)
+        s2,
+        BaseTensorStats.from_fields(frozenset(fields2), dims2, StaticFillFType(0)),
     )
     s2.dcs = set(dcs2)
 
-    parent = MapJoin(Literal(ffuncs.add), (node1, node2))
-    reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=parent,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    reduce_stats = DCStatsFactory().mapjoin(ffuncs.add, s1, s2)
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
 
 
-""""""
-
-
 @pytest.mark.parametrize(
-    "dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz",
+    "fill3, expected_nnz",
     [
-        (
-            {Field("i"): 1000, Field("j"): 100},
-            [DC(frozenset(), frozenset([Field("i"), Field("j")]), 5)],
-            {Field("j"): 100, Field("k"): 1000},
-            [DC(frozenset(), frozenset([Field("j"), Field("k")]), 10)],
-            {Field("i"): 1000, Field("j"): 100, Field("k"): 1000},
-            [DC(frozenset(), frozenset([Field("i"), Field("j"), Field("k")]), 10)],
-            10 * 1000 + 5 * 1000 + 10,
-        ),
+        pytest.param(1, 10 * 1000 + 5 * 1000 + 10, id="all-nonzero-fill"),
+        pytest.param(0, 10, id="mixed-fill"),
     ],
 )
-def test_large_disjoint_disjunction_dc_card(
-    dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz
-):
-    dims1 = {Field(k.name): v for k, v in dims1.items()}
-    dims2 = {Field(k.name): v for k, v in dims2.items()}
-    dims3 = {Field(k.name): v for k, v in dims3.items()}
-    cache = {}
+def test_disjoint_join_dc_card(fill3, expected_nnz):
+    dims1 = {Field("i"): 1000.0, Field("j"): 100.0}
+    dcs1 = [DC(frozenset(), frozenset([Field("i"), Field("j")]), 5)]
+    dims2 = {Field("j"): 100.0, Field("k"): 1000.0}
+    dcs2 = [DC(frozenset(), frozenset([Field("j"), Field("k")]), 10)]
+    dims3 = {Field("i"): 1000.0, Field("j"): 100.0, Field("k"): 1000.0}
+    dcs3 = [DC(frozenset(), frozenset([Field("i"), Field("j"), Field("k")]), 10)]
 
     node1 = Table(
         Literal(ft.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
     )
-    s1 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node1,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    s1 = StatsInterpreter(DCStatsFactory())(node1, OrderedDict())
     _overwrite_def(
-        s1, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims1, 1)
+        s1,
+        BaseTensorStats.from_fields(
+            frozenset({Field("i"), Field("j")}), dims1, StaticFillFType(1)
+        ),
     )
     s1.dcs = set(dcs1)
 
     node2 = Table(
         Literal(ft.asarray(np.zeros((1, 1), dtype=int))), (Field("j"), Field("k"))
     )
-    s2 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node2,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    s2 = StatsInterpreter(DCStatsFactory())(node2, OrderedDict())
     _overwrite_def(
-        s2, BaseTensorStats.from_fields(frozenset({Field("j"), Field("k")}), dims2, 1)
+        s2,
+        BaseTensorStats.from_fields(
+            frozenset({Field("j"), Field("k")}), dims2, StaticFillFType(1)
+        ),
     )
     s2.dcs = set(dcs2)
 
@@ -2994,122 +2371,40 @@ def test_large_disjoint_disjunction_dc_card(
         Literal(ft.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
     )
-    s3 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node3,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    s3 = StatsInterpreter(DCStatsFactory())(node3, OrderedDict())
     _overwrite_def(
         s3,
         BaseTensorStats.from_fields(
-            frozenset({Field("i"), Field("j"), Field("k")}), dims3, 1
+            frozenset({Field("i"), Field("j"), Field("k")}),
+            dims3,
+            StaticFillFType(fill3),
         ),
     )
     s3.dcs = set(dcs3)
 
-    map = MapJoin(Literal(ffuncs.mul), (node1, node2))
-
-    parent = MapJoin(Literal(ffuncs.mul), (map, node3))
-
-    reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=parent,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    factory = DCStatsFactory()
+    reduce_stats = factory.mapjoin(ffuncs.mul, factory.mapjoin(ffuncs.mul, s1, s2), s3)
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
 
 
-@pytest.mark.parametrize(
-    "dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz",
-    [
-        (
-            {Field("i"): 1000, Field("j"): 100},
-            [DC(frozenset(), frozenset([Field("i"), Field("j")]), 5)],
-            {Field("j"): 100, Field("k"): 1000},
-            [DC(frozenset(), frozenset([Field("j"), Field("k")]), 10)],
-            {Field("i"): 1000, Field("j"): 100, Field("k"): 1000},
-            [DC(frozenset(), frozenset([Field("i"), Field("j"), Field("k")]), 10)],
-            10,
-        ),
-    ],
-)
-def test_mixture_disjoint_disjunction_dc_card(
-    dims1, dcs1, dims2, dcs2, dims3, dcs3, expected_nnz
-):
-    cache = {}
-
-    node1 = Table(
-        Literal(ft.asarray(np.zeros((1, 1), dtype=int))), (Field("i"), Field("j"))
-    )
-    s1 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node1,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    _overwrite_def(
-        s1, BaseTensorStats.from_fields(frozenset([Field("i"), Field("j")]), dims1, 1)
-    )
-    s1.dcs = set(dcs1)
-
-    node2 = Table(
-        Literal(ft.asarray(np.zeros((1, 1), dtype=int))), (Field("j"), Field("k"))
-    )
-    s2 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node2,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    _overwrite_def(
-        s2, BaseTensorStats.from_fields(frozenset([Field("j"), Field("k")]), dims2, 1)
-    )
-    s2.dcs = set(dcs2)
-
-    node3 = Table(
-        Literal(ft.asarray(np.zeros((1, 1, 1), dtype=int))),
-        (Field("i"), Field("j"), Field("k")),
-    )
-    s3 = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node3,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    _overwrite_def(
-        s3,
-        BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims3, 0
-        ),
-    )
-    s3.dcs = set(dcs3)
-
-    map = MapJoin(Literal(ffuncs.mul), (node1, node2))
-    parent = MapJoin(Literal(ffuncs.mul), (map, node3))
-
-    reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=parent,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    assert reduce_stats.estimate_non_fill_values() == expected_nnz
+@pytest.mark.parametrize("factory", [DCStatsFactory, ExactStatsFactory])
+def test_aggregate_does_not_bound_joins_over_reduced_fields(factory):
+    sf = factory()
+    i, j = Field("i"), Field("j")
+    # Every degree of a single entry is 1, but its projection onto i says
+    # nothing about the j of a tensor it joins.
+    entry = sf(ft.asarray(np.diag([1.0, 0.0, 0.0, 0.0])), (i, j))
+    row = sf.aggregate(ffuncs.or_, False, (j,), sf.support(entry))
+    full = sf.support(sf(ft.asarray(np.ones((4, 4))), (i, j)))
+    assert sf.mapjoin(ffuncs.and_, row, full).estimate_non_fill_values() == 4
 
 
 @pytest.mark.parametrize(
-    "dims, dcs, expected_nnz",
+    "dims, dcs, reduce_indices, expected_nnz",
     [
-        (
+        # Full reduction over all three fields
+        pytest.param(
             {Field("i"): 1000, Field("j"): 1000, Field("k"): 1000},
             [
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 50),
@@ -3122,53 +2417,12 @@ def test_mixture_disjoint_disjunction_dc_card(
                 DC(frozenset([Field("i")]), frozenset([Field("k")]), 5),
                 DC(frozenset([Field("k")]), frozenset([Field("i")]), 5),
             ],
+            [Field("i"), Field("j"), Field("k")],
             1,
+            id="full-reduce",
         ),
-    ],
-)
-def test_full_reduce_DC_card(dims, dcs, expected_nnz):
-    cache = {}
-
-    node = Table(
-        Literal(ft.asarray(np.zeros((1, 1, 1), dtype=int))),
-        (Field("i"), Field("j"), Field("k")),
-    )
-    stat = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    _overwrite_def(
-        stat,
-        BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
-        ),
-    )
-    stat.dcs = set(dcs)
-
-    reduce_node = Aggregate(
-        op=Literal(ffuncs.add),
-        init=Literal(0),
-        idxs=(Field("i"), Field("j"), Field("k")),
-        arg=node,
-    )
-    reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=reduce_node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
-
-@pytest.mark.parametrize(
-    "dims, dcs, expected_nnz",
-    [
-        (
+        # Reduce two of three fields
+        pytest.param(
             {Field("i"): 1000, Field("j"): 1000, Field("k"): 1000},
             [
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 1),
@@ -3181,53 +2435,12 @@ def test_full_reduce_DC_card(dims, dcs, expected_nnz):
                 DC(frozenset([Field("i")]), frozenset([Field("k")]), 5),
                 DC(frozenset([Field("k")]), frozenset([Field("i")]), 5),
             ],
+            [Field("i"), Field("j")],
             5,
+            id="two-attr-reduce",
         ),
-    ],
-)
-def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
-    cache = {}
-
-    node = Table(
-        Literal(ft.asarray(np.zeros((1, 1, 1), dtype=int))),
-        (Field("i"), Field("j"), Field("k")),
-    )
-    st = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    _overwrite_def(
-        st,
-        BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
-        ),
-    )
-    st.dcs = set(dcs)
-
-    reduce_node = Aggregate(
-        op=Literal(ffuncs.add),
-        init=Literal(0),
-        idxs=(Field("i"), Field("j")),
-        arg=node,
-    )
-    reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=reduce_node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
-
-@pytest.mark.parametrize(
-    "dims, dcs, expected_nnz",
-    [
-        (
+        # Reduce one of three fields
+        pytest.param(
             {Field("i"): 1000, Field("j"): 1000, Field("k"): 1000},
             [
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 1),
@@ -3240,54 +2453,12 @@ def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
                 DC(frozenset([Field("i")]), frozenset([Field("k")]), 5),
                 DC(frozenset([Field("k")]), frozenset([Field("i")]), 5),
             ],
+            [Field("i")],
             5,
+            id="one-attr-reduce",
         ),
-    ],
-)
-def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
-    cache = {}
-
-    node = Table(
-        Literal(ft.asarray(np.zeros((1, 1, 1), dtype=int))),
-        (Field("i"), Field("j"), Field("k")),
-    )
-    st = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    _overwrite_def(
-        st,
-        BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
-        ),
-    )
-    st.dcs = set(dcs)
-
-    reduce_node = Aggregate(
-        op=Literal(ffuncs.add),
-        init=Literal(0),
-        idxs=(Field("i"),),
-        arg=node,
-    )
-    reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=reduce_node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-
-    assert reduce_stats.estimate_non_fill_values() == expected_nnz
-
-
-@pytest.mark.parametrize(
-    "dims, dcs, reduce_indices, expected_nnz",
-    [
         # Asymmetric densities
-        (
+        pytest.param(
             {Field("i"): 100, Field("j"): 100, Field("k"): 100},
             [
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 100),
@@ -3296,9 +2467,10 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
             ],
             [Field("j")],
             5000,
+            id="asymmetric-densities",
         ),
         # Sparse + dense mix
-        (
+        pytest.param(
             {Field("i"): 100, Field("j"): 100, Field("k"): 100},
             [
                 DC(frozenset(), frozenset([Field("i"), Field("k")]), 900),
@@ -3306,9 +2478,10 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
             ],
             [Field("i"), Field("k")],
             100,
+            id="sparse-dense-mix",
         ),
         # Imbalance across dimensions
-        (
+        pytest.param(
             {Field("i"): 1000, Field("j"): 100, Field("k"): 10},
             [
                 DC(frozenset(), frozenset([Field("i"), Field("j")]), 5),
@@ -3317,45 +2490,26 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
             ],
             [Field("i")],
             5,
+            id="dimension-imbalance",
         ),
     ],
 )
 def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
-    cache = {}
-
     node = Table(
         Literal(ft.asarray(np.zeros((1, 1, 1), dtype=int))),
         (Field("i"), Field("j"), Field("k")),
     )
-    st = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    st = StatsInterpreter(DCStatsFactory())(node, OrderedDict())
     _overwrite_def(
         st,
         BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, StaticFillFType(0.0)
         ),
     )
     st.dcs = set(dcs)
 
     reduce_fields = tuple(reduce_indices)
-    reduce_node = Aggregate(
-        op=Literal(ffuncs.add),
-        init=Literal(0),
-        idxs=reduce_fields,
-        arg=node,
-    )
-    reduce_stats = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=reduce_node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    reduce_stats = DCStatsFactory().aggregate(ffuncs.add, 0, reduce_fields, st)
 
     assert reduce_stats.estimate_non_fill_values() == expected_nnz
 
@@ -3368,12 +2522,8 @@ def _lp_table(dense, fields):
 
 
 def _lp_stats(dense, fields, ps=(1.0, 2.0, math.inf)):
-    return insert_statistics(
-        stats_factory=LPStatsFactory(ps=ps),
-        node=_lp_table(dense, fields),
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
+    return StatsInterpreter(LPStatsFactory(ps=ps))(
+        _lp_table(dense, fields), OrderedDict()
     )
 
 
@@ -3389,13 +2539,7 @@ def test_lp_base_tensor_matches_dc():
     i, j = Field("i"), Field("j")
     A = np.array([[1.0, 0.0, 2.0], [0.0, 5.0, 3.0], [4.0, 0.0, 0.0]])
     lp = _lp_stats(A, (i, j))
-    dc = insert_statistics(
-        stats_factory=DCStatsFactory(),
-        node=_lp_table(A, (i, j)),
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
-    )
+    dc = StatsInterpreter(DCStatsFactory())(_lp_table(A, (i, j)), OrderedDict())
     assert lp.estimate_non_fill_values() == pytest.approx(dc.estimate_non_fill_values())
 
 
@@ -3407,12 +2551,8 @@ def test_lp_empty_tensor_is_zero():
 
 
 def test_lp_scalar_tensor():
-    stats = insert_statistics(
-        stats_factory=LPStatsFactory(),
-        node=Table(Literal(ft.asarray(np.asarray(5.0))), ()),
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
+    stats = StatsInterpreter(LPStatsFactory())(
+        Table(Literal(ft.asarray(np.asarray(5.0))), ()), OrderedDict()
     )
     assert stats.estimate_non_fill_values() == 1.0
 
@@ -3554,3 +2694,114 @@ def test_lp_norm_endpoints():
 def test_lpdc_is_hashable_frozen():
     dc = DC(frozenset(), frozenset({Field("i")}), 3.0, 2.0)
     assert dc in {dc}
+
+
+_OVER_DATA = np.array(
+    [
+        [1, 1, 1, 1, 0, 0],
+        [0, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 1],
+    ],
+    dtype=float,
+)
+_OVER_I, _OVER_J = Field("i"), Field("j")
+
+
+def _largest_slice(fields):
+    axes = tuple(
+        axis for axis, idx in enumerate((_OVER_I, _OVER_J)) if idx not in fields
+    )
+    return float(np.max(np.count_nonzero(_OVER_DATA, axis=axes), initial=0))
+
+
+_OVER_FIELDS = [(), (_OVER_I,), (_OVER_J,), (_OVER_I, _OVER_J), (Field("k"),)]
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        DenseStatsFactory(),
+        UniformStatsFactory(),
+        VPStatsFactory(),
+        ExactStatsFactory(),
+        SamplingStatsFactory(sample_nnz=_OVER_DATA.size),
+        BlockedUniformStatsFactory(blocks_per_dim={_OVER_I: 2, _OVER_J: 2}),
+        BlockedStatsFactory(
+            ExactStatsFactory(), blocks_per_dim={_OVER_I: 2, _OVER_J: 2}
+        ),
+        DCStatsFactory(),
+        LPStatsFactory(),
+    ],
+)
+def test_estimate_non_fill_values_over_without_tensor_fields(factory):
+    stats = factory(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
+    total = stats.estimate_non_fill_values()
+    assert stats.estimate_non_fill_values(over=()) == total
+    # Fields the tensor doesn't have don't split it into slices.
+    assert stats.estimate_non_fill_values(over=(Field("k"),)) == pytest.approx(total)
+
+
+@pytest.mark.parametrize("fields", _OVER_FIELDS)
+@pytest.mark.parametrize(
+    "factory",
+    [
+        ExactStatsFactory(),
+        # Blocks of single elements are exact.
+        BlockedUniformStatsFactory(blocks_per_dim={_OVER_I: 4, _OVER_J: 6}),
+        BlockedStatsFactory(
+            ExactStatsFactory(), blocks_per_dim={_OVER_I: 4, _OVER_J: 6}
+        ),
+    ],
+)
+def test_estimate_non_fill_values_over_is_exact(factory, fields):
+    stats = factory(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
+    assert stats.estimate_non_fill_values(over=fields) == _largest_slice(fields)
+
+
+@pytest.mark.parametrize("fields", _OVER_FIELDS)
+def test_estimate_non_fill_values_over_uniform(fields):
+    sizes = {_OVER_I: 4, _OVER_J: 6}
+    slices = math.prod(sizes[idx] for idx in fields if idx in sizes)
+    dense = DenseStatsFactory()(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
+    assert dense.estimate_non_fill_values(over=fields) == 24 / slices
+    uniform = UniformStatsFactory()(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
+    assert uniform.estimate_non_fill_values(over=fields) == pytest.approx(7 / slices)
+    sampling = SamplingStatsFactory(sample_nnz=_OVER_DATA.size)(
+        ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J)
+    )
+    assert sampling.estimate_non_fill_values(over=fields) == pytest.approx(7 / slices)
+
+
+@pytest.mark.parametrize("fields", _OVER_FIELDS)
+@pytest.mark.parametrize("factory", [DCStatsFactory(), LPStatsFactory()])
+def test_estimate_non_fill_values_over_max_degrees(factory, fields):
+    # Max degrees bound the largest slice, rather than an average one, and are
+    # tight for a single matrix.
+    stats = factory(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
+    assert stats.estimate_non_fill_values(over=fields) == pytest.approx(
+        _largest_slice(fields)
+    )
+
+
+@pytest.mark.parametrize("fields", _OVER_FIELDS)
+def test_estimate_non_fill_values_over_distinct_values(fields):
+    # A slice holds at most one value for each combination of the distinct
+    # values of the indices it doesn't fix: three rows and five columns.
+    stats = VPStatsFactory()(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
+    expected = {(_OVER_I,): 5, (_OVER_J,): 3, (_OVER_I, _OVER_J): 1}
+    assert stats.estimate_non_fill_values(over=fields) == expected.get(tuple(fields), 7)
+    assert stats.estimate_non_fill_values(over=fields) >= _largest_slice(fields)
+
+
+def test_exact_idempotent_reduction_of_fills_is_fill():
+    # A max of fills is the output fill, even with an init.
+    i, j = Field("i"), Field("j")
+    node = Aggregate(
+        Literal(ffuncs.max),
+        Literal(0.0),
+        Table(Literal(ft.asarray(np.zeros((2, 3)))), (i, j)),
+        (j,),
+    )
+    stats = StatsInterpreter(ExactStatsFactory())(node, OrderedDict())
+    assert stats.estimate_non_fill_values() == 0.0

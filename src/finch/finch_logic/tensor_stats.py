@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import MutableMapping
 from typing import Any, Generic, TypeVar
 
-from finch.algebra import AbstractFill, FinchOperator
+from finch.algebra import AbstractFillFType, FinchOperator, StaticFillFType
 
 from .nodes import Field
 
@@ -24,11 +24,12 @@ class TensorStats(ABC):
 
     @property
     @abstractmethod
-    def fill_value(self) -> AbstractFill: ...
+    def fill_type(self) -> AbstractFillFType:
+        """The fill of the tensor's format, which a kernel may depend on."""
 
-    @fill_value.setter
+    @fill_type.setter
     @abstractmethod
-    def fill_value(self, value: AbstractFill) -> None: ...
+    def fill_type(self, value: AbstractFillFType) -> None: ...
 
 
 TS = TypeVar("TS", bound=TensorStats)
@@ -40,6 +41,13 @@ class StatsFactory(ABC, Generic[TS]):
 
     @abstractmethod
     def copy(self, stat: TS) -> TS: ...
+
+    def support(self, stat: TS) -> TS:
+        """Statistics of the boolean indicator of non-fill entries."""
+        # Support preserves the non-fill structure, even for dynamic fills.
+        result = self.copy(stat)
+        result.fill_type = StaticFillFType(False)
+        return result
 
     @abstractmethod
     def mapjoin(self, op: FinchOperator, *args: TS) -> TS: ...

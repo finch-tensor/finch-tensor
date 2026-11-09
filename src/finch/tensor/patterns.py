@@ -8,18 +8,29 @@ from typing import Any
 
 import numpy as np
 
+from finch import finch_assembly as asm
+from finch import finch_notation as ntn
 from finch.algebra import (
     AbstractFill,
+    AbstractFillFType,
     DynamicFill,
     FType,
+    ImmutableStructFType,
+    MutableStructFType,
     StaticFill,
+    StaticFillFType,
     TensorFType,
+    TupleFType,
     as_fill,
     ffuncs,
     ftype,
     is_dynamic,
+    resolve_fill,
 )
+from finch.compile import looplets as lplt
+from finch.compile.lower import FinchTensorFType
 
+from .level import LevelFType
 from .override_tensor import OverrideTensor
 from .scalar import Scalar
 from .traits import (
@@ -38,13 +49,13 @@ def _shape_size(shape: tuple) -> int:
 class IndexTensorFType(TensorFType):
     _element_type: FType
     _shape_type: tuple[FType, ...]
-    _fill_value: AbstractFill
+    _fill_type: AbstractFillFType
 
     def __init__(
         self,
         _element_type: FType | type = np.intp,
         _shape_type: tuple[FType | type, ...] = (),
-        _fill_value: AbstractFill | None = None,
+        _fill_type: AbstractFillFType | None = None,
     ):
         # Frozen dataclass: fields have to be set through `object`.
         object.__setattr__(self, "_element_type", ftype(_element_type))
@@ -53,16 +64,18 @@ class IndexTensorFType(TensorFType):
         )
         object.__setattr__(
             self,
-            "_fill_value",
-            StaticFill(self._element_type(0)) if _fill_value is None else _fill_value,
+            "_fill_type",
+            StaticFillFType(self._element_type(0))
+            if _fill_type is None
+            else _fill_type,
         )
 
     @property
-    def fill_value(self) -> AbstractFill:
-        return self._fill_value
+    def fill_type(self) -> AbstractFillFType:
+        return self._fill_type
 
-    def with_fill(self, fill_value: AbstractFill) -> IndexTensorFType:
-        return IndexTensorFType(self._element_type, self._shape_type, fill_value)
+    def with_fill(self, fill_type: AbstractFillFType) -> IndexTensorFType:
+        return IndexTensorFType(self._element_type, self._shape_type, fill_type)
 
     @property
     def element_type(self) -> FType:
@@ -83,15 +96,13 @@ class IndexTensorFType(TensorFType):
         if not isinstance(other, IndexTensorFType):
             return False
         return (
-            builtins.bool(np.all(ffuncs.same(self.fill_value, other.fill_value)))
+            self.fill_type == other.fill_type
             and self._element_type == other._element_type
             and self._shape_type == other._shape_type
         )
 
     def __hash__(self):
-        return hash(
-            (ffuncs.samehash(self.fill_value), self._element_type, self._shape_type)
-        )
+        return hash((self.fill_type, self._element_type, self._shape_type))
 
     def construct(self, shape: tuple) -> IndexTensor:
         return IndexTensor(shape, self.element_type)
@@ -112,16 +123,16 @@ class IndexTensorFType(TensorFType):
 
 @dataclass(frozen=True, eq=False)
 class FillTensorFType(TensorFType):
-    _fill_value: AbstractFill
+    _fill_type: AbstractFillFType
     _element_type: FType
     _shape_type: tuple
 
     @property
-    def fill_value(self) -> AbstractFill:
-        return self._fill_value
+    def fill_type(self) -> AbstractFillFType:
+        return self._fill_type
 
-    def with_fill(self, fill_value: AbstractFill) -> FillTensorFType:
-        return replace(self, _fill_value=fill_value)
+    def with_fill(self, fill_type: AbstractFillFType) -> FillTensorFType:
+        return replace(self, _fill_type=fill_type)
 
     @property
     def element_type(self) -> FType:
@@ -144,18 +155,16 @@ class FillTensorFType(TensorFType):
         if not isinstance(other, FillTensorFType):
             return False
         return (
-            builtins.bool(np.all(ffuncs.same(self._fill_value, other._fill_value)))
+            self._fill_type == other._fill_type
             and self._element_type == other._element_type
             and self._shape_type == other._shape_type
         )
 
     def __hash__(self):
-        return hash(
-            (ffuncs.samehash(self._fill_value), self._element_type, self._shape_type)
-        )
+        return hash((self._fill_type, self._element_type, self._shape_type))
 
     def construct(self, shape: tuple) -> FillTensor:
-        return FillTensor(shape, self.fill_value)
+        return FillTensor(shape, resolve_fill(self._fill_type))
 
     def __call__(self, val: Any) -> FillTensor:
         """
@@ -221,8 +230,8 @@ class FillTensor(OverrideTensor):
     @property
     def ftype(self):
         return FillTensorFType(
-            self._fill,
             self._fill.ftype,
+            self._fill.element_type,
             tuple(ftype(dim) for dim in self.shape),
         )
 
@@ -278,7 +287,7 @@ class IndexTensor(OverrideTensor):
     @property
     def fill_value(self) -> Any:
         """Default fill value."""
-        return self.ftype.fill_value.value
+        return resolve_fill(self.ftype.fill_type, self._fill).value
 
     @property
     def element_type(self) -> FType:
@@ -295,28 +304,25 @@ class IndexTensor(OverrideTensor):
         return IndexTensorFType(
             self._element_type,
             tuple(ftype(dim) for dim in self.shape),
-            self._fill,
+            None if self._fill is None else self._fill.ftype,
         )
 
 
 @dataclass(frozen=True, eq=False)
 class PatternTensorFType(TensorFType):
-    _fill_value: Any
+    _fill_type: AbstractFillFType
     _pattern_value: Any
     _element_type: FType
     _shape_type: tuple
     _tensor_type: type[PatternTensor]
     _constructor_kwargs: tuple[tuple[str, Any], ...]
 
-    def __post_init__(self):
-        object.__setattr__(self, "_fill_value", as_fill(self._fill_value))
-
     @property
-    def fill_value(self) -> AbstractFill:
-        return self._fill_value
+    def fill_type(self) -> AbstractFillFType:
+        return self._fill_type
 
-    def with_fill(self, fill_value: AbstractFill) -> PatternTensorFType:
-        return replace(self, _fill_value=fill_value)
+    def with_fill(self, fill_type: AbstractFillFType) -> PatternTensorFType:
+        return replace(self, _fill_type=fill_type)
 
     @property
     def element_type(self) -> FType:
@@ -330,13 +336,21 @@ class PatternTensorFType(TensorFType):
     def level_format_properties(self) -> list[FormatProperty]:
         return self._tensor_type._level_format_properties(self.ndim)
 
+    def default_protocols(self):
+        # A pattern is looked up in its outer dimensions, and walked in its
+        # innermost one.
+        return (ntn.Follow(),) * (self.ndim - 1) + (ntn.Walk(),) if self.ndim else ()
+
+    def protocols(self):
+        return tuple((proto,) for proto in self.default_protocols())
+
     def from_numpy(self, arr):
         raise NotImplementedError
 
     def __eq__(self, other):
         match other:
             case PatternTensorFType(
-                _fill_value=fill_value,
+                _fill_type=fill_type,
                 _pattern_value=pattern_value,
                 _element_type=element_type,
                 _shape_type=shape_type,
@@ -344,7 +358,7 @@ class PatternTensorFType(TensorFType):
                 _constructor_kwargs=constructor_kwargs,
             ):
                 return (
-                    builtins.bool(np.all(ffuncs.same(self._fill_value, fill_value)))
+                    self._fill_type == fill_type
                     and builtins.bool(
                         np.all(ffuncs.same(self._pattern_value, pattern_value))
                     )
@@ -359,8 +373,8 @@ class PatternTensorFType(TensorFType):
     def __hash__(self):
         return hash(
             (
-                ffuncs.samehash(self._fill_value),
-                ffuncs.samehash(self._pattern_value),
+                self._fill_type,
+                ffuncs.canonical(self._pattern_value),
                 self._element_type,
                 self._shape_type,
                 self._tensor_type,
@@ -411,7 +425,7 @@ class PatternTensor(OverrideTensor):
 
     def with_fill(self, fill_value: AbstractFill) -> PatternTensor:
         clone = copy(self)
-        clone._fill_value = as_fill(fill_value)
+        clone._fill_value = fill_value
         return clone
 
     def __getitem__(self, idxs):
@@ -444,7 +458,7 @@ class PatternTensor(OverrideTensor):
 
     @property
     def fill_value(self) -> Any:
-        return self.ftype.fill_value.value
+        return self._fill_value.value
 
     @property
     def element_type(self) -> FType:
@@ -457,7 +471,7 @@ class PatternTensor(OverrideTensor):
     @property
     def ftype(self):
         return PatternTensorFType(
-            self._fill_value,
+            self._fill_value.ftype,
             self._pattern_value,
             self._element_type,
             tuple(ftype(dim) for dim in self.shape),
@@ -511,6 +525,202 @@ class ReshapeMaskTensor(PatternTensor):
         )
 
 
+@dataclass(frozen=True, eq=False)
+class EyeTensorFType(PatternTensorFType, FinchTensorFType, MutableStructFType):
+    """
+    An eye tensor is passed to kernels by its shape, so that a kernel may
+    declare it as a workspace with the extents of its loops.
+    """
+
+    @property
+    def struct_name(self):
+        return "EyeTensor"
+
+    @property
+    def struct_fields(self):
+        return [("shape", TupleFType.from_tuple(self.shape_type))]
+
+    def struct_setattr(self, obj, attr, value):
+        match attr:
+            case "shape":
+                obj._shape = tuple(int(dim) for dim in value)
+            case _:
+                setattr(obj, attr, value)
+
+    def from_fields(self, shape):
+        return self.construct(shape)
+
+    @property
+    def lvl_t(self):
+        return EyeLevelFType(self)
+
+    def get_child_type(self, attr):
+        if attr != "lvl":
+            raise TypeError(f"{self} does not support child {attr!r}")
+        return self.lvl_t
+
+    def get_child(self, obj, attr):
+        self.get_child_type(attr)
+        return obj
+
+    def lower_dim(self, ctx, obj, r):
+        return self.lvl_t.level_lower_dim(ctx, ctx(obj.lvl), r)
+
+    def lower_fill(self, ctx, obj):
+        match self.fill_type:
+            case StaticFillFType() as fill_type:
+                return asm.Literal(fill_type.value)
+        raise NotImplementedError(f"Cannot lower the dynamic fill of a {self}")
+
+    def lower_unwrap(self, ctx, obj):
+        raise NotImplementedError(f"Unfurl a {self} before reading it")
+
+    def lower_increment(self, ctx, obj, op, val):
+        raise NotImplementedError(f"Cannot update a {self}")
+
+    def lower_declare(self, ctx, tns, init, op, shape):
+        shape = tuple(
+            dim
+            if dim.result_type == dim_t
+            else asm.Call(asm.Literal(ffuncs.astype(dim_t)), (dim,))
+            for dim, dim_t in zip(shape, self.shape_type, strict=True)
+        )
+        ctx.exec(
+            asm.SetAttr(
+                ctx(tns.lvl.root),
+                asm.Literal("shape"),
+                asm.Call(asm.Literal(ffuncs.make_tuple), shape),
+            )
+        )
+
+    def lower_freeze(self, ctx, tns, op):
+        return tns
+
+    def lower_thaw(self, ctx, tns, op):
+        return tns
+
+    def unfurl(self, ctx, tns, ext, mode, proto):
+        tns = ctx.resolve(tns)
+        return self.lvl_t.level_unfurl(ctx, tns, ext, mode, proto, ctx(tns.pos))
+
+
+@dataclass(unsafe_hash=True)
+class EyeLevelFType(LevelFType, ImmutableStructFType):
+    """The rows (`nind == 0`) or columns (`nind == 1`) of an eye tensor."""
+
+    tns: EyeTensorFType
+    nind: int = 0
+
+    @property
+    def struct_name(self):
+        return "EyeLevel"
+
+    @property
+    def struct_fields(self):
+        return [("tns", self.tns)]
+
+    def from_fields(self, tns):
+        raise NotImplementedError("An eye level is a view of its tensor")
+
+    def construct(self, shape, *, pos):
+        raise NotImplementedError("An eye level is a view of its tensor")
+
+    def level_get_child_type(self, attr):
+        if attr != "lvl" or self.ndim == 0:
+            raise TypeError(f"{self} does not support child {attr!r}")
+        return self.lvl_t
+
+    def level_get_child(self, obj, attr):
+        self.level_get_child_type(attr)
+        return obj
+
+    @property
+    def lvl_t(self):
+        return EyeLevelFType(self.tns, self.nind + 1)
+
+    @property
+    def ndim(self):
+        return self.tns.ndim - self.nind
+
+    @property
+    def shape_type(self):
+        return self.tns.shape_type[self.nind :]
+
+    @property
+    def fill_type(self):
+        return self.tns.fill_type
+
+    @property
+    def element_type(self):
+        return self.tns.element_type
+
+    @property
+    def position_type(self):
+        return ftype(np.intp)
+
+    @property
+    def buffer_type(self):
+        raise NotImplementedError("An eye level has no buffer")
+
+    @property
+    def buffer_factory(self):
+        raise NotImplementedError("An eye level has no buffer")
+
+    def level_format_properties(self, n):
+        raise NotImplementedError
+
+    def level_cost(self, fields, stats, stats_factory, num_pos, lvl):
+        raise NotImplementedError
+
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        raise NotImplementedError("Declare the owning eye tensor instead")
+
+    def level_lower_freeze(self, ctx, tns, op, pos):
+        return tns
+
+    def level_lower_thaw(self, ctx, tns, op, pos):
+        return tns
+
+    def level_lower_dim(self, ctx, obj, r):
+        return asm.GetAttr(
+            asm.GetAttr(obj, asm.Literal("shape")),
+            asm.Literal(f"element_{self.nind + r}"),
+        )
+
+    def level_lower_unwrap(self, ctx, tns, pos):
+        raise NotImplementedError("Unfurl an eye level before reading it")
+
+    def level_lower_increment(self, ctx, obj, op, val, pos):
+        raise NotImplementedError("Cannot update an eye level")
+
+    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+        if self.nind == 0:
+            return lplt.Lookup(
+                lambda ctx, idx: lplt.Run(
+                    ntn.Fiber(ntn.Child(tns.lvl), tns.pos, (*tns.idxs, idx))
+                )
+            )
+        # A column holds the pattern only where it is offset by k from its row.
+        i = tns.idxs[-1]
+        k = dict(self.tns._constructor_kwargs)["k"]
+        diag = ntn.Call(ntn.L(ffuncs.add), (i, ntn.L(i.result_type(k)))) if k else i
+
+        def run(val):
+            return lambda ctx, idx: lplt.Run(ntn.Full(ntn.Literal(val)))
+
+        return lplt.Sequence(
+            head=run(self.fill_type.value),
+            split=lambda ctx, ext: diag,
+            tail=lambda ctx, idx: lplt.Sequence(
+                head=run(self.tns._pattern_value),
+                split=lambda ctx, ext: ntn.Call(
+                    ntn.L(ffuncs.add), (diag, ext.get_unit())
+                ),
+                tail=run(self.fill_type.value),
+            ),
+        )
+
+
 class EyeTensor(PatternTensor):
     def __init__(self, shape, *, k: int = 0, dtype=None):
         self._k = k
@@ -518,6 +728,14 @@ class EyeTensor(PatternTensor):
 
     def contains(self, i, j) -> bool:
         return j - i == self._k
+
+    @property
+    def ftype(self):
+        return EyeTensorFType(**vars(super().ftype))
+
+    def declare(self, init, op, shape):
+        self._shape = tuple(int(dim) for dim in shape)
+        return self
 
 
 class UpperTriangleTensor(PatternTensor):
@@ -589,22 +807,31 @@ class RollTensor(PatternTensor):
 
 
 class RepeatTensor(PatternTensor):
+    """Map each of ``n`` indices to ``k`` repeated indices.
+
+    ``shape`` is ``(n, n * k)``, and row ``i`` holds the repeats ``j`` of ``i``,
+    so that the efficient row-major traversal visits each index and then its
+    repeats. For ``k <= 0``, all entries are false.
+    """
+
     def __init__(self, shape, *, k: int = 0, dtype=None):
         self._k = k
         super().__init__(shape, dtype=dtype, k=self._k)
 
     @classmethod
     def _level_format_properties(cls, ndim: int) -> list[FormatProperty]:
-        return [Blocked((1,), (0,)), Repeated((1,), (0,))]
+        return [Blocked((0,), (1,)), Repeated((0,), (1,))]
 
     def contains(self, i, j) -> bool:
-        return self._k > 0 and j == i // self._k
+        return self._k > 0 and i == j // self._k
 
 
 class ChunkMaskTensor(PatternTensor):
     """Map ``n`` indices to chunks of size ``b``.
 
-    ``shape`` is ``(n, ceil(n / b))``; the last chunk may be shorter.
+    ``shape`` is ``(ceil(n / b), n)``, and row ``j`` holds the indices of chunk
+    ``j``, so that the efficient row-major traversal visits each chunk and then
+    its indices. The last chunk may be shorter.
     """
 
     def __init__(self, shape, *, b: int, dtype=None):
@@ -619,20 +846,22 @@ class ChunkMaskTensor(PatternTensor):
             pattern_value=True,
             b=self._b,
         )
-        n, chunks = map(operator.index, self.shape)
+        chunks, n = map(operator.index, self.shape)
         if n < 0:
             raise ValueError("n must be nonnegative")
         if chunks != (n + self._b - 1) // self._b:
-            raise ValueError("shape[1] must equal ceil(shape[0] / b)")
+            raise ValueError("shape[0] must equal ceil(shape[1] / b)")
 
-    def contains(self, i, j) -> bool:
+    def contains(self, j, i) -> bool:
         return j == i // self._b
 
 
 class SplitMaskTensor(PatternTensor):
     """Partition ``n`` indices into ``p`` contiguous regions of nearly equal size.
 
-    ``shape`` is ``(n, p)``. Region ``j`` covers ``n*j//p <= i < n*(j+1)//p``.
+    ``shape`` is ``(p, n)``, and row ``j`` covers ``n*j//p <= i < n*(j+1)//p``,
+    so that the efficient row-major traversal visits each region and then its
+    indices.
     """
 
     def __init__(self, shape, *, dtype=None):
@@ -643,14 +872,14 @@ class SplitMaskTensor(PatternTensor):
             fill_value=False,
             pattern_value=True,
         )
-        n, p = map(operator.index, self.shape)
+        p, n = map(operator.index, self.shape)
         if n < 0:
             raise ValueError("n must be nonnegative")
         if p <= 0:
-            raise ValueError("shape[1] must be positive")
+            raise ValueError("shape[0] must be positive")
 
-    def contains(self, i, j) -> bool:
-        n, p = self.shape
+    def contains(self, j, i) -> bool:
+        p, n = self.shape
         return n * j // p <= i < n * (j + 1) // p
 
 
@@ -676,7 +905,8 @@ class RandomMaskTensor(PatternTensor):
     coordinates give the same value even if the shape changes.
 
     Like Finch.jl, indexed masks mix the seed, then each one-based coordinate
-    from the last axis to the first. Scalar masks use the seed directly.
+    from the first axis to the last, which is Finch.jl's order once the axes
+    are reversed like other tensors. Scalar masks use the seed directly.
     The high 53 bits give a value in ``[0, 1)`` that is compared with ``p``.
     """
 
@@ -722,7 +952,7 @@ class RandomMaskTensor(PatternTensor):
         if not idxs:
             return _randommask_uniform(self._seed) < self._p
         state = _randommask_mix(self._seed)
-        for idx in reversed(idxs):
+        for idx in idxs:
             state = _randommask_mix(state ^ (operator.index(idx) + 1))
         return _randommask_uniform(state) < self._p
 

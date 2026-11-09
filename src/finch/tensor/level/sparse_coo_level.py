@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 
+from finch import finch_notation as ntn
 from finch.algebra import (
     AbstractFill,
     FType,
@@ -42,9 +43,9 @@ class SparseCOOLevelFType(ImmutableStructFType, MultiDimensionLevelFType):
         if self.coo_ndim != len(self.tbl_type.struct_fieldtypes):
             raise ValueError("SparseCOOLevelFType tbl arity must match COO dimensions")
 
-    def with_fill(self, fill_value: Any) -> "SparseCOOLevelFType":
+    def with_fill(self, fill_type: Any) -> "SparseCOOLevelFType":
         return SparseCOOLevelFType(
-            self.lvl_type.with_fill(fill_value),
+            self.lvl_type.with_fill(fill_type),
             self.coo_shape_type,
             self.ptr_type,
             self.idx_type,
@@ -78,8 +79,8 @@ class SparseCOOLevelFType(ImmutableStructFType, MultiDimensionLevelFType):
         return len(self.coo_shape_tuple_type.struct_fieldtypes)
 
     @property
-    def fill_value(self) -> Any:
-        return self.lvl_t.fill_value
+    def fill_type(self):
+        return self.lvl_t.fill_type
 
     @property
     def element_type(self) -> FType:
@@ -124,6 +125,12 @@ class SparseCOOLevelFType(ImmutableStructFType, MultiDimensionLevelFType):
 
     def level_format_properties(self, n):
         return self.lvl_t.level_format_properties(n)
+
+    def level_default_protocols(self):
+        return (ntn.Walk(),) * self.coo_ndim + self.lvl_t.level_default_protocols()
+
+    def level_protocols(self):
+        return ((ntn.Walk(),),) * self.coo_ndim + self.lvl_t.level_protocols()
 
     def construct(self, shape: tuple[Any, ...], *, pos: int) -> "SparseCOOLevel":
         if len(shape) < self.coo_ndim:

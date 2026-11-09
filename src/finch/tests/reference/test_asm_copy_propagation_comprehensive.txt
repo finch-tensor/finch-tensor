@@ -27,7 +27,7 @@ def main() -> finch.int64:
         a: finch.int64 = i
         for j in range(0, 2):
             b: finch.int64 = j
-            result: finch.int64 = add(result, add(a, j))
+            result: finch.int64 = add(result, add(i, j))
     d: finch.int64 = result
     if lt(d, 100):
         c: finch.int64 = d

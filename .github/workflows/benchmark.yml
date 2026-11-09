@@ -1,6 +1,16 @@
 name: Benchmark
 jobs:
   benchmark:
+    # PRs are only benchmarked once a maintainer adds the `benchmark` label.
+    # Adding any other label to a labeled PR shouldn't rerun (or cancel) benchmarks.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (contains(github.event.pull_request.labels.*.name, 'benchmark') &&
+       (github.event.action != 'labeled' || github.event.label.name == 'benchmark'))
+    concurrency:
+      # Cancel superseded runs on PR branches; pushes to main get a unique group
+      group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
       contents: read # required for actions/checkout
@@ -12,7 +22,7 @@ jobs:
           fetch-depth: 0
       - uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.71.3
+          pixi-version: v0.83.0
           environments: benchmark
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v4
@@ -21,6 +31,21 @@ jobs:
           run: |
             pixi run benchmark -vvv -m "not slow"
 
+  instructions:
+    name: How to run benchmarks
+    if: >-
+      github.event_name == 'pull_request' &&
+      !contains(github.event.pull_request.labels.*.name, 'benchmark')
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Print instructions
+        run: |
+          msg="CodSpeed benchmarks are skipped on this PR. Add the 'benchmark' label to run them on every push; remove it to stop."
+          echo "::notice title=Benchmarks skipped::$msg"
+          echo "### 🐦 Benchmarks skipped" >> "$GITHUB_STEP_SUMMARY"
+          echo "Add the \`benchmark\` label to this PR to run CodSpeed benchmarks on every push. Remove the label to stop." >> "$GITHUB_STEP_SUMMARY"
+
 on:
   push:
     branches:
@@ -28,3 +53,5 @@ on:
   pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened, labeled]
+  workflow_dispatch:

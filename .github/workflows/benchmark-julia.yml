@@ -1,10 +1,18 @@
 name: Julia Benchmark
 
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   benchmark-julia:
-    runs-on: ubuntu-latest
+    runs-on: codspeed-macro-arm64-graviton-ubuntu-22-04
     permissions:
       contents: read # required for actions/checkout
+      id-token: write
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v7
@@ -12,10 +20,10 @@ jobs:
           fetch-depth: 0
       - uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.71.3
+          pixi-version: v0.83.0
           environments: benchmark-julia
       - name: Run Julia benchmarks
-        run: pixi run benchmark-julia -vvv -m "not slow"
-
-on:
-  workflow_dispatch:
+        uses: CodSpeedHQ/action@v5
+        with:
+          mode: walltime
+          run: pixi run benchmark-julia -vvv -m "not slow"

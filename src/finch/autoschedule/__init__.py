@@ -7,6 +7,7 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Relabel,
     Reorder,
     Table,
@@ -15,7 +16,7 @@ from finch.finch_logic import (
 from finch.symbolic import PostOrderDFS, PostWalk, PreWalk
 
 from .capture import LogicCapture
-from .compiler import LogicCompiler, NotationGenerator
+from .compiler import CompilerFormLowerer, LogicCompiler, NotationGenerator
 from .default_schedulers import (
     COMPILE_JULIA,
     COMPILE_JULIA_GALLEY,
@@ -41,6 +42,7 @@ from .formatter.formatter import (
 from .formatter.smart_formatter import FDFormatter, SmartFormatter
 from .loop_orderer.loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
+from .protocolize import LogicProtocolizer, protocolize
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 
 __all__ = [
@@ -57,6 +59,7 @@ __all__ = [
     "Aggregate",
     "Alias",
     "BufferizedNDArrayFormatter",
+    "CompilerFormLowerer",
     "DefaultLogicFactorizer",
     "DefaultLogicFormatter",
     "DefaultLoopOrderer",
@@ -70,6 +73,7 @@ __all__ = [
     "LogicFormatter",
     "LogicNormalizer",
     "LogicNotationLowerer",
+    "LogicProtocolizer",
     "MapJoin",
     "NotationGenerator",
     "Plan",
@@ -78,6 +82,7 @@ __all__ = [
     "PreWalk",
     "Produces",
     "Query",
+    "QueryInto",
     "Relabel",
     "Reorder",
     "SmartFormatter",
@@ -85,6 +90,7 @@ __all__ = [
     "Value",
     "get_default_scheduler",
     "normalize_names",
+    "protocolize",
     "set_default_scheduler",
     "with_default_scheduler",
 ]

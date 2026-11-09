@@ -53,8 +53,7 @@ class FusedNode(Term, ABC):
 class FusedTree(FusedNode, TermTree, ABC):
     @property
     @abstractmethod
-    def children(self) -> list[FusedNode]:  # type: ignore[override]
-        ...
+    def children(self) -> list[FusedNode]: ...
 
 
 class FusedExpression(FusedNode, ExpressionTerm, ABC):

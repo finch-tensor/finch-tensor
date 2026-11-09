@@ -5,6 +5,7 @@ from finch import finch_notation as ntn
 from finch.algebra import ffuncs, ftype
 from finch.compile.looplets import Lookup, Run, Switch, Thunk
 from finch.compile.lower import AssemblyContext, LoopletContext, SymbolicExtent
+from finch.symbolic import PostOrderDFS
 
 
 @pytest.mark.parametrize(
@@ -57,6 +58,70 @@ def test_lookup_and_run(start, end, expected, point):
     interpreter = asm.AssemblyInterpreter()
     interpreter(asm.Block(ctx.emit()))
     assert interpreter(ctx(result)) == expected
+
+
+@pytest.mark.parametrize("with_run", [False, True])
+@pytest.mark.parametrize("guarded", [False, True])
+@pytest.mark.parametrize(
+    "start, end, point",
+    [(2, 5, False), (2, 2, False), (2, 3, False), (3, 4, True)],
+)
+def test_loop_lowering_preserves_iterations(with_run, guarded, start, end, point):
+    idx = ntn.Variable("i", ftype(int))
+    result = ntn.Variable("result", ftype(int))
+    ctx = AssemblyContext()
+    ctx(ntn.Assign(result, ntn.Literal(0)))
+    tensor_type = ntn.Full(ntn.Literal(10), (ntn.Literal(end - start),)).result_type
+    value: ntn.NotationExpression = ntn.Literal(10)
+    if with_run:
+        value = ntn.Unwrap(
+            ntn.Access(
+                ntn.Looplet(Run(ntn.Full(value)), tensor_type),
+                ntn.Read(),
+                (idx,),
+            )
+        )
+    body: ntn.NotationStatement = ntn.Assign(
+        result, ntn.Call(ntn.Literal(ffuncs.add), (result, value))
+    )
+    if guarded:
+        body = ntn.If(ntn.Call(ntn.Literal(ffuncs.eq), (idx, ntn.Literal(3))), body)
+    ext = (
+        SymbolicExtent.point(ntn.Literal(start))
+        if point
+        else SymbolicExtent(ntn.Literal(start), ntn.Literal(end))
+    )
+    LoopletContext(ctx, idx)(ext, body)
+    program = asm.Block(ctx.emit())
+    interpreter = asm.AssemblyInterpreter()
+    interpreter(program)
+    assert interpreter(ctx(result)) == sum(
+        10 for i in range(start, end) if not guarded or i == 3
+    )
+    assert any(isinstance(node, asm.ForLoop) for node in PostOrderDFS(program)) != point
+
+
+def test_run_annihilator_simplifies_before_lookup():
+    idx = ntn.Variable("i", ftype(int))
+    result = ntn.Variable("result", ftype(int))
+    tensor_type = ntn.Full(ntn.Literal(0), (ntn.Literal(3),)).result_type
+
+    def lookup(ctx, idx):
+        pytest.fail("An annihilated lookup should not be lowered")
+
+    args = tuple(
+        ntn.Unwrap(ntn.Access(ntn.Looplet(tns, tensor_type), ntn.Read(), (idx,)))
+        for tns in (Run(ntn.Full(ntn.Literal(0))), Lookup(lookup))
+    )
+    body = ntn.LoopletSimplify()(
+        ntn.Assign(result, ntn.Call(ntn.Literal(ffuncs.mul), args))
+    )
+    ctx = AssemblyContext()
+    ctx(ntn.Assign(result, ntn.Literal(1)))
+    LoopletContext(ctx, idx)(SymbolicExtent(ntn.Literal(0), ntn.Literal(3)), body)
+    interpreter = asm.AssemblyInterpreter()
+    interpreter(asm.Block(ctx.emit()))
+    assert interpreter(ctx(result)) == 0
 
 
 @pytest.mark.parametrize(

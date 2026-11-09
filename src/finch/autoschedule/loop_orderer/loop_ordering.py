@@ -5,14 +5,22 @@ from functools import reduce
 from itertools import chain as join_chains
 
 from finch.algebra.tensor import TensorFType
-from finch.algebra.utils import intersect, is_subsequence, with_subsequence
+from finch.algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
 from finch.autoschedule.factorizer.optimize import with_unique_lhs
 from finch.autoschedule.stages import LogicLoopOrderer
-from finch.autoschedule.util import flatten_plans, propagate_copy_queries, push_fields
+from finch.autoschedule.util import (
+    flatten_plans,
+    fuse_loop_order,
+    propagate_copy_queries,
+    push_relabels,
+)
 from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    Fuse,
+    HardAlias,
+    Literal,
     LogicExpression,
     LogicLoader,
     LogicStatement,
@@ -20,12 +28,12 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Reorder,
     StatsFactory,
     Table,
     TensorStats,
 )
-from finch.finch_logic.nodes import MapJoin
 from finch.symbolic import Namespace, PostOrderDFS, PostWalk, Rewrite
 from finch.util.logging import LOG_LOGIC_POST_OPT
 
@@ -35,25 +43,48 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 def concordize(
     root: LogicStatement, bindings: dict[Alias, TensorFType]
 ) -> LogicStatement:
+    """
+    Read every Table of a query in the loop order of its enclosing Fuse nodes.
+    A Table stored in another order reads a transposed copy of its tensor
+    instead, which is made after each statement that writes the tensor. Copies
+    may read their argument in any order.
+    """
     needed_swizzles: dict[Alias, dict[tuple[int, ...], Alias]] = {}
     namespace = Namespace(root)
 
-    def rule_0(ex):
-        match ex:
-            case Reorder(Table(Alias(_) as var, idxs_1), idxs_2):
-                if not is_subsequence(intersect(idxs_1, idxs_2), idxs_2):
-                    idxs_subseq = with_subsequence(intersect(idxs_2, idxs_1), idxs_1)
-                    perm = tuple(idxs_1.index(idx) for idx in idxs_subseq)
-                    return Reorder(
-                        Table(
-                            needed_swizzles.setdefault(var, {}).setdefault(
-                                perm, Alias(namespace.freshen(var.name))
-                            ),
-                            idxs_subseq,
-                        ),
-                        idxs_2,
+    def swizzle(rhs: LogicExpression, loop_order: tuple[Field, ...]):
+        def rule(ex):
+            match ex:
+                case Table(Alias(_) as var, idxs_1, protocols) if not is_subsequence(
+                    intersect(idxs_1, loop_order), loop_order
+                ):
+                    idxs_subseq = with_subsequence(
+                        intersect(loop_order, idxs_1), idxs_1
                     )
-                return None
+                    perm = tuple(idxs_1.index(idx) for idx in idxs_subseq)
+                    return Table(
+                        needed_swizzles.setdefault(var, {}).setdefault(
+                            perm, HardAlias(namespace.freshen(var.name))
+                        ),
+                        idxs_subseq,
+                        tuple(protocols[p] for p in perm) if protocols else (),
+                    )
+
+        return Rewrite(PostWalk(rule))(rhs)
+
+    def concordant(stmt: LogicStatement, loop_order: tuple[Field, ...]):
+        match stmt:
+            case Plan(bodies):
+                return Plan(tuple(concordant(body, loop_order) for body in bodies))
+            case Fuse(idx, body):
+                return Fuse(idx, concordant(body, (*loop_order, idx)))
+            case Query(_, Table()):
+                return stmt
+            case Query(lhs, rhs):
+                return Query(lhs, swizzle(rhs, loop_order))
+            case QueryInto(lhs, op, rhs):
+                return QueryInto(lhs, op, swizzle(rhs, loop_order))
+        return stmt
 
     def _get_swizzle_queries(lhs: Alias) -> tuple[Query, ...]:
         ndims = len(next(iter(needed_swizzles[lhs].items()))[0])
@@ -63,69 +94,70 @@ def concordize(
             for perm, alias in needed_swizzles[lhs].items()
         )
 
-    def rule_1(ex):
-        match ex:
-            case Query(Table(Alias() as lhs, _), _) as q if lhs in needed_swizzles:
-                swizzle_queries = _get_swizzle_queries(lhs)
-                return Plan((q, *swizzle_queries))
-
     assert isinstance(root, Plan)
     root = flatten_plans(root)
     match root:
-        case Plan(bodies) if isinstance(bodies[-1], Produces):
-            prod = bodies[-1]
-            root = Plan(bodies[:-1])
-            root = Rewrite(PostWalk(rule_0))(root)
-            root = Rewrite(PostWalk(rule_1))(root)
+        case Plan((*bodies, Produces() as prod)):
+            bodies = [concordant(body, ()) for body in bodies]
             # Consider also aliases from input arguments.
-            for alias in bindings:
-                if alias in needed_swizzles:
-                    swizzle_queries = _get_swizzle_queries(alias)
-                    root = Plan((*swizzle_queries, root))
-            return flatten_plans(Plan((root, prod)))
+            stmts: list[LogicStatement] = [
+                query
+                for alias in bindings
+                if alias in needed_swizzles
+                for query in _get_swizzle_queries(alias)
+            ]
+            for body in bodies:
+                stmts.append(body)
+                swizzled: set[Alias] = set()
+                for node in PostOrderDFS(body):
+                    match node:
+                        case Query(Table(Alias() as lhs, _), _) | QueryInto(
+                            Table(Alias() as lhs, _), _, _
+                        ) if lhs in needed_swizzles and lhs not in swizzled:
+                            swizzled.add(lhs)
+                            stmts.extend(_get_swizzle_queries(lhs))
+            return Plan((*stmts, prod))
         case _:
             raise Exception(f"Invalid root: {root}")
 
 
-def drop_internal_reorders(
-    root: LogicStatement, keep_loop_orders: bool
-) -> LogicStatement:
+def drop_internal_reorders(root: LogicStatement) -> LogicStatement:
+    """
+    Remove the Reorders within the right-hand side of each aggregate query and
+    in-place update, whose fields are ordered by their left-hand tables.
+    """
+
     def reorder_remover(ex):
         match ex:
             case Reorder(arg_2, _):
                 return arg_2
 
-    def rule_1(stmt):
+    def rule(stmt):
         match stmt:
             case Query(lhs, Aggregate(op, init, arg, idxs_2)):
                 arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
                 return Query(lhs, Aggregate(op, init, arg_1, idxs_2))
-            case Query(lhs, MapJoin(op, (tbl, Aggregate(op1, init, arg, ag_idxs)))):
+            case QueryInto(lhs, op, arg):
                 arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
-                return Query(
-                    lhs, MapJoin(op, (tbl, Aggregate(op1, init, arg_1, ag_idxs)))
-                )
+                return QueryInto(lhs, op, arg_1)
 
-    def rule_2(stmt):
+    return Rewrite(PostWalk(rule))(root)
+
+
+def with_copy_loop_orders(root: Plan) -> Plan:
+    """
+    Set the loop order of each copy, which visits the fields of its left-hand
+    table in order and then the fields it reduces. A copy may read its argument
+    in another order, representing a transpose.
+    """
+
+    def loop_ordered(stmt: LogicStatement) -> LogicStatement:
         match stmt:
-            case Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)):
-                arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
-                return Query(lhs, Aggregate(op, init, Reorder(arg_1, idxs_1), idxs_2))
-            case Query(
-                lhs,
-                MapJoin(op, (tbl, Aggregate(op1, init, Reorder(arg, idxs_1), ag_idxs))),
-            ):
-                arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
-                return Query(
-                    lhs,
-                    MapJoin(
-                        op, (tbl, Aggregate(op1, init, Reorder(arg_1, idxs_1), ag_idxs))
-                    ),
-                )
+            case Query(Table(_, lhs_idxs), Table(_, idxs)):
+                return fuse_loop_order(stmt, (*lhs_idxs, *setdiff(idxs, lhs_idxs)))
+        return stmt
 
-    if keep_loop_orders:
-        return Rewrite(PostWalk(rule_2))(root)
-    return Rewrite(PostWalk(rule_1))(root)
+    return Plan(tuple(loop_ordered(body) for body in root.bodies))
 
 
 class CycleInFields(Exception): ...
@@ -181,15 +213,37 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
     return result
 
 
+def with_loop_order(
+    stmt: LogicStatement, loop_order: tuple[Field, ...]
+) -> LogicStatement:
+    """
+    Set the loop order of an aggregate query or in-place update by wrapping it
+    in a Fuse node for each field of the loop order. A query can't change the
+    layout of the table it writes, so its loop order is permuted to visit the
+    fields of that table in order, and includes the fields which only that
+    table has, such as output-only unit dimensions.
+    """
+    match stmt:
+        case Query(Table(_, lhs_idxs), Aggregate()) | QueryInto(
+            Table(_, lhs_idxs), _, _
+        ):
+            loop_order = with_subsequence(intersect(lhs_idxs, loop_order), loop_order)
+            loop_order = toposort([list(loop_order), list(lhs_idxs)])
+            return fuse_loop_order(stmt, loop_order)
+        case _:
+            raise ValueError(f"Expected an aggregate or in-place query, got {stmt}")
+
+
 def heuristic_loop_order(plan: Plan) -> Plan:
     new_queries = []
     for query in plan.bodies[:-1]:
 
         def rule_1(query):
             match query:
-                case Query(lhs, Aggregate(op, init, arg, idxs)):
-                    idxs_2 = _heuristic_loop_order(arg)
-                    return Query(lhs, Aggregate(op, init, Reorder(arg, idxs_2), idxs))
+                case QueryInto(_, _, Literal()):
+                    return query
+                case Query(_, Aggregate(_, _, arg, _)) | QueryInto(_, _, arg):
+                    return with_loop_order(query, _heuristic_loop_order(arg))
                 case Query(_, Table(Alias(), _)) as q:
                     return q
                 case _:
@@ -222,20 +276,20 @@ class AbstractLoopOrderer(LogicLoopOrderer):
         stats_factory: StatsFactory,
     ):
         def loop_order_transform(prgm, bindings):
-            prgm = drop_internal_reorders(prgm, keep_loop_orders=False)
+            prgm = drop_internal_reorders(prgm)
             assert isinstance(prgm, Plan)
             prgm = self.set_loop_orders(prgm, stats, stats_factory)
-            prgm = push_fields(prgm)
+            prgm = push_relabels(prgm)
             assert isinstance(prgm, Plan)
             prgm = concordize(prgm, bindings)
-            prgm = drop_internal_reorders(prgm, keep_loop_orders=True)
             prgm = propagate_copy_queries(prgm, bindings)
             prgm = flatten_plans(prgm)
             return prgm, bindings
 
         stmt, bindings = with_unique_lhs(loop_order_transform, prgm, bindings)
         assert isinstance(stmt, Plan)
-        stmt = flatten_plans(stmt)
+        # Copies include those which write renamed inputs back.
+        stmt = with_copy_loop_orders(flatten_plans(stmt))
         return self.ctx(stmt, bindings, stats, stats_factory)
 
 

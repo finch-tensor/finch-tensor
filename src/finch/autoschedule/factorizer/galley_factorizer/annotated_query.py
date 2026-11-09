@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from typing import Any, Generic, TypeVar, cast
 
 from finch.algebra import (
-    DynamicFill,
-    StaticFill,
     cansplitpush,
     ffuncs,
     is_associative,
@@ -14,12 +12,13 @@ from finch.algebra import (
     repeat_operator,
 )
 from finch.algebra.algebra import FinchOperator
-from finch.autoschedule.tensor_stats.logic_to_stats import insert_statistics
-from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
+from finch.autoschedule.cost_models import CostModel, FlopsCostModel
+from finch.autoschedule.tensor_stats import StatsInterpreter
 from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    HardAlias,
     Literal,
     LogicExpression,
     LogicNode,
@@ -30,9 +29,9 @@ from finch.finch_logic import (
     StatsFactory,
     Table,
     TensorStats,
+    fill_expression,
 )
-from finch.symbolic import gensym
-from finch.tensor import Scalar
+from finch.symbolic import PostOrderDFS, gensym
 
 # A location in an expression tree. Unlike a node value, a path identifies one
 # occurrence, so rewrites addressed by path cannot confuse structurally equal
@@ -57,16 +56,18 @@ class AnnotatedQuery(Generic[TS]):
     connected_idxs: OrderedDict[Field, set[Field]]
     bindings: OrderedDict[Alias, TS]
     output_order: list[Field]
+    cost_model: CostModel
 
     def __init__(
         self,
         stats_factory: StatsFactory[TS],
         q: Query,
         bindings: OrderedDict[Alias, TS] | None = None,
+        cost_model: CostModel | None = None,
     ):
         """
-        Build an `AnnotatedQuery` from a logical `Query`, extracting reduction
-        structure and precomputing tensor statistics.
+        Build an `AnnotatedQuery` from a logical `Query`, extracting its
+        reduction structure.
 
         Parameters
         ----------
@@ -77,24 +78,19 @@ class AnnotatedQuery(Generic[TS]):
             `rhs` may contain `Aggregate` nodes.
         bindings : OrderedDict[Alias, TensorStats], optional
             Existing alias→stats environment to seed the analysis.
+        cost_model : CostModel, optional
+            Cost model used to estimate the cost of each reduction. Defaults
+            to `FlopsCostModel`.
         """
         assert isinstance(q, Query), (
             "Annotated Queries can only be built from queries of the form: "
             "Query(Table(lhs, idxs), rhs)"
         )
         self.stats_factory = stats_factory
+        self.cost_model = cost_model if cost_model is not None else FlopsCostModel()
         if bindings is None:
             bindings = OrderedDict()
         self.bindings = bindings
-        cache: dict[object, TS] = {}
-        insert_statistics(
-            self.stats_factory,
-            q,
-            bindings=bindings,
-            replace=False,
-            cache=cache,
-        )
-        self.cache = cache
         output_name = q.lhs.tns
         assert isinstance(output_name, Alias)
         output_order = list(q.lhs.idxs)
@@ -110,7 +106,7 @@ class AnnotatedQuery(Generic[TS]):
 
         def strip_aggregates(
             node: LogicNode,
-        ) -> tuple[LogicNode, list[tuple[Field, Path, Literal, Literal, LogicNode]]]:
+        ) -> tuple[LogicNode, list[tuple[Field, Path, Literal, Literal]]]:
             """Remove Aggregate nodes bottom-up, recording each reduction index
             together with the path of the aggregate's argument in the stripped
             tree."""
@@ -118,7 +114,7 @@ class AnnotatedQuery(Generic[TS]):
                 case Aggregate(Literal() as op, Literal() as init, arg, idxs):
                     new_arg, records = strip_aggregates(arg)
                     for idx in idxs:
-                        records.append((idx, (), op, init, new_arg))
+                        records.append((idx, (), op, init))
                     return new_arg, records
                 case LogicTree():
                     children = node.children
@@ -128,8 +124,8 @@ class AnnotatedQuery(Generic[TS]):
                         new_child, child_records = strip_aggregates(child)
                         new_children.append(new_child)
                         records.extend(
-                            (idx, (i, *path), op, init, arg)
-                            for idx, path, op, init, arg in child_records
+                            (idx, (i, *path), op, init)
+                            for idx, path, op, init in child_records
                         )
                     if new_children != children:
                         node = type(node).from_children(*new_children)
@@ -138,41 +134,30 @@ class AnnotatedQuery(Generic[TS]):
                     return node, []
 
         point_expr, agg_records = strip_aggregates(expr)
-        for idx, agg_path, op_lit, init_lit, agg_arg in agg_records:
+        for idx, agg_path, op_lit, init_lit in agg_records:
             idx_starting_path[idx] = agg_path
             idx_top_order[idx] = top_counter
             top_counter += 1
 
-            if op_lit.val is None:
-                idx_op[idx] = ffuncs.init_write(cache[agg_arg].fill_value)
-                match cache[agg_arg].fill_value:
-                    case DynamicFill() as fill:
-                        idx_init[idx] = fill
-                    case StaticFill() as fill:
-                        idx_init[idx] = fill.value
-            else:
-                idx_op[idx] = op_lit.val
-                idx_init[idx] = init_lit.val
+            idx_op[idx] = op_lit.val
+            idx_init[idx] = init_lit.val
 
             starting_reduce_idxs.append(idx)
 
-        cache_point: dict[object, TS] = {}
-        insert_statistics(
-            self.stats_factory,
-            point_expr,
-            bindings=bindings,
-            replace=False,
-            cache=cache_point,
-        )
-        self.cache_point = cache_point
-
         reduce_idxs: list[Field] = []
         original_idx: OrderedDict[Field, Field] = OrderedDict(
-            (idx, idx) for idx in cache[q.rhs].index_order
+            (idx, idx) for idx in q.rhs.fields()
         )
         idx_lowest_path: OrderedDict[Field, Path] = OrderedDict()
-        stats_point = cache_point[point_expr]
-        self.idx_dim_size: dict[Field, Any] = dict(stats_point.dim_sizes)
+        # The size of each field, from the statistics of a table it indexes.
+        self.idx_dim_size: dict[Field, Any] = {
+            idx: bindings[node.tns].dim_sizes[field]
+            for node in PostOrderDFS(point_expr)
+            if isinstance(node, Table) and isinstance(node.tns, Alias)
+            for idx, field in zip(
+                node.idxs, bindings[node.tns].index_order, strict=True
+            )
+        }
         for idx in starting_reduce_idxs:
             agg_op = idx_op[idx]
             starting_path = idx_starting_path[idx]
@@ -259,6 +244,7 @@ class AnnotatedQuery(Generic[TS]):
         """
         new = object.__new__(AnnotatedQuery)
         new.stats_factory = self.stats_factory
+        new.cost_model = self.cost_model
         new.output_name = self.output_name
         new.point_expr = self.point_expr
         new.reduce_idxs = list(self.reduce_idxs)
@@ -273,8 +259,6 @@ class AnnotatedQuery(Generic[TS]):
         )
         new.output_order = list(self.output_order)
         new.bindings = OrderedDict(self.bindings.items())
-        new.cache = OrderedDict(self.cache.items())
-        new.cache_point = OrderedDict(self.cache_point.items())
         new.idx_dim_size = dict(self.idx_dim_size)
 
         return new
@@ -610,7 +594,6 @@ class AnnotatedQuery(Generic[TS]):
         replace_path: Path = root_path
         removal_paths: list[Path] = []
         reducible_idxs = self.get_reducible_idxs()
-        stats_cache = self.cache_point
 
         use_root = False
         match root_node:
@@ -622,15 +605,15 @@ class AnnotatedQuery(Generic[TS]):
                 # E.g. when you reduce one vertex of a triangle, you should
                 # do the other two as well.
                 args_with_reduce_idx = [
-                    arg for arg in args if original_idx in stats_cache[arg].index_order
+                    arg for arg in args if original_idx in arg.fields()
                 ]
                 kernel_idxs = set().union(
-                    *(stats_cache[arg].index_order for arg in args_with_reduce_idx)
+                    *(arg.fields() for arg in args_with_reduce_idx)
                 )
                 relevant_pos = [
                     i
                     for i, arg in enumerate(args)
-                    if set(stats_cache[arg].index_order).issubset(kernel_idxs)
+                    if set(arg.fields()).issubset(kernel_idxs)
                 ]
                 relevant_args = [args[i] for i in relevant_pos]
                 if len(relevant_pos) == len(args):
@@ -639,9 +622,6 @@ class AnnotatedQuery(Generic[TS]):
                     replace_path = (*root_path, relevant_pos[0] + 1)
                     removal_paths = [(*root_path, i + 1) for i in relevant_pos[1:]]
                 query_expr = MapJoin(Literal(op), tuple(relevant_args))
-                stats_cache[query_expr] = self.stats_factory.mapjoin(
-                    op, *[stats_cache[arg] for arg in relevant_args]
-                )
                 relevant_pos_set = set(relevant_pos)
                 for idx in reducible_idxs:
                     if self.idx_op[idx] != self.idx_op[reduce_idx]:
@@ -650,7 +630,7 @@ class AnnotatedQuery(Generic[TS]):
                     pos_with_idx = {
                         i
                         for i, arg in enumerate(args)
-                        if self.original_idx[idx] in stats_cache[arg].index_order
+                        if self.original_idx[idx] in arg.fields()
                     }
                     if idx in self.connected_idxs[
                         reduce_idx
@@ -686,7 +666,7 @@ class AnnotatedQuery(Generic[TS]):
         # An index absent from the extracted kernel is not reduced by iterating:
         # applying the operator over |Dom(idx)| identical values is the repeat
         # operator, i.e. sum_i B = B * |Dom(i)|.
-        kernel_order = stats_cache[query_expr].index_order
+        kernel_order = query_expr.fields()
         repeat_op = repeat_operator(agg_op.ftype)
         repeated = (
             []
@@ -700,12 +680,7 @@ class AnnotatedQuery(Generic[TS]):
         # Aggregate at the root, as the rest of the optimizer expects.
         for idx in repeated:
             factor = Literal(self.idx_dim_size[idx])
-            stats_cache[factor] = self.stats_factory(Scalar(factor.val), ())
-            repeated_expr = MapJoin(Literal(repeat_op), (query_expr, factor))
-            stats_cache[repeated_expr] = self.stats_factory.mapjoin(
-                repeat_op, stats_cache[query_expr], stats_cache[factor]
-            )
-            query_expr = repeated_expr
+            query_expr = MapJoin(Literal(repeat_op), (query_expr, factor))
 
         query_expr = Aggregate(
             Literal(agg_op),
@@ -713,14 +688,8 @@ class AnnotatedQuery(Generic[TS]):
             query_expr,
             tuple(aggregated),
         )
-        stats_cache[query_expr] = self.stats_factory.aggregate(
-            agg_op,
-            agg_init,
-            tuple(aggregated),
-            stats_cache[query_expr.arg],
-        )
 
-        query = Query(Table(Alias(gensym("A")), query_expr.fields()), query_expr)
+        query = Query(Table(HardAlias(gensym("A")), query_expr.fields()), query_expr)
         return query, replace_path, removal_paths, reduced_idxs
 
     def reduce_idx(self, reduce_idx: Field, do_condense: bool = False) -> Query:
@@ -758,17 +727,9 @@ class AnnotatedQuery(Generic[TS]):
 
         alias_expr = query.lhs.tns
         assert isinstance(alias_expr, Alias)
-        stats_cache = self.cache_point
-        insert_statistics(
-            self.stats_factory,
-            query,
-            self.bindings,
-            replace=False,
-            cache=stats_cache,
-        )
-        alias_idxs = list(self.bindings[alias_expr].index_order)
+        StatsInterpreter(self.stats_factory)(query, self.bindings)
 
-        alias_table = Table(alias_expr, tuple(alias_idxs))
+        alias_table = Table(alias_expr, query.lhs.idxs)
         transforms: dict[Path, Callable[[LogicNode], LogicNode | None]] = {
             replace_path: lambda _node: alias_table
         }
@@ -811,14 +772,6 @@ class AnnotatedQuery(Generic[TS]):
             new_parent_idxs, new_connected_idxs
         )
 
-        insert_statistics(
-            self.stats_factory,
-            new_point_expr,
-            self.bindings,
-            replace=True,
-            cache=stats_cache,
-        )
-
         self.reduce_idxs = new_reduce_idxs
         self.point_expr = new_point_expr
         self.idx_lowest_path = new_idx_lowest_path
@@ -837,17 +790,9 @@ class AnnotatedQuery(Generic[TS]):
         """
         expr = self.point_expr
         if not isinstance(expr, Table):
-            match self.cache_point[expr].fill_value:
-                case DynamicFill() as fill:
-                    init = Literal(fill)
-                case StaticFill() as fill:
-                    init = Literal(fill.value)
-            expr = Aggregate(
-                Literal(ffuncs.overwrite),
-                init,
-                cast(LogicExpression, expr),
-                (),
-            )
+            arg = cast(LogicExpression, expr)
+            # The result starts from the fill value of what overwrites it.
+            expr = Aggregate(Literal(ffuncs.overwrite), fill_expression(arg), arg, ())
         return Query(
             Table(self.output_name, tuple(self.output_order)),
             cast(LogicExpression, expr),
@@ -869,26 +814,6 @@ class AnnotatedQuery(Generic[TS]):
             in the current state of `aq`.
         """
         query, _, _, _ = self.get_reduce_query(reduce_idx)
-        stats_cache = self.cache_point
-        insert_statistics(
-            self.stats_factory,
-            query.rhs,
-            self.bindings,
-            replace=False,
-            cache=stats_cache,
-        )
-        match query.rhs:
-            case Aggregate() as agg:
-                mat_stats = stats_cache[agg]
-                comp_stats = stats_cache[agg.arg]
-                if isinstance(mat_stats, NumericStats) and isinstance(
-                    comp_stats, NumericStats
-                ):
-                    return (
-                        10 * mat_stats.estimate_non_fill_values()
-                        + comp_stats.estimate_non_fill_values()
-                    )
-                raise TypeError("Stats Class must be inherit from NumericStats")
-        raise ValueError(
-            "The root of the reduction query should always be an Aggregate node."
+        return self.cost_model.predict_cost(
+            query, {}, self.bindings, self.stats_factory
         )

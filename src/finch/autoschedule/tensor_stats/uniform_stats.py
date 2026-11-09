@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 from typing import Any
 
 import numpy as np
@@ -23,7 +24,7 @@ class UniformStatsFactory(
         base = super().__call__(tensor, fields)
 
         if tensor.ndim == 0:
-            nnz = float(tensor.item() != base.fill_value.value)
+            nnz = float(tensor.item() != tensor.fill_value)
         else:
             lps = get_lp_norms(tensor, fields, norms=(1.0,))
             nnz = lps[fields[0]][0]
@@ -93,9 +94,11 @@ class UniformStatsFactory(
             p_old = stats.estimate_non_fill_values() / old_vol if old_vol > 0 else 0.0
         else:
             raise TypeError("Stats Class must be inherit from NumericStats")
-        if is_annihilator(op.ftype, stats.fill_value):
+        if is_annihilator(op.ftype, stats.fill_type):
             res_p = math.pow(p_old, k)
-        elif is_identity(op.ftype, stats.fill_value):
+        elif is_identity(op.ftype, stats.fill_type) or init is None:
+            # Without an init, a fold of fills is the new fill, so an output is
+            # fill when all of its inputs are, as for an identity.
             res_p = 1 - math.pow((1 - p_old), k)
         else:
             res_p = 1.0
@@ -130,8 +133,10 @@ class UniformStats(NumericStats):
         super().__init__(base)
         self.nnz = float(nnz)
 
-    def estimate_non_fill_values(self) -> float:
-        return self.nnz
+    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
+        # Non-fill values are spread evenly over the slices.
+        slices = self.get_dim_space_size(tuple(set(over) & set(self.index_order)))
+        return self.nnz / slices
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]

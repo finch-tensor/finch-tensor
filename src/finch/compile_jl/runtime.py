@@ -10,7 +10,8 @@ from typing import Any
 import numpy as np
 
 from finch.algebra import Tensor, TensorFType
-from finch.tensor import BufferizedNDArray
+from finch.algebra.fill import DynamicFillFType
+from finch.tensor import BufferizedNDArray, FiberTensorFType
 from finch.tensor.np_wrapper import NumPyWrapper
 from finch.tensor.override_tensor import OverrideTensor
 from finch.tensor.scalar import Scalar
@@ -18,6 +19,7 @@ from finch.tensor.scalar import Scalar
 from .analyze import reset_argument_positions, returned_argument_positions
 from .interop import jl_tensor_to_python, tensor_to_jl
 from .julia import jl
+from .types import _zero_value
 
 
 @dataclass
@@ -50,7 +52,14 @@ class _StoragePool:
         )
         if self._free[key]:
             return self._free[key].popitem()[1]
-        tensor = ftype.construct(shape)
+        match ftype:
+            case FiberTensorFType(fill_type=DynamicFillFType() as fill_type):
+                # A dynamic fill is pinned in storage, so any value will do.
+                tensor = ftype.construct(
+                    shape, fill_value=fill_type(_zero_value(fill_type.element_type))
+                )
+            case _:
+                tensor = ftype.construct(shape)
         return _StorageLease(
             tensor_to_jl(tensor, pin_fill=pin_fill),
             key,
@@ -106,8 +115,7 @@ class JuliaOwnedTensor(OverrideTensor):
 
     def item(self):
         if not self._shape:
-            values = self.raw_julia_obj.lvl.val.to_numpy(copy=False)
-            return values[0].item()
+            return jl.first(self.raw_julia_obj.lvl.val)
         return self._as_tensor().item()
 
     def __getitem__(self, index):
@@ -159,6 +167,18 @@ class _KernalMetadata:
     returned_positions: tuple[int, ...]
 
 
+def _measure(args, dim):
+    """The size of a dimension, which is constant or the axis of an argument,
+    cast like the kernel does."""
+    if isinstance(dim, int):
+        return dim
+    pos, axis, casts = dim
+    size = args[pos].shape[axis]
+    for cast in casts:
+        size = cast(size)
+    return size
+
+
 class FinchJLRuntime(ABC):
     """Runtime services used by the Julia compiler and its kernels."""
 
@@ -194,6 +214,10 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
     def kernel_call(self, func_name, kernel, args):
         metadata = self._kernel_metadata[id(kernel)]
 
+        # Masks take the shapes they're declared with before they're passed.
+        for pos, dims in getattr(kernel, "declares", ()):
+            args[pos].declare(None, None, tuple(_measure(args, dim) for dim in dims))
+
         # Lease Julia storage only for resettable compiler-created outputs.
         julia_buf_args: list[JuliaOwnedTensor] = []
         for position, tensor in enumerate(args):
@@ -218,12 +242,23 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
                 julia_buf = self._to_julia_owned_tensor(tensor, pin_fill)
             julia_buf_args.append(julia_buf)
 
-        getattr(jl, func_name)(*(arg.raw_julia_obj for arg in julia_buf_args))
-
-        # Associate returned tensors with their Python ownership handles.
-        return tuple(
-            julia_buf_args[position] for position in metadata.returned_positions
+        raw_args = [arg.raw_julia_obj for arg in julia_buf_args]
+        raw_args.extend(
+            int(_measure(args, extent)) for extent in getattr(kernel, "extents", ())
         )
+        raw_results = jl.values(getattr(jl, func_name)(*raw_args))
+
+        # Finch returns new tensor headers when declarations change dimensions.
+        # Keep the ownership handles and their pooled storage in sync with them.
+        results = []
+        for position, raw in zip(metadata.returned_positions, raw_results, strict=True):
+            result = julia_buf_args[position]
+            result._raw_julia_obj = raw
+            result._shape = tuple(int(dim) for dim in reversed(jl.size(raw)))
+            if result._lease is not None:
+                result._lease.raw = raw
+            results.append(result)
+        return tuple(results)
 
     def _to_julia_owned_tensor(
         self, tensor: Tensor, pin_fill: bool = False

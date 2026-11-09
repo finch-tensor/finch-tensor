@@ -364,3 +364,43 @@ def test_assert_mlir_generation():
     )
     code = MLIRGenerator()(program).code
     assert "cf.assert" in code
+
+
+@pytest.mark.c_backend
+def test_notation_assert_c_failure():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            """
+import numpy as np
+from finch import finch_assembly as asm, finch_notation as ntn
+from finch.algebra import ffuncs, ftype
+from finch.codegen.c_codegen import CCompiler
+from finch.compile import NotationCompiler
+
+dim_type = ftype(np.intp)
+a = ntn.Variable("a_dim", dim_type)
+b = ntn.Variable("b_dim", dim_type)
+program = ntn.Module((ntn.Function(
+    ntn.Variable("checked_shape", asm.AssemblyKernelFType(
+        "checked_shape", (dim_type, dim_type), dim_type
+    )),
+    (a, b),
+    ntn.Block((
+        ntn.Assert(ntn.Call(ntn.Literal(ffuncs.eq), (a, b))),
+        ntn.Return(a),
+    )),
+),))
+kernel = NotationCompiler(CCompiler())(program).checked_shape
+assert kernel(np.intp(3), np.intp(3)) == 3
+kernel(np.intp(3), np.intp(4))
+""",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 1
+    assert "Finch assertion failed:" in result.stderr
+    assert "a_dim" in result.stderr and "b_dim" in result.stderr

@@ -23,6 +23,7 @@ class _LowerPackedStructSlotsContext:
         field_replacements=None,
         path_replacements=None,
         lowerings=None,
+        field_loads=None,
     ):
         self.slot_vars = {} if slot_vars is None else slot_vars
         self.field_replacements = (
@@ -30,6 +31,7 @@ class _LowerPackedStructSlotsContext:
         )
         self.path_replacements = {} if path_replacements is None else path_replacements
         self.lowerings = {} if lowerings is None else lowerings
+        self.field_loads = {} if field_loads is None else field_loads
 
     def scope(self):
         return _LowerPackedStructSlotsContext(
@@ -37,11 +39,16 @@ class _LowerPackedStructSlotsContext:
             dict(self.field_replacements),
             dict(self.path_replacements),
             dict(self.lowerings),
+            dict(self.field_loads),
         )
 
     @staticmethod
     def _field_name(root: asm.Slot, path: tuple[str, ...]):
         return f"{root.name}_{'_'.join(path)}_slot"
+
+    @staticmethod
+    def _field_var_name(root: asm.Slot, path: tuple[str, ...]):
+        return f"{root.name}_{'_'.join(path)}"
 
     def _register_struct_slot(
         self,
@@ -52,7 +59,7 @@ class _LowerPackedStructSlotsContext:
         unpacks = []
         repacks = []
 
-        def visit(slot_expr, var_expr, type_, path):
+        def visit(slot_expr, var_expr, type_, path, mutable):
             match type_:
                 case BufferFType():
                     buf_slot = asm.Slot(self._field_name(slot, path), type_)
@@ -69,9 +76,23 @@ class _LowerPackedStructSlotsContext:
                             asm.GetAttr(var_expr, attr_lit),
                             attr_t,
                             (*path, attr),
+                            mutable or type_.is_mutable,
                         )
+                case _ if mutable:
+                    # A field of a mutable struct is read through a pointer,
+                    # which backends can't hoist out of loops that store to
+                    # buffers. Read it once into a variable instead, and reload
+                    # the variable whenever the field is set.
+                    field_var = asm.Variable(self._field_var_name(slot, path), type_)
+                    self.field_replacements[slot_expr] = field_var
+                    self.field_replacements[var_expr] = field_var
+                    self.path_replacements[(slot.name, path)] = field_var
+                    self.field_loads[(slot.name, path)] = asm.Assign(
+                        field_var, var_expr
+                    )
+                    unpacks.append(asm.Assign(field_var, var_expr))
 
-        visit(slot, root_var, slot.type, ())
+        visit(slot, root_var, slot.type, (), False)
         lowering = _PackedSlotLowering(root_var, tuple(unpacks), tuple(repacks))
         self.lowerings[slot.name] = lowering
         return lowering
@@ -82,6 +103,9 @@ class _LowerPackedStructSlotsContext:
         for key in tuple(self.path_replacements):
             if key[0] == slot.name:
                 del self.path_replacements[key]
+        for key in tuple(self.field_loads):
+            if key[0] == slot.name:
+                del self.field_loads[key]
 
         def is_field_of_slot(expr):
             match expr:
@@ -159,7 +183,16 @@ class _LowerPackedStructSlotsContext:
             case asm.Assign(var, val):
                 return asm.Assign(var, self.expr(val))
             case asm.SetAttr(obj, attr, val):
-                return asm.SetAttr(self.expr(obj), attr, self.expr(val))
+                stmt_2 = asm.SetAttr(self.expr(obj), attr, self.expr(val))
+                if (key := self._path_key(asm.GetAttr(obj, attr))) is None:
+                    return stmt_2
+                root, path = key
+                reloads = [
+                    load
+                    for (load_root, load_path), load in self.field_loads.items()
+                    if load_root == root and load_path[: len(path)] == path
+                ]
+                return asm.Block((stmt_2, *reloads))
             case asm.Store(buffer, index, value):
                 return asm.Store(
                     self.expr(buffer),

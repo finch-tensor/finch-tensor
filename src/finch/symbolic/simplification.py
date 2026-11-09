@@ -185,21 +185,33 @@ def annihilate(node: Term) -> Term | None:
     return None
 
 
+def _keeps_type(old: Term, new: Term) -> bool:
+    """Whether `new` is known to have the type of `old`."""
+    old_t = getattr(old, "result_type", None)
+    new_t = getattr(new, "result_type", None)
+    return old_t is not None and new_t is not None and old_t == new_t
+
+
 def drop_identities(node: Term) -> Term | None:
     """
-    `f(a..., e, b...)` => `f(a..., b...)` when `e` is an identity for `f`.
+    `f(a..., e, b...)` => `f(a..., b...)` when `e` is an identity for `f`, and
+    dropping it doesn't change the type of the result.
     """
     match node:
         case CallTerm(
             op=ExpressionTerm(result_type=FinchOperatorFType() as op_type), args=args
         ) if is_associative(op_type):
             if len(args) == 2 and arity(op_type) == 2:
-                if isinstance(args[0], LiteralTerm) and is_identity(
-                    op_type, args[0].val
+                if (
+                    isinstance(args[0], LiteralTerm)
+                    and is_identity(op_type, args[0].val)
+                    and _keeps_type(node, args[1])
                 ):
                     return args[1]
-                if isinstance(args[1], LiteralTerm) and is_identity(
-                    op_type, args[1].val
+                if (
+                    isinstance(args[1], LiteralTerm)
+                    and is_identity(op_type, args[1].val)
+                    and _keeps_type(node, args[0])
                 ):
                     return args[0]
             if math.isinf(arity(op_type)):
@@ -212,7 +224,8 @@ def drop_identities(node: Term) -> Term | None:
                 ]
                 if len(kept) == len(args):
                     return None
-                return _call_like(node, kept or args[-1:])
+                new_node = _call_like(node, kept or args[-1:])
+                return new_node if _keeps_type(node, new_node) else None
     return None
 
 

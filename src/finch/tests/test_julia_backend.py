@@ -17,8 +17,9 @@ from finch import (
     ffuncs,
     ftype,
 )
-from finch.algebra import DynamicFill, DynamicFillError
+from finch.algebra import DynamicFill, DynamicFillError, DynamicFillFType
 from finch.autoschedule import (
+    CompilerFormLowerer,
     DefaultLogicFactorizer,
     DefaultLoopOrderer,
     FDFormatter,
@@ -28,6 +29,8 @@ from finch.autoschedule import (
     with_default_scheduler,
 )
 from finch.autoschedule.tensor_stats import FDStatsFactory
+from finch.autoschedule.util import fuse_loop_order
+from finch.compile.lower import make_extent
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.compile_jl.interop import jl_tensor_to_python, tensor_to_jl
 from finch.compile_jl.julia import jl, julia_available
@@ -66,6 +69,14 @@ def _requires_julia_backend():
         pytest.skip("the julia extra (juliapkg, juliacall) is not installed")
 
 
+@pytest.mark.parametrize("fill_wrapper", [DynamicFill, DynamicFillFType])
+def test_julia_nested_tuple_fill_placeholder(fill_wrapper):
+    from finch.compile_jl.types import _julia_literal
+
+    value = (np.float64(3), (np.intp(2), np.bool_(True)))
+    assert _julia_literal(fill_wrapper(value)) == "(0.0, (0, false))"
+
+
 def test_compile_julia_preserves_definition_type():
     _requires_julia_backend()
 
@@ -92,6 +103,82 @@ def test_compile_julia_preserves_definition_type():
     assert ftype(first) != ftype(second)
     for kernel in (first, second):
         np.testing.assert_array_equal(kernel(tensor)[0].to_numpy(), tensor.to_numpy())
+
+
+def test_compile_julia_resolves_shape_bindings():
+    _requires_julia_backend()
+    tensor_type = ft.asarray(np.zeros(0, dtype=np.int64)).ftype
+    source, output = (ntn.Variable(name, tensor_type) for name in ("source", "output"))
+    src, dst = (ntn.Slot(name, tensor_type) for name in ("src", "dst"))
+    dim, stop, idx = (
+        ntn.Variable(name, ftype(np.int64)) for name in ("dim", "stop", "idx")
+    )
+    op = ntn.Literal(ffuncs.overwrite)
+    result = ntn.Call(ntn.Literal(ffuncs.make_tuple), (output,))
+    body = ntn.Block(
+        (
+            ntn.Unpack(src, source),
+            ntn.Unpack(dst, output),
+            ntn.Assign(dim, ntn.Dimension(src, ntn.Literal(0))),
+            # This dimension is used through a binding in a nested block.
+            # Its scope must include the loop in the following block.
+            ntn.Block(
+                (
+                    ntn.Block(
+                        (
+                            ntn.Assign(
+                                stop,
+                                ntn.Call(ntn.Literal(ffuncs.astype(ft.int64)), (dim,)),
+                            ),
+                        )
+                    ),
+                )
+            ),
+            ntn.Block(
+                (
+                    ntn.Declare(dst, ntn.Literal(np.int64(0)), op, (stop,)),
+                    ntn.Loop(
+                        idx,
+                        ntn.Call(ntn.Literal(make_extent), (ntn.Literal(0), stop)),
+                        ntn.Increment(
+                            ntn.Access(dst, ntn.Update(op), (idx,)),
+                            ntn.Call(
+                                ntn.Literal(ffuncs.add),
+                                (
+                                    ntn.Unwrap(ntn.Access(src, ntn.Read(), (idx,))),
+                                    ntn.Literal(np.int64(3)),
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            ),
+            ntn.Repack(src, source),
+            ntn.Repack(dst, output),
+            ntn.Return(result),
+        )
+    )
+    function = ntn.Function(
+        ntn.Variable(
+            "bound_copy",
+            AssemblyKernelFType(
+                "bound_copy", (tensor_type, tensor_type), result.result_type
+            ),
+        ),
+        (source, output),
+        body,
+    )
+    kernel = FinchJLCompiler()(ntn.Module((function,))).bound_copy
+    assert kernel.extents == ((0, 0, (ffuncs.astype(ft.int64),)),)
+    # Shape bindings must not introduce scopes around declared/returned tensors.
+    for line in kernel.jl_code.splitlines():
+        if ".=" in line or line.lstrip().startswith("return "):
+            assert line.startswith("        ") and not line.startswith("         ")
+    assert "Int64(" not in kernel.jl_code
+    for size in (5, 0, 2):
+        data = np.arange(size, dtype=np.int64)
+        (actual,) = kernel(ft.asarray(data), ft.asarray(np.zeros_like(data)))
+        np.testing.assert_array_equal(actual.to_numpy(), data + 3)
 
 
 @pytest.mark.parametrize(
@@ -174,17 +261,18 @@ def test_compile_julia_init_write_rejects_dynamic_fill():
         PairCarryTensor((5, 3)),
         ReverseTensor((3, 5)),
         *(RollTensor((7, 3), k=k) for k in (-4, 0, 5)),
-        *(RepeatTensor((7, 3), k=k) for k in (-1, 0, 2)),
-        ChunkMaskTensor((10, 4), b=3),
-        ChunkMaskTensor((6, 3), b=2, dtype=np.int32),
+        *(RepeatTensor((3, 7), k=k) for k in (-1, 0, 2)),
+        ChunkMaskTensor((4, 10), b=3),
+        ChunkMaskTensor((3, 6), b=2, dtype=np.int32),
         ChunkMaskTensor((3, 3), b=1),
-        ChunkMaskTensor((2, 1), b=5),
+        ChunkMaskTensor((1, 2), b=5),
         ChunkMaskTensor((0, 0), b=3),
-        SplitMaskTensor((10, 3)),
-        SplitMaskTensor((6, 3), dtype=np.float64),
-        SplitMaskTensor((3, 5)),
-        SplitMaskTensor((3, 1)),
-        SplitMaskTensor((0, 3)),
+        SplitMaskTensor((3, 10)),
+        SplitMaskTensor((3, 10), dtype=np.intp),
+        SplitMaskTensor((3, 6), dtype=np.float64),
+        SplitMaskTensor((5, 3)),
+        SplitMaskTensor((1, 3)),
+        SplitMaskTensor((3, 0)),
         RandomMaskTensor((), 0.4, seed=42),
         RandomMaskTensor((), 0.5, seed=1 << 63),
         RandomMaskTensor((0,), 0.5, seed=42),
@@ -229,7 +317,55 @@ def test_compile_julia_pattern_masks(mask):
     with with_default_scheduler(COMPILE_JULIA):
         result = ft.compute(ft.defer(mask) + ft.defer(data))
 
+    assert result.shape == expected.shape
     np.testing.assert_array_equal(result.to_numpy(), expected)
+
+
+_MATRIX = np.arange(1.0, 13.0).reshape(3, 4)
+_VECTOR = np.array([3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0])
+
+
+@pytest.mark.parametrize(
+    "op, np_op, arg",
+    [
+        (lambda a: ft.flip(a, axis=1), lambda a: np.flip(a, axis=1), _MATRIX),
+        (lambda a: ft.roll(a, 2, axis=1), lambda a: np.roll(a, 2, axis=1), _MATRIX),
+        (lambda a: ft.roll(a, -1, axis=0), lambda a: np.roll(a, -1, axis=0), _MATRIX),
+        (
+            lambda a: ft.repeat(a, 3, axis=1),
+            lambda a: np.repeat(a, 3, axis=1),
+            _MATRIX,
+        ),
+        (
+            lambda a: ft.cumulative_sum(a, axis=1),
+            lambda a: np.cumsum(a, axis=1),
+            _MATRIX,
+        ),
+        (
+            lambda a: ft.cumulative_sum(a, include_initial=True),
+            lambda a: np.concatenate([[0.0], np.cumsum(a)]),
+            _VECTOR,
+        ),
+        (ft.sort, np.sort, _VECTOR),
+        (
+            lambda a: ft.argsort(a, stable=True),
+            lambda a: np.argsort(a, kind="stable"),
+            _VECTOR,
+        ),
+        (lambda a: ft.triu(a, k=1), lambda a: np.triu(a, k=1), _MATRIX),
+        (lambda a: ft.tril(a, k=-1), lambda a: np.tril(a, k=-1), _MATRIX),
+    ],
+)
+def test_compile_julia_pattern_interface(op, np_op, arg):
+    # These functions select, reduce, and fill through pattern masks, fill
+    # tensors, and choose, which all lower specially on the Julia backend.
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(op(ft.defer(arg)))
+
+    np.testing.assert_array_equal(result.to_numpy(), np_op(arg))
 
 
 def test_compile_julia_numeric_pattern_mask():
@@ -272,8 +408,9 @@ def test_random_mask_matches_julia(shape):
     for seed in (0, 1, 42, (1 << 63) - 1, 1 << 63, (1 << 64) - 1):
         for p in (0.0, np.nextafter(0.0, 1.0), 0.4, 0.5, np.nextafter(1.0, 0.0), 1.0):
             mask = RandomMaskTensor(shape, p, seed=seed)
-            native = jl.Finch.randommask(shape, p, seed=jl.UInt64(seed))
-            expected = materialize(native).to_numpy()
+            # Julia masks have the reversed axes of Python masks.
+            native = jl.Finch.randommask(shape[::-1], p, seed=jl.UInt64(seed))
+            expected = np.transpose(materialize(native).to_numpy())
             actual = np.array([mask[idx].item() for idx in np.ndindex(shape)])
             np.testing.assert_array_equal(actual.reshape(shape), expected)
 
@@ -286,13 +423,13 @@ def test_random_mask_large_coordinates_match_julia():
     large_index = (shape[0] + 1) // 2
     for seed in (42, (1 << 64) - 1):
         mask = RandomMaskTensor(shape, 0.5, seed=seed)
-        native = jl.Finch.randommask(shape, 0.5, seed=jl.UInt64(seed))
+        native = jl.Finch.randommask(shape[::-1], 0.5, seed=jl.UInt64(seed))
         for idx in (
             (2, 3, 1),
             tuple(dim - 1 for dim in shape),
             (large_index, large_index, 7),
         ):
-            assert mask[idx].item() == jl.getindex(native, *(i + 1 for i in idx))
+            assert mask[idx].item() == jl.getindex(native, *(i + 1 for i in idx[::-1]))
 
 
 def test_compile_julia_pattern_lowering(file_regression):
@@ -315,7 +452,9 @@ def test_compile_julia_pattern_lowering(file_regression):
             return super().__call__(prgm)
 
     compiler = RecordingJLCompiler()
-    scheduler = _compile_julia_fd(FDFormatter(LogicCompiler(compiler)))
+    scheduler = _compile_julia_fd(
+        FDFormatter(CompilerFormLowerer(LogicCompiler(compiler)))
+    )
     for mask in (
         EyeTensor((3, 5), k=1),
         UpperTriangleTensor((3, 5), k=-1),
@@ -323,8 +462,8 @@ def test_compile_julia_pattern_lowering(file_regression):
         RollTensor((7, 3), k=-4),
         OneHotMaskTensor(5, index=2),
         ReshapeMaskTensor((2, 3), (3, 2)),
-        ChunkMaskTensor((10, 4), b=3),
-        SplitMaskTensor((10, 3)),
+        ChunkMaskTensor((4, 10), b=3),
+        SplitMaskTensor((3, 10)),
         RandomMaskTensor((), 0.4, seed=42),
         RandomMaskTensor(7, 0.25, seed=42),
         RandomMaskTensor((3, 5), 0.5, seed=(1 << 64) - 1, dtype=np.intp),
@@ -340,6 +479,7 @@ def test_compile_julia_pattern_lowering(file_regression):
 def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
     _requires_julia_backend()
     from finch.autoschedule import default_schedulers
+    from finch.autoschedule.factor_cache import FactorCacheEvaluator
     from finch.autoschedule.tensor_stats import SamplingStatsFactory
     from finch.compile_jl.compiler import (
         FinchJLCompiler,
@@ -369,19 +509,29 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
     scheduler = LogicNormalizer(
         LogicExecutor(
             DefaultLogicFactorizer(
-                LogicSimplify(DefaultLoopOrderer(FDFormatter(LogicCompiler(compiler))))
+                LogicSimplify(
+                    DefaultLoopOrderer(
+                        FDFormatter(CompilerFormLowerer(LogicCompiler(compiler)))
+                    )
+                )
             ),
             stats_factory=FDStatsFactory(),
         )
     )
-    monkeypatch.setattr(default_schedulers, "NON_RECURSIVE_SCHEDULER", scheduler)
+    monkeypatch.setattr(
+        default_schedulers,
+        "CACHING_SCHEDULER",
+        LogicNormalizer(FactorCacheEvaluator(scheduler)),
+    )
     i, j = Field("i"), Field("j")
     data = np.arange(35, dtype=DTYPE).reshape(5, 7) % 3
-    factory = SamplingStatsFactory(sample_prob=0.5)
+    factory = SamplingStatsFactory()
     factory._rng = np.random.default_rng(42)
-    stats = factory(_csr_tensor(data), (i, j))
+    stats = factory(_csr_tensor(data), (i, j), [0.5, 0.5])
     rows, cols = (
-        np.array([factory._get_mask(field, size)[idx].item() for idx in range(size)])
+        np.array(
+            [factory._get_mask(field, size, 0.5)[idx].item() for idx in range(size)]
+        )
         for field, size in zip((i, j), data.shape, strict=True)
     )
     expected = np.count_nonzero((data != 0) * rows[:, None] * cols[None, :])
@@ -421,7 +571,9 @@ def test_compile_julia_blocked_uniform_grid_lowering(monkeypatch, file_regressio
     compiler = RecordingJLCompiler()
     scheduler = LogicNormalizer(
         LogicExecutor(
-            LogicSimplify(DefaultLogicFormatter(LogicCompiler(compiler))),
+            LogicSimplify(
+                DefaultLogicFormatter(CompilerFormLowerer(LogicCompiler(compiler)))
+            ),
             stats_factory=FDStatsFactory(),
         )
     )
@@ -446,36 +598,6 @@ def test_compile_julia_blocked_uniform_grid_lowering(monkeypatch, file_regressio
     np.testing.assert_array_equal(stats.block_sizes[i], [2, 3])
     np.testing.assert_array_equal(stats.block_sizes[j], [2, 2, 3])
     file_regression.check("\n\n".join(compiler.sources), extension=".jl")
-
-
-def test_julia_element_ftype_can_customize_vector_lowering():
-    _requires_julia_backend()
-    from finch.compile_jl import JuliaElementFType
-    from finch.compile_jl import types as jl_dtypes
-    from finch.compile_jl.julia import jl
-
-    class PairFType(ft.FType, JuliaElementFType):
-        def __eq__(self, other):
-            return isinstance(other, PairFType)
-
-        def __hash__(self):
-            return hash(PairFType)
-
-        def __call__(self, val):
-            left, right = val
-            return int(left), int(right)
-
-        def julia_type(self):
-            return jl.Tuple[(jl.Int64, jl.Int64)]
-
-        def julia_value(self, value, *, offset: int = 0):
-            left, right = value
-            return int(left) + offset, int(right) + offset
-
-    vec = jl_dtypes.to_jl_vector(PairFType(), [(0, 3), (4, 5)], offset=1)
-
-    assert str(jl.typeof(vec)) == "Vector{Tuple{Int64, Int64}}"
-    assert [tuple(entry) for entry in vec] == [(1, 4), (5, 6)]
 
 
 def _element_level(data) -> ElementLevel:
@@ -550,8 +672,8 @@ class RecordingFDFormatter(FDFormatter):
         super().__init__(loader)
         self.output_ftypes = []
 
-    def get_tensor_ftype(self, fill_value, shape_type, stats):
-        tensor_ftype = super().get_tensor_ftype(fill_value, shape_type, stats)
+    def get_tensor_ftype(self, fill_value, shape_type, stats, over=()):
+        tensor_ftype = super().get_tensor_ftype(fill_value, shape_type, stats, over)
         self.output_ftypes.append(tensor_ftype)
         return tensor_ftype
 
@@ -640,7 +762,9 @@ def test_compile_julia_sparse_diagonal_lowering(sparse_diagonal_data, file_regre
             return super().__call__(prgm)
 
     compiler = RecordingJLCompiler()
-    scheduler = _compile_julia_fd(FDFormatter(LogicCompiler(compiler)))
+    scheduler = _compile_julia_fd(
+        FDFormatter(CompilerFormLowerer(LogicCompiler(compiler)))
+    )
     data = sparse_diagonal_data
     mask = EyeTensor(data.shape, dtype=DTYPE)
     with with_default_scheduler(scheduler):
@@ -664,6 +788,85 @@ def test_compile_julia_sums_sparse_list_level():
     result = _compute_sparse_axis_sum(level)
 
     np.testing.assert_array_equal(result.to_numpy(), EXPECTED_ROW_SUMS)
+
+
+@pytest.mark.parametrize("protocol", ["walk", "gallop", "follow"])
+def test_compile_julia_protocols(protocol):
+    _requires_julia_backend()
+    from finch import dense, fiber_tensor
+    from finch import finch_logic as lgc
+    from finch.compile_jl.compiler import FinchJLGenerator, handle_fills
+
+    class RecordingJLCompiler(FinchJLCompiler):
+        def __init__(self):
+            super().__init__()
+            self.sources = []
+
+        def __call__(self, prgm):
+            for func in prgm.children:
+                func, _ = handle_fills(func)
+                self.sources.append(FinchJLGenerator()(func))
+            return super().__call__(prgm)
+
+    protocols = {"walk": lgc.Walk(), "gallop": lgc.Gallop(), "follow": lgc.Follow()}
+    data_a = np.array([[1, 0, 2], [0, 3, 0], [4, 0, 5]], dtype=DTYPE)
+    data_b = np.array([1, 0, 7], dtype=DTYPE)
+    i, j = lgc.Field("i"), lgc.Field("j")
+    A, B, Y = lgc.HardAlias("A"), lgc.HardAlias("B"), lgc.HardAlias("Y")
+    # The columns of the sparse rows of A are read with the protocol, and B is
+    # looked up at each of them.
+    product = lgc.MapJoin(
+        lgc.Literal(ffuncs.mul),
+        (
+            lgc.Table(A, (i, j), (lgc.DefaultProtocol(), protocols[protocol])),
+            lgc.Table(B, (j,), (lgc.Follow(),)),
+        ),
+    )
+    rhs = lgc.Aggregate(lgc.Literal(ffuncs.add), lgc.Literal(DTYPE(0)), product, (j,))
+    query = fuse_loop_order(lgc.Query(lgc.Table(Y, (i,)), rhs), (i, j))
+    prgm = lgc.Plan((query, lgc.Produces((Y,))))
+    out_t = fiber_tensor(
+        dense(element(DTYPE(0), ftype(DTYPE), ftype(np.intp)), ftype(np.intp))
+    )
+    bindings = {
+        A: _csr_tensor(data_a),
+        B: ft.asarray(data_b),
+        Y: out_t.construct((3,)),
+    }
+    compiler = RecordingJLCompiler()
+    lib, *_ = CompilerFormLowerer(LogicCompiler(compiler))(
+        prgm, {k: v.ftype for k, v in bindings.items()}, {}, None
+    )
+    (result,) = lib.main(*bindings.values())
+
+    (source,) = compiler.sources
+    assert f"{protocol}(" in source
+    assert "follow(" in source
+    np.testing.assert_array_equal(
+        jl.Array(result.raw_julia_obj).to_numpy(), data_a @ data_b
+    )
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.int32, np.float64, np.int64])
+@pytest.mark.parametrize("scheduler", ["COMPILE_JULIA", "COMPILE_JULIA_GALLEY"])
+def test_compile_julia_sparse_fill_value_dtypes(dtype, scheduler):
+    """Kernel prototypes must carry the fill type of non-default-width dtypes."""
+    _requires_julia_backend()
+    from finch import autoschedule
+
+    elem_ftype = element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)
+    level = SparseListLevel(
+        ElementLevel(elem_ftype, NumpyBuffer(STORED_VALUES.astype(dtype))),
+        COLS,
+        ROW_PTR,
+        COL_IDX,
+    )
+    arg = ft.defer(FiberTensor(DenseLevel(level, ROWS)))
+
+    with with_default_scheduler(getattr(autoschedule, scheduler)):
+        result = ft.compute(ft.sum(arg + arg, axis=1))
+
+    np.testing.assert_array_equal(result.to_numpy(), 2 * EXPECTED_ROW_SUMS)
 
 
 def test_compile_julia_sums_sparse_coo_level():
@@ -722,7 +925,9 @@ def test_compile_julia_with_fd_formatter_uses_dense_output_levels():
     _requires_julia_backend()
     from finch.compile_jl.compiler import FinchJLCompiler
 
-    formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
+    formatter = RecordingFDFormatter(
+        CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
+    )
     scheduler = _compile_julia_fd(formatter)
     data = np.array([[1, 0, 2], [0, 3, 4]], dtype=DTYPE)
     arg = ft.asarray(data)
@@ -770,7 +975,7 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
         case _:
             raise ValueError(f"Unknown sparse end-to-end op: {op_name}")
 
-    formatter = FDFormatter(LogicCompiler(FinchJLCompiler()))
+    formatter = FDFormatter(CompilerFormLowerer(LogicCompiler(FinchJLCompiler())))
     scheduler = _compile_julia_fd(formatter)
     left_data = sparse_a
     right_data = sparse_b if op_name == "matmul" else sparse_a
@@ -897,3 +1102,163 @@ def test_compile_julia_full_reduction_returns_a_scalar(scheduler):
 
     assert result.shape == ()
     np.testing.assert_allclose(np.array(result), data.sum())
+
+
+def _float_csr(data: np.ndarray, fill: float) -> FiberTensor:
+    ptr, idx, vals = [0], [], []
+    for row in data:
+        stored = np.flatnonzero(row != fill)
+        idx.extend(stored)
+        vals.extend(row[stored])
+        ptr.append(len(vals))
+    elem_t = element(fill, ftype(np.float64), ftype(np.intp), NumpyBufferFType)
+    return FiberTensor(
+        DenseLevel(
+            SparseListLevel(
+                ElementLevel(elem_t, NumpyBuffer(np.array(vals, dtype=np.float64))),
+                np.intp(data.shape[1]),
+                NumpyBuffer(np.array(ptr, dtype=np.intp)),
+                NumpyBuffer(np.array(idx, dtype=np.intp)),
+            ),
+            np.intp(data.shape[0]),
+        )
+    )
+
+
+def _julia_binary(op, a, b, out_fill, compiler):
+    from finch import dense, fiber_tensor, sparse_list
+    from finch import finch_logic as lgc
+
+    i, j = lgc.Field("i"), lgc.Field("j")
+    A, B, Y = lgc.HardAlias("A"), lgc.HardAlias("B"), lgc.HardAlias("Y")
+    body = lgc.MapJoin(lgc.Literal(op), (lgc.Table(A, (i, j)), lgc.Table(B, (i, j))))
+    rhs = lgc.Aggregate(lgc.Literal(ffuncs.overwrite), lgc.Literal(out_fill), body, ())
+    query = fuse_loop_order(lgc.Query(lgc.Table(Y, (i, j)), rhs), (i, j))
+    prgm = lgc.Plan((query, lgc.Produces((Y,))))
+    out_t = fiber_tensor(
+        dense(
+            sparse_list(
+                element(out_fill, ftype(np.float64), ftype(np.intp)), ftype(np.intp)
+            ),
+            ftype(np.intp),
+        )
+    )
+    bindings = {A: a, B: b, Y: out_t.construct(a.shape)}
+    lib, *_ = CompilerFormLowerer(LogicCompiler(compiler))(
+        prgm, {k: v.ftype for k, v in bindings.items()}, {}, None
+    )
+    (res,) = lib.main(*bindings.values())
+    return np.transpose(jl.Array(res.raw_julia_obj).to_numpy())
+
+
+def test_julia_floor_divide_floors_like_numpy():
+    _requires_julia_backend()
+    a = np.array([[-7.0, 7.0], [1.0, -1.0]])
+    b = np.array([[2.0, 2.0], [0.1, 0.1]])
+    got = _julia_binary(
+        ffuncs.floordiv,
+        _float_csr(a, 0.0),
+        _float_csr(b, 0.0),
+        np.float64(np.nan),
+        FinchJLCompiler(),
+    )
+    np.testing.assert_array_equal(got, np.floor_divide(a, b))
+
+
+def test_julia_coo_round_trip_keeps_python_dim_order():
+    _requires_julia_backend()
+    dense = np.zeros((2, 3, 4), dtype=DTYPE)
+    coords = np.array([[0, 0, 1], [0, 2, 3], [1, 1, 0], [1, 2, 2]], dtype=np.intp)
+    dense[tuple(coords.T)] = [1, 2, 3, 4]
+    level = SparseCOOLevel(
+        _element_level([1, 2, 3, 4]),
+        (np.intp(2), np.intp(3), np.intp(4)),
+        NumpyBuffer(np.array([0, 4], dtype=np.intp)),
+        tuple(NumpyBuffer(np.ascontiguousarray(c)) for c in coords.T),
+    )
+    tensor = FiberTensor(level)
+
+    jl_obj = tensor_to_jl(tensor)
+    np.testing.assert_array_equal(np.transpose(jl.Array(jl_obj).to_numpy()), dense)
+
+    back = jl_tensor_to_python(jl_obj).lvl
+    assert tuple(int(s) for s in back.coo_shape) == (2, 3, 4)
+    for got, want in zip(back.tbl, coords.T, strict=True):
+        np.testing.assert_array_equal(got.to_numpy(), want)
+
+
+def test_julia_kernel_writes_coo_output_in_python_dim_order():
+    _requires_julia_backend()
+    from finch import fiber_tensor, sparse_coo
+    from finch import finch_logic as lgc
+
+    data = np.array([[0.0, 1.5, 0.0], [2.5, 0.0, 3.5]])
+    i, j = lgc.Field("i"), lgc.Field("j")
+    A, Y = lgc.HardAlias("A"), lgc.HardAlias("Y")
+    rhs = lgc.Aggregate(
+        lgc.Literal(ffuncs.overwrite), lgc.Literal(0.0), lgc.Table(A, (i, j)), ()
+    )
+    query = fuse_loop_order(lgc.Query(lgc.Table(Y, (i, j)), rhs), (i, j))
+    prgm = lgc.Plan((query, lgc.Produces((Y,))))
+    out_t = fiber_tensor(
+        sparse_coo(element(0.0, ftype(np.float64), ftype(np.intp)), 2, ftype(np.intp))
+    )
+    bindings = {A: _float_csr(data, 0.0), Y: out_t.construct(data.shape)}
+    lib, *_ = CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))(
+        prgm, {k: v.ftype for k, v in bindings.items()}, {}, None
+    )
+    (res,) = lib.main(*bindings.values())
+
+    np.testing.assert_array_equal(
+        np.transpose(jl.Array(res.raw_julia_obj).to_numpy()), data
+    )
+    lvl = jl_tensor_to_python(res.raw_julia_obj).lvl
+    assert tuple(int(s) for s in lvl.coo_shape) == data.shape
+    rows, cols = (c.to_numpy()[: int(lvl.ptr.to_numpy()[-1])] for c in lvl.tbl)
+    np.testing.assert_array_equal(rows, [0, 1, 1])
+    np.testing.assert_array_equal(cols, [1, 0, 2])
+
+
+def test_infer_shape_accepts_broadcast_reorder():
+    from finch import finch_logic as lgc
+
+    a, out = lgc.HardAlias("a"), lgc.HardAlias("out")
+    i, j = lgc.Field("i"), lgc.Field("j")
+    prgm = lgc.Plan(
+        (
+            lgc.Query(lgc.Table(out, (i, j)), lgc.Reorder(lgc.Table(a, (i,)), (i, j))),
+            lgc.Produces((out,)),
+        )
+    )
+    shapes = prgm.infer_shape({a: (3,)})
+    assert shapes[out] == (3, None)
+
+
+def test_minus_one_buffer_to_numpy_shifts_every_tuple_field():
+    from finch.compile_jl.buffer import MinusOneBuffer
+
+    raw = np.zeros(3, dtype=[("element_1", np.intp), ("element_2", np.intp)])
+    raw["element_1"] = [1, 2, 3]
+    raw["element_2"] = [4, 5, 6]
+    arr = MinusOneBuffer(NumpyBuffer(raw)).to_numpy()
+
+    np.testing.assert_array_equal(arr["element_1"], [0, 1, 2])
+    np.testing.assert_array_equal(arr["element_2"], [3, 4, 5])
+    np.testing.assert_array_equal(raw["element_1"], [1, 2, 3])
+
+
+def test_register_julia_op_maps_and_defines_once():
+    _requires_julia_backend()
+    from finch.compile_jl import compiler
+
+    class _Op:
+        ftype = object()
+
+    op = _Op()
+    source = "finch_test_twice(x) = 2x"
+    compiler.register_julia_op(op, "finch_test_twice", source)
+    compiler.register_julia_op(op, "finch_test_twice", source)
+
+    assert compiler._JULIA_OPS[op.ftype] == "finch_test_twice"
+    assert int(jl.finch_test_twice(3)) == 6
+    del compiler._JULIA_OPS[op.ftype]

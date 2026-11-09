@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Any, cast
 from finch import tensor
 from finch.algebra import (
     CallableFType,
-    DynamicFill,
+    DynamicFillFType,
     FType,
-    StaticFill,
+    StaticFillFType,
     TensorFType,
     ftype,
     return_type,
@@ -65,8 +65,7 @@ class NotationNode(Term, ABC):
 class NotationTree(NotationNode, TermTree):
     @property
     @abstractmethod
-    def children(self) -> list[NotationNode]:  # type: ignore[override]
-        ...
+    def children(self) -> list[NotationNode]: ...
 
 
 class NotationExpression(NotationNode, ExpressionTerm):
@@ -256,6 +255,28 @@ class Dimension(NotationTree, NotationExpression):
 
 
 @dataclass(eq=True, frozen=True)
+class FillValue(NotationTree, NotationExpression):
+    """
+    Notation AST expression representing the fill value of tensor `tns`.
+    """
+
+    tns: NotationExpression
+
+    @property
+    def result_type(self):
+        assert isinstance(self.tns.result_type, TensorFType)
+        return self.tns.result_type.element_type
+
+    @classmethod
+    def from_children(cls, tns):
+        return cls(tns)
+
+    @property
+    def children(self):
+        return [self.tns]
+
+
+@dataclass(eq=True, frozen=True)
 class Access(NotationTree, NotationExpression):
     """
     Notation AST expression representing the value of tensor `tns` at the indices
@@ -292,11 +313,13 @@ class Full(NotationTree, NotationExpression):
     def result_type(self):
         match self.val:
             case Literal(val):
-                fill = StaticFill(val)
+                fill_type = StaticFillFType(val)
             case _:
-                fill = DynamicFill(self.val.result_type(0))
+                fill_type = DynamicFillFType(self.val.result_type)
         return tensor.patterns.FillTensorFType(
-            fill, self.val.result_type, tuple(dim.result_type for dim in self.shape)
+            fill_type,
+            self.val.result_type,
+            tuple(dim.result_type for dim in self.shape),
         )
 
     @classmethod
@@ -308,12 +331,54 @@ class Full(NotationTree, NotationExpression):
         return [self.val, *self.shape]
 
 
+class Protocol(NotationNode):
+    """
+    Notation AST node representing how a loop visits an index of a tensor it
+    reads or writes, as in Finch.jl.
+    """
+
+
+@dataclass(eq=True, frozen=True)
+class DefaultProtocol(Protocol):
+    """Lets the tensor choose how the loop visits the index."""
+
+
+@dataclass(eq=True, frozen=True)
+class Walk(Protocol):
+    """Steps through the indices which the tensor stores."""
+
+
+@dataclass(eq=True, frozen=True)
+class Gallop(Protocol):
+    """Skips ahead to the next index which every galloped tensor stores."""
+
+
+@dataclass(eq=True, frozen=True)
+class Follow(Protocol):
+    """Looks up each index which the loop visits."""
+
+
+@dataclass(eq=True, frozen=True)
+class Extrude(Protocol):
+    """Writes each index once, in order."""
+
+
+@dataclass(eq=True, frozen=True)
+class Laminate(Protocol):
+    """Writes indices in any order, and any number of times."""
+
+
 @dataclass(eq=True, frozen=True)
 class Read(AccessMode):
     """
     Notation AST node representing a read-only access mode for a tensor.
     This mode allows reading the value of a tensor without modifying it.
+    Attributes:
+        protocols: The protocol of each index of the access, or none to let
+            the tensor choose every protocol.
     """
+
+    protocols: tuple[Protocol, ...] = ()
 
     @property
     def children(self):
@@ -330,13 +395,20 @@ class Update(AccessMode, NotationTree):
     value of a tensor, use the ops `algebra.overwrite` or `algebra.init_write`.
     Attributes:
         op: The operation used to update the value of the tensor.
+        protocols: The protocol of each index of the access, or none to let
+            the tensor choose every protocol.
     """
 
     op: NotationExpression
+    protocols: tuple[Protocol, ...] = ()
+
+    @classmethod
+    def from_children(cls, op, *protocols):
+        return cls(op, protocols)
 
     @property
     def children(self):
-        return [self.op]
+        return [self.op, *self.protocols]
 
 
 @dataclass(eq=True, frozen=True)
@@ -440,6 +512,17 @@ class IfElse(NotationTree, NotationStatement):
     @property
     def children(self):
         return [self.cond, self.then_body, self.else_body]
+
+
+@dataclass(eq=True, frozen=True)
+class Assert(NotationTree, NotationStatement):
+    """Check that an expression is true at runtime."""
+
+    exp: NotationExpression
+
+    @property
+    def children(self):
+        return [self.exp]
 
 
 @dataclass(eq=True, frozen=True)
@@ -624,11 +707,12 @@ class Repack(NotationTree, NotationStatement):
 class Declare(NotationTree, NotationStatement):
     """
     Notation AST statement that declares `tns` with an initial value `init` reduced
-    with `op` in the current scope.
+    with `op` in the current scope, resizing it to `shape`. A tensor with a
+    dynamic fill takes `init` as its fill.
     """
 
     tns: NotationExpression
-    init: Literal
+    init: NotationExpression
     op: NotationExpression
     shape: tuple[NotationExpression, ...]
 
@@ -812,13 +896,35 @@ class NotationPrinterContext(Context):
             case Assign(Variable(var_n, var_t), val):
                 self.exec(f"{feed}{var_n}: {qual_str(var_t)} = {self(val)}")
                 return None
+            case DefaultProtocol():
+                return "default"
+            case Walk():
+                return "walk"
+            case Gallop():
+                return "gallop"
+            case Follow():
+                return "follow"
+            case Extrude():
+                return "extrude"
+            case Laminate():
+                return "laminate"
             case Dimension(tns, r):
                 tns_e = self(tns)
                 r_e = self(r)
                 return f"{tns_e}.shape[{r_e}]"
+            case FillValue(tns):
+                return f"{self(tns)}.fill_value"
             case Access(tns, mode, idxs):
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]
+                match mode:
+                    case Read(protocols) | Update(_, protocols) if protocols:
+                        idxs_e = [
+                            idx
+                            if proto == DefaultProtocol()
+                            else f"{self(proto)}({idx})"
+                            for idx, proto in zip(idxs_e, protocols, strict=True)
+                        ]
                 match mode:
                     case Read():
                         return f"read({tns_e}, {idxs_e})"
@@ -832,6 +938,9 @@ class NotationPrinterContext(Context):
                 tns_e = self(tns)
                 val_e = self(val)
                 self.exec(f"{feed}increment({tns_e}, {val_e})")
+                return None
+            case Assert(exp):
+                self.exec(f"{feed}assert({self(exp)})")
                 return None
             case Block(bodies):
                 ctx_2 = self.block()

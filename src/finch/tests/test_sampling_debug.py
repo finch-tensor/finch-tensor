@@ -7,7 +7,7 @@ import numpy as np
 import finch as fl
 import finch.algebra.ffuncs as ffuncs
 from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
-from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
+from finch.autoschedule.tensor_stats import StatsInterpreter
 from finch.autoschedule.tensor_stats.sampling_stats import (
     SamplingStatsFactory,
     _dgood1,
@@ -20,8 +20,8 @@ from finch.autoschedule.tensor_stats.sampling_stats import (
 )
 from finch.finch_logic import (
     Aggregate,
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -35,7 +35,7 @@ rng = np.random.default_rng(0)
 
 
 def materialize(sketch):
-    out = Alias("sketch_out")
+    out = HardAlias("sketch_out")
     prgm = Plan((Query(Table(out, sketch.fields()), sketch), Produces((out,))))
     result = NON_RECURSIVE_SCHEDULER(prgm)[0]
     if isinstance(result, fl.FiberTensor):
@@ -47,23 +47,24 @@ def materialize(sketch):
 
 
 def test_verify_sketch_computation(n=20, density=0.4, sample_prob=0.5, seed=0):
-
     rs = np.random.default_rng(seed)
     A = (rs.random((n, n)) < density).astype(float)
     B = (rs.random((n, n)) < density).astype(float)
 
     # SamplingStats
-    factory = SamplingStatsFactory(sample_prob=sample_prob, estimator="uj1")
+    factory = SamplingStatsFactory(sample_nnz=10000, estimator="uj1")
     factory._rng = rs
 
-    s_a = factory(fl.asarray(A), (i, k))
-    s_b = factory(fl.asarray(B), (k, j))
+    s_a = factory(fl.asarray(A), (i, k), [sample_prob] * 2)
+    s_b = factory(fl.asarray(B), (k, j), [sample_prob] * 2)
     mm = factory.mapjoin(ffuncs.mul, s_a, s_b)
     factory_sketch = materialize(factory.aggregate(ffuncs.add, 0.0, (k,), mm).sketch)
 
     # manually calculating
     mask_i, mask_k, mask_j = (
-        np.array([factory._get_mask(field, n)[idx].item() for idx in range(n)])
+        np.array(
+            [factory._get_mask(field, n, sample_prob)[idx].item() for idx in range(n)]
+        )
         for field in (i, k, j)
     )
     pat_a = (A != 0).astype(float)
@@ -130,30 +131,9 @@ def test_mapjoin():
     ta = Table(Literal(fl.asarray(data_a)), (i, j))
     tb = Table(Literal(fl.asarray(data_b)), (j, k))
 
-    cache = {}
-    stats_factory = SamplingStatsFactory(sample_prob=1)
-    insert_statistics(
-        stats_factory=stats_factory,
-        node=ta,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
-    insert_statistics(
-        stats_factory=stats_factory,
-        node=tb,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    stats_factory = SamplingStatsFactory()
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
-    stats = insert_statistics(
-        stats_factory=stats_factory,
-        node=node_mul,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    stats = StatsInterpreter(stats_factory)(node_mul, OrderedDict())
 
     true_nnz = float(np.count_nonzero(data_a[:, :, None] * data_b[None, :, :]))
     assert stats.estimate_non_fill_values() == pytest.approx(true_nnz, abs=1.0)
@@ -171,21 +151,14 @@ def test_aggregate():
     ta = Table(Literal(fl.asarray(data_a)), (i, j))
     tb = Table(Literal(fl.asarray(data_b)), (j, k))
 
-    cache = {}
-    stats_factory = SamplingStatsFactory(sample_prob=0.25, estimator="schlosser")
+    stats_factory = SamplingStatsFactory(estimator="schlosser")
     node = Aggregate(
         op=Literal(ffuncs.add),
         init=Literal(0.0),
         arg=MapJoin(Literal(ffuncs.mul), (ta, tb)),
         idxs=(j,),
     )
-    stats = insert_statistics(
-        stats_factory=stats_factory,
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache=cache,
-    )
+    stats = StatsInterpreter(stats_factory)(node, OrderedDict())
 
     print(materialize(stats.sketch))
     true_nnz = float(
