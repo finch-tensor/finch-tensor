@@ -11,6 +11,7 @@ from finch.algebra.tensor import TensorFType
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    DimensionTable,
     FillTable,
     Fuse,
     Literal,
@@ -149,6 +150,9 @@ class StatsMachine(Generic[TS]):
 
             case FillTable(tns):
                 return fill_statistics(self.stats_factory, self(tns).fill_type)
+
+            case DimensionTable():
+                return fill_statistics(self.stats_factory, node.fill_type({}))
 
             case MapJoin():
                 if not isinstance(node.op, Literal):

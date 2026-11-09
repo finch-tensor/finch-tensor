@@ -9,6 +9,7 @@ from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    DimensionTable,
     FillTable,
     Fuse,
     Literal,
@@ -97,7 +98,11 @@ class FlopsBasis(FactorizeBasis, AliasedForm):
                     out_stats = stats_factory.mapjoin(op, init_stats, out_stats)
                     return out_stats, iter_stats
                 case MapJoin(Literal(op), (arg,)):
-                    return visit_expr(arg)
+                    # A unary map iterates as its argument does, but its output
+                    # has the mapped fill (e.g. a norm's (value, scale) tuples),
+                    # which an aggregate over it reads.
+                    arg_stats, iter_stats = visit_expr(arg)
+                    return stats_factory.mapjoin(op, arg_stats), iter_stats
                 case MapJoin(Literal(op), args):
                     out_stats = stats_factory.mapjoin(
                         op, *(visit_expr(arg)[0] for arg in args)
@@ -109,7 +114,7 @@ class FlopsBasis(FactorizeBasis, AliasedForm):
                 case Relabel(arg, idxs):
                     out_stats, iter_stats = visit_expr(arg)
                     return stats_factory.relabel(out_stats, idxs), iter_stats
-                case Table() | FillTable() | Literal():
+                case Table() | Literal() | FillTable() | DimensionTable():
                     out_stats = machine(expr)
                     return out_stats, out_stats
                 case _:

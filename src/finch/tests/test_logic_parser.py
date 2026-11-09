@@ -74,6 +74,7 @@ matmul = query(
                 (
                     lgc.FillTable(A),
                     lgc.FillTable(lgc.FusedAlias(w, 1)),
+                    lgc.DimensionTable(A, lgc.Literal(1)),
                     lgc.Reorder(lgc.Relabel(lgc.Table(A, (i, j)), (j, i)), (i, j)),
                     lgc.Table(lgc.Literal(np.float32(2.0)), ()),
                 ),

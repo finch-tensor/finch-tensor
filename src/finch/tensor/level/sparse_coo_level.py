@@ -10,6 +10,7 @@ from finch.algebra import (
     ftype,
     ftypes,
 )
+from finch.finch_assembly import BufferFType
 
 from .level import Level, LevelFType, MultiDimensionLevel, MultiDimensionLevelFType
 
@@ -19,7 +20,7 @@ class SparseCOOLevelFType(ImmutableStructFType, MultiDimensionLevelFType):
         self,
         lvl_type: LevelFType,
         dimension_ftype: TupleFType,
-        ptr_type: FType,
+        ptr_type: BufferFType,
         idx_type: FType,
         tbl_type: FType,
     ) -> None:
@@ -27,8 +28,8 @@ class SparseCOOLevelFType(ImmutableStructFType, MultiDimensionLevelFType):
             raise TypeError("SparseCOOLevelFType lvl_type must be a level type")
         if not isinstance(dimension_ftype, TupleFType):
             raise TypeError("SparseCOOLevelFType dimension_ftype must be a tuple type")
-        if not isinstance(ptr_type, FType):
-            raise TypeError("SparseCOOLevelFType ptr_type must be an ftype")
+        if not isinstance(ptr_type, BufferFType):
+            raise TypeError("SparseCOOLevelFType ptr_type must be a buffer type")
         if not isinstance(idx_type, FType):
             raise TypeError("SparseCOOLevelFType idx_type must be an ftype")
         if not isinstance(tbl_type, TupleFType):
