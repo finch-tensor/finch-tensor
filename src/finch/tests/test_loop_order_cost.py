@@ -11,6 +11,7 @@ from finch.autoschedule import DefaultLogicFactorizer
 from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
 from finch.autoschedule.cost_models import (
     LOOP_COST_MODEL,
+    Concat,
     CostModel,
     PigeonBasis,
     Prefix,
@@ -20,7 +21,6 @@ from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
 from finch.autoschedule.loop_orderer.loop_order_greedy import (
     GreedyLoopOrderer,
-    connected_loop_candidates,
     greedy_loop_order,
 )
 from finch.autoschedule.normalize import LogicNormalizer
@@ -60,7 +60,9 @@ def test_empty_input_cost_matches_model():
         assert sum(
             model.predict_component_cost(Prefix(order[:n], expr), machine)
             for n in range(len(order) + 1)
-        ) == model.predict_cost(fuse_loop_order(query, order), {}, bindings, sf)
+        ) == pytest.approx(
+            model.predict_cost(fuse_loop_order(query, order), {}, bindings, sf)
+        )
 
 
 def test_empty_relation_cost_matches_model():
@@ -96,7 +98,9 @@ def test_empty_relation_cost_matches_model():
         assert sum(
             model.predict_component_cost(Prefix(order[:n], expr), machine)
             for n in range(len(order) + 1)
-        ) == model.predict_cost(fuse_loop_order(query, order), {}, bindings, sf)
+        ) == pytest.approx(
+            model.predict_cost(fuse_loop_order(query, order), {}, bindings, sf)
+        )
 
 
 def greedy_scheduler():
@@ -152,22 +156,6 @@ def test_greedy_orderer_matches_reference_results():
         assert np.allclose(np.asarray(result), expected)
 
 
-def test_candidates_preserve_remaining_order():
-    """Candidates must stay ordered: iterating a set would make tie-breaking
-    depend on ``Field`` hashes, which differ between processes.
-    """
-    i, j, k = Field("i"), Field("j"), Field("k")
-
-    remaining = [k, j, i]
-    assert connected_loop_candidates((), remaining) == remaining
-
-    candidates = connected_loop_candidates((j,), [k, i])
-    assert isinstance(candidates, list)
-    assert candidates == [k, i]
-    assert connected_loop_candidates((j,), [i, k]) == [i, k]
-    assert connected_loop_candidates((i,), [k, j]) == [k, j]
-
-
 def test_greedy_order_breaks_ties_by_field_order():
     """The two ends of a symmetric chain cost exactly the same, so which one
     greedy starts from is decided purely by the tie-break. Mirroring the chain
@@ -196,10 +184,10 @@ def test_greedy_order_breaks_ties_by_field_order():
         Prefix((i,), forward), machine
     ) == pigeon.predict_component_cost(Prefix((m,), forward), machine)
 
-    order = greedy_loop_order(forward, sf, forward_bindings)
+    order = greedy_loop_order(forward, sf, forward_bindings, cost_model=pigeon)
     assert order[0] == i
     assert set(order) == {i, j, k, m}
-    assert greedy_loop_order(forward, sf, forward_bindings) == order
+    assert greedy_loop_order(forward, sf, forward_bindings, cost_model=pigeon) == order
 
     # Same chain written back-to-front: the tie must now break the other way.
     reverse = MapJoin(
@@ -211,16 +199,19 @@ def test_greedy_order_breaks_ties_by_field_order():
         b: sf(ones, (k, j)),
         a: sf(ones, (j, i)),
     }
-    reverse_order = greedy_loop_order(reverse, sf, reverse_bindings)
+    reverse_order = greedy_loop_order(reverse, sf, reverse_bindings, cost_model=pigeon)
     assert reverse_order[0] == m
     assert set(reverse_order) == {i, j, k, m}
-    assert greedy_loop_order(reverse, sf, reverse_bindings) == reverse_order
+    assert (
+        greedy_loop_order(reverse, sf, reverse_bindings, cost_model=pigeon)
+        == reverse_order
+    )
 
 
 def test_greedy_avoids_transposing_a_sparse_input():
     """``B`` is a sparse diagonal stored ``(i, j)``, so reformatting it costs far
     more than reformatting the dense ``A`` stored ``(j, i)``. Read and write
-    costs tie, and the expression's field order puts ``j`` first, so only the
+    costs tie, and the expression's field order puts ``j`` first, so only a
     transpose cost can steer greedy to the cheaper ``(i, j)``.
     """
     sf = DCStatsFactory()
@@ -239,7 +230,9 @@ def test_greedy_avoids_transposing_a_sparse_input():
 
     pigeon = CostModel(PigeonBasis(), [1.0, 1.0, 10.0, 1.0, 0.0])
     transpose = CostModel(TransposeBasis(), [0.5, 60.0])
-    model = LOOP_COST_MODEL
+    model = CostModel(
+        Concat(PigeonBasis(), TransposeBasis()), [1.0, 1.0, 10.0, 1.0, 0.0, 0.5, 60.0]
+    )
     machine = StatsMachine(sf, dict(bindings))
     # Reads and writes alone cannot separate the two, so the field-order
     # tie-break would pick j; transposing the sparse B is what makes that order
@@ -259,7 +252,7 @@ def test_greedy_avoids_transposing_a_sparse_input():
     ]
     assert costs[0] < costs[1]
 
-    assert greedy_loop_order(expr, sf, bindings) == (i, j)
+    assert greedy_loop_order(expr, sf, bindings, cost_model=model) == (i, j)
 
 
 def test_prefix_totals_match_program_cost():

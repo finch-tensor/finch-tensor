@@ -486,6 +486,24 @@ def test_default_runtime_uses_a_free_buffer():
     assert result.raw_julia_obj is lease.raw
 
 
+def test_cleared_runtime_allocates_a_new_buffer():
+    runtime = _runtime(
+        {"test_runtime_cleared_buffer": _KernalMetadata(frozenset({0}), (0,))}
+    )
+    tensor = ft.asarray(np.arange(4, dtype=np.float64))
+    lease = runtime.free_pool.acquire(tensor.ftype, tensor.shape, False)
+    runtime.free_pool.release_lease(lease)
+    runtime.free_pool.clear()
+
+    result = runtime.kernel_call(
+        "test_runtime_cleared_buffer",
+        runtime._kernels["test_runtime_cleared_buffer"],
+        (tensor,),
+    )[0]
+
+    assert result.raw_julia_obj is not lease.raw
+
+
 def test_default_runtime_reuses_a_sparse_free_buffer():
     _requires_julia_backend()
     source = ft.asarray(sps.csr_array([[1, 0], [0, 2]], dtype=np.float64))

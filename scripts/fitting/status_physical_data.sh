@@ -3,7 +3,8 @@
 # programs are generated, timed, and coalesced, the models fitted, the
 # states of the Slurm jobs which scripts/fitting/launch_physical_data.sh
 # submitted, the latest progress of each task which hasn't finished, and the
-# logs which report errors.
+# logs which report errors. For a DIR of several stages, which
+# launch_physical_data.sh puts in DIR/STAGE, the progress of each.
 #
 #     scripts/fitting/status_physical_data.sh DIR
 set -euo pipefail
@@ -13,6 +14,13 @@ if [[ $# -ne 1 ]]; then
   exit 2
 fi
 directory=$1
+if [[ ! -f $directory/jobs.txt ]] && compgen -G "$directory/*/jobs.txt" >/dev/null; then
+  for jobs in "$directory"/*/jobs.txt; do
+    echo "== $(basename "$(dirname "$jobs")")"
+    "$0" "$(dirname "$jobs")"
+  done
+  exit 0
+fi
 
 count() {
   find "$directory/data" -maxdepth 1 -name "*.$1" 2>/dev/null | wc -l | tr -d ' '
