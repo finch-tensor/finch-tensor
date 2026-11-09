@@ -410,6 +410,48 @@ def test_optimize_protocols_prices_a_follow_by_its_lookups():
     assert [protos[0] for protos in read_protocols(out, x, y)] == [Walk(), Walk()]
 
 
+def test_a_root_within_other_loops_is_not_stepped_through_again():
+    # c[] = sum_ij A[i, j] v[j] under (i, j): v is the same at every i, so
+    # walking it, or galloping it beside a walk or alone, steps through all of
+    # it again for each row of A, whether or not the row is followed. A model
+    # which prices walks cheaply would do that; v is followed instead, or
+    # galloped with the row, which leapfrogs.
+    sf = DCStatsFactory()
+    i, j = Field("i"), Field("j")
+    a, v, c = HardAlias("a"), HardAlias("v"), HardAlias("c")
+    stats: dict[Alias, TensorStats] = {
+        a: sf(fl.asarray(np.eye(8)), (i, j)),
+        v: sf(fl.asarray(np.ones(8)), (j,)),
+    }
+    walks = CostModel(
+        PROTOCOL_BASIS,
+        [
+            {"walk.visits": 1.0, "follow.visits": 100.0, "gallop.visits": 100.0}.get(
+                name.partition(".")[2], 0.0
+            )
+            for name in PROTOCOL_BASIS.feature_names
+        ],
+    )
+    expr = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(v, (j,)))),
+        (i, j),
+    )
+    plan = Plan((fuse_loop_order(Query(Table(c, ()), expr), (i, j)), Produces((c,))))
+
+    def protocols(row):
+        fmt = fiber_tensor(dense(row(element(0.0))))
+        out = optimize_protocols(plan, {a: fmt, v: LIST}, stats, sf, walks)
+        [(_, row_j), (vec_j,)] = read_protocols(out, a, v)
+        return vec_j, row_j
+
+    vec_j, row_j = protocols(lambda lvl: sparse_list(lvl, ftype(np.intp)))
+    assert vec_j == Follow() or (vec_j, row_j) == (Gallop(), Gallop())
+    # A dense row can't restrict the loop, so v may lead it.
+    assert protocols(lambda lvl: dense(lvl))[0] == Walk()
+
+
 def test_a_dense_level_above_is_entered_at_every_slot():
     sf = ExactStatsFactory()
     i, j = Field("i"), Field("j")
