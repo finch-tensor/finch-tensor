@@ -14,6 +14,7 @@ from finch.algebra.fill import (
     StaticFillFType,
 )
 from finch.algebra.ftypes import FDTypeNumpy, FType, TupleFType
+from finch.finch_assembly import BufferFType
 from finch.tensor import DenseLevelFType, ElementLevelFType, LevelFType
 from finch.tensor.bufferized_ndarray import BufferizedNDArrayFType
 from finch.tensor.fiber_tensor import FiberTensorFType
@@ -272,7 +273,7 @@ def _buffer_ctor_str(
 
 
 def _index_buffer_ctor_str(
-    buffer_type: FType,
+    buffer_type: BufferFType,
     elem_type_str: str | None = None,
     *,
     index_fields: tuple[int, ...] | None = None,

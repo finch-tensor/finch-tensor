@@ -37,7 +37,7 @@ def _warn_compute(x, op_name: str):
 
 
 def full(
-    shape: int | tuple[int, ...],
+    shape: int | np.integer | tuple[int, ...],
     fill_value: bool | complex,
     *,
     dtype: Any | None = None,
@@ -46,15 +46,21 @@ def full(
     return compute(lazy.full(shape, fill_value, dtype=dtype, device=device))
 
 
-def zeros(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+def zeros(
+    shape: int | np.integer | tuple[int, ...], *, dtype: Any | None = None, device=None
+):
     return compute(lazy.zeros(shape, dtype=dtype, device=device))
 
 
-def ones(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+def ones(
+    shape: int | np.integer | tuple[int, ...], *, dtype: Any | None = None, device=None
+):
     return compute(lazy.ones(shape, dtype=dtype, device=device))
 
 
-def empty(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+def empty(
+    shape: int | np.integer | tuple[int, ...], *, dtype: Any | None = None, device=None
+):
     return compute(lazy.empty(shape, dtype=dtype, device=device))
 
 
