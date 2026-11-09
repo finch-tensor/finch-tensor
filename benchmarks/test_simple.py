@@ -153,28 +153,6 @@ def sparse_vector_gen(dimension, sparsity):
         yield create_random_fill_vector(dimension, nnf, rng)
 
 
-def sparse_list(dimension, idx, val):
-    def asnp(list):
-        return np.asarray(list)
-
-    val = asnp(val)
-    idx = asnp(idx)
-
-    return ft.FiberTensor(
-        ft.SparseListLevel(
-            ft.ElementLevel(
-                _format=ft.element(
-                    ft.ftype(val.dtype)(0), ft.ftype(val.dtype), ft.ftype(idx.dtype)
-                ),
-                _val=ft.NumpyBuffer(val),
-            ),
-            ptr=ft.NumpyBuffer(np.asarray([0, len(val)], dtype=idx.dtype)),
-            dimension=ft.ftype(idx.dtype)(dimension),
-            idx=ft.NumpyBuffer(idx),
-        )
-    )
-
-
 @pytest.mark.parametrize("dimension", [10**7])
 @pytest.mark.parametrize("sparsity", VECTOR_SPARSITY_RUNS)
 def test_addition(scheduler, benchmark, dimension, sparsity):
