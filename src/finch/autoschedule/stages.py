@@ -10,6 +10,7 @@ from finch.finch_assembly.stages import AssemblyLibrary
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    DimensionTable,
     Field,
     FillTable,
     Fuse,
@@ -282,7 +283,7 @@ class SingleAggregateForm(AliasedForm):
                     for arg in args:
                         validate(arg, agg_allowed)
                     return None
-                case Literal() | FillTable() | Alias() | Table():
+                case Literal() | FillTable() | DimensionTable() | Alias() | Table():
                     return None
                 case _:
                     raise ValueError(f"Unsupported query type: {node}")
@@ -347,7 +348,7 @@ class LoopOrderedForm(SingleAggregateForm):
                         "since Fuse nodes give the loop order and the left-hand "
                         "tables order the results."
                     )
-                case Table() | Literal() | FillTable():
+                case Table() | Literal() | FillTable() | DimensionTable():
                     return
                 case _:
                     raise ValueError(f"Unsupported query type: {node}")
@@ -406,7 +407,7 @@ class FormattedForm(LoopOrderedForm):
                             f"Alias {tns.name} is not defined in bindings. All aliase\
                                  must have TensorFTypes specified at this stage."
                         )
-                case Literal() | FillTable():
+                case Literal() | FillTable() | DimensionTable():
                     return
                 case _:
                     raise ValueError(f"Unsupported query type: {node}")

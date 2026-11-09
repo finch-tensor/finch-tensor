@@ -16,6 +16,7 @@ from finch.autoschedule.util import (
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    DimensionTable,
     Field,
     FillTable,
     HardAlias,
@@ -208,9 +209,13 @@ def propagate_map_queries(root: LogicStatement) -> LogicStatement:
 
     assert isinstance(root, LogicNode)
     rets = get_productions(root)
-    # A definition whose fill value is read stays, since inlining the fill of
-    # every use would grow the program with each inlined definition.
-    filled = {node.tns for node in PostOrderDFS(root) if isinstance(node, FillTable)}
+    # A definition whose fill value or dimension is read stays, since inlining
+    # the fill of every use would grow the program with each inlined definition.
+    filled = {
+        node.tns
+        for node in PostOrderDFS(root)
+        if isinstance(node, FillTable | DimensionTable)
+    }
     props = {}
 
     def rule_1(node):
@@ -249,8 +254,13 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
                 defs[a] = reorder_to(b, idxs)
 
     rets = get_productions(root)
-    # A definition whose fill value is read stays, as in `propagate_map_queries`.
-    filled = {node.tns for node in PostOrderDFS(root) if isinstance(node, FillTable)}
+    # A definition whose fill value or dimension is read stays, as in
+    # `propagate_map_queries`.
+    filled = {
+        node.tns
+        for node in PostOrderDFS(root)
+        if isinstance(node, FillTable | DimensionTable)
+    }
 
     def rule_1(ex):
         match ex:
@@ -336,6 +346,10 @@ def lift_fields(root):
 
 def propagate_transpose_queries(root: LogicStatement):
     props: dict[Alias, LogicExpression] = {}
+    # A definition whose dimension is read stays.
+    dimensioned = {
+        node.tns for node in PostOrderDFS(root) if isinstance(node, DimensionTable)
+    }
 
     def rule_1(node):
         match node:
@@ -356,7 +370,7 @@ def propagate_transpose_queries(root: LogicStatement):
             case Query(
                 Table(lhs, idxs),
                 (Table(Alias(_), _) | Reorder(Table(Alias(_), _), _)),
-            ) as q:
+            ) as q if lhs not in dimensioned:
                 props[lhs] = Rewrite(PostWalk(rule_1))(reorder_to(q.rhs, idxs))
                 return Plan()
 

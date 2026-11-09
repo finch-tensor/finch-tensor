@@ -7,7 +7,7 @@ from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import FType, MutableStructFType, ffuncs, ftype, ftypes, is_dynamic
 from finch.compile import looplets as lplt
-from finch.finch_assembly import BufferFType, parse_assembly
+from finch.finch_assembly import parse_assembly
 
 from .level import (
     Level,
@@ -26,11 +26,22 @@ _UNSET = -1
 class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
     _lvl_t: LevelFType
     dimension_type: ftypes.FDTypeInteger = ftypes.intp
+    # None only as constructor input, __post_init__ defaults these to buffers
+    # of the child level's buffer factory.
+    ptr_type: Any = None
+    tbl_type: Any = None
+    srt_type: Any = None
 
     def __post_init__(self) -> None:
         if not isinstance(self._lvl_t, LevelFType):
             raise TypeError("SparseByteMapLevelFType lvl_t must be a level type")
         self.dimension_type = ftype(self.dimension_type)
+        if self.ptr_type is None:
+            self.ptr_type = self.buffer_factory(self.position_type)
+        if self.tbl_type is None:
+            self.tbl_type = self.buffer_factory(ftypes.bool_)
+        if self.srt_type is None:
+            self.srt_type = self.buffer_factory(self.position_type)
 
     @property
     def struct_name(self) -> str:
@@ -78,18 +89,6 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
     @property
     def buffer_factory(self) -> Any:
         return self.lvl_t.buffer_factory
-
-    @property
-    def ptr_type(self) -> BufferFType:
-        return self.buffer_factory(self.position_type)
-
-    @property
-    def tbl_type(self) -> FType:
-        return self.buffer_factory(ftypes.bool_)
-
-    @property
-    def srt_type(self) -> FType:
-        return self.buffer_factory(self.position_type)
 
     @property
     def lvl_t(self) -> LevelFType:
@@ -197,6 +196,47 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
                 tbl[q] = absent
             end
         end
+        """
+        exec_block(
+            ctx, parse_assembly(expr, locals() | self._bindings(tns), position_type=l_t)
+        )
+        child = asm.GetAttr(tns, asm.Literal("lvl"))
+        if self.lvl_t.supports_reassembly:
+            # The child holds the fill wherever this level wasn't written, so
+            # only the cleared positions are reset, instead of declaring it.
+            bindings = self._bindings(tns)
+            n_tbl = bindings["n_tbl"]
+            one = ctx.block()
+            one.exec(
+                asm.Assign(
+                    q, asm.Call(bindings["to_len"], (asm.Load(bindings["srt"], r),))
+                )
+            )
+            self.lvl_t.level_lower_assemble(
+                one,
+                child,
+                q,
+                asm.Call(asm.Literal(ffuncs.add), (q, asm.Literal(l_t(1)))),
+            )
+            every = ctx.block()
+            self.lvl_t.level_lower_assemble(every, child, asm.Literal(l_t(0)), n_tbl)
+            many = asm.Call(
+                asm.Literal(ffuncs.gt),
+                (
+                    asm.Call(asm.Literal(ffuncs.mul), (n_dirty, asm.Literal(l_t(16)))),
+                    n_tbl,
+                ),
+            )
+            ctx.exec(
+                asm.IfElse(
+                    many,
+                    asm.Block(tuple(every.emit())),
+                    asm.ForLoop(
+                        r, asm.Literal(l_t(0)), n_dirty, asm.Block(tuple(one.emit()))
+                    ),
+                )
+            )
+        expr = """finch
         tns.qos_fill = zero
         tns.dimension = dimension
         dim = to_len(tns.dimension)
@@ -220,9 +260,9 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
         exec_block(
             ctx, parse_assembly(expr, locals() | self._bindings(tns), position_type=l_t)
         )
-        child = asm.GetAttr(tns, asm.Literal("lvl"))
-        child_pos = asm.Call(asm.Literal(ffuncs.mul), (pos, dim))
-        self.lvl_t.level_lower_declare(ctx, child, init, op, shape[1:], child_pos)
+        if not self.lvl_t.supports_reassembly:
+            child_pos = asm.Call(asm.Literal(ffuncs.mul), (pos, dim))
+            self.lvl_t.level_lower_declare(ctx, child, init, op, shape[1:], child_pos)
         self.lvl_t.level_lower_assemble(ctx, child, tbl_len, q_stop)
 
     def level_lower_assemble(self, ctx, lvl, start, stop):
@@ -656,7 +696,13 @@ class SparseByteMapLevel(SingleDimensionLevel):
 
     @property
     def ftype(self) -> SparseByteMapLevelFType:
-        return SparseByteMapLevelFType(self.lvl.ftype, ftype(self.dimension))  # type: ignore[abstract]
+        return SparseByteMapLevelFType(  # type: ignore[abstract]
+            self.lvl.ftype,
+            ftype(self.dimension),
+            ftype(self.ptr),
+            ftype(self.tbl),
+            ftype(self.srt),
+        )
 
     @property
     def val(self) -> Any:
