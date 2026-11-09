@@ -37,7 +37,7 @@ def coalesce(directory: Path, chunk, output: Path | None) -> None:
         records.append({"name": example, **record, "formats": {}, **timing})
         variants += len(timing["runtimes"])
     output = directory / "examples.json" if output is None else output
-    output.write_text(json.dumps({"examples": records}))
+    output.write_text(json.dumps({"examples": records}) + "\n")
     print(
         f"wrote {variants} timed variants of {len(records)} of {len(programs)} "
         f"programs to {output}",

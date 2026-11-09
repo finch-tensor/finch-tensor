@@ -292,7 +292,7 @@ def fit(data: Path, name, models, output: Path | None, seed, tune=False) -> None
         if classes is not None:
             # parse_models classes the writes of the model by this cutoff.
             saved["region_cutoff"] = classes.region
-        output.write_text(json.dumps(saved, indent=2))
+        output.write_text(json.dumps(saved, indent=2) + "\n")
 
 
 def main() -> None:
