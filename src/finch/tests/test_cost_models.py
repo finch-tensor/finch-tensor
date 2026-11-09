@@ -385,7 +385,7 @@ def test_loop_costs_are_additive_over_prefixes(cost):
             cost.predict_component_cost(Prefix(order[:n], expr, order), machine)
             for n in range(len(order) + 1)
         )
-        assert cost.predict_cost(query, {}, stats, sf) == expected
+        assert cost.predict_cost(query, {}, stats, sf) == pytest.approx(expected)
 
 
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])

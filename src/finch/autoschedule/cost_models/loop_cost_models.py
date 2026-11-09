@@ -1,6 +1,8 @@
+import json
 import math
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Generic
 
 import numpy as np
@@ -30,7 +32,7 @@ from finch.finch_logic import (
 )
 from finch.symbolic import PostOrderDFS, PostWalk, Rewrite, Term
 
-from .cost_models import NS, Basis, Concat, CostModel, Stratify
+from .cost_models import NS, Affine, Basis, Concat, CostModel, Stratify
 
 
 @dataclass(frozen=True)
@@ -602,32 +604,27 @@ class WriteClasses:
 
 
 write_class = WriteClasses()
-WRITE_BASIS = Stratify(WriteBasis(), N_WRITE_CLASSES, write_class)
 
 
-def write_coefficients(scatter: float, workspace: float) -> list[float]:
-    """The coefficients of WRITE_BASIS which charge a write which scatters
-    workspace in the class whose scattered region is within its cutoff,
-    scatter in the other, and nothing else."""
-    return [
-        cost
-        for cls in range(N_WRITE_CLASSES)
-        for cost in (0.0, scatter if cls else workspace, 0.0, 0.0)
-    ]
+def loop_basis(classes: WriteClasses = write_class) -> Basis[Prefix]:
+    """The basis of the loop model, whose writes are of the classes of the
+    region cutoff of classes."""
+    return Affine(
+        Concat(PigeonBasis(), Stratify(WriteBasis(), N_WRITE_CLASSES, classes))
+    )
 
 
-# Allocations are weighted 10x reads and operations, a lookup costs as much as
-# an iteration, dense iterations are free until the model is fitted, and a
-# write which scatters costs 10 iterations more than one in order, as it does
-# into a hash level, which most sparse outputs need for it.
-LOOP_COST_MODEL = CostModel(
-    Concat(PigeonBasis(), TransposeBasis(), WRITE_BASIS),
-    [1.0, 1.0, 10.0, 1.0, 0.0, 0.5, 60.0, *write_coefficients(10.0, 10.0)],
-)
-# A small workspace takes the writes of a query which scatter, as a dense level
-# or a byte map does, almost as cheaply as those in order. Otherwise, they cost
-# as much as they do without workspaces.
-WORKSPACE_LOOP_COST_MODEL = CostModel(
-    Concat(PigeonBasis(), TransposeBasis(), WRITE_BASIS),
-    [1.0, 1.0, 10.0, 1.0, 0.0, 0.5, 60.0, *write_coefficients(10.0, 1.0)],
+def loop_cost_model(data: Mapping[str, Any]) -> CostModel[Prefix]:
+    """The loop model of data, which fit_physical_data wrote, whose writes are
+    classed by its region cutoff if it was tuned."""
+    basis = loop_basis(WriteClasses(data.get("region_cutoff", write_class.region)))
+    return CostModel(basis, np.zeros(basis.n_features)).from_json(data)
+
+
+# The loop model, which the loop orderers price with. Its coefficients are
+# those scripts/fitting fitted to the timings of its loop stage, which runs the
+# workspacer, the formatter, and the protocol optimizer after each loop order,
+# so a write which scatters costs what it does once it is staged.
+LOOP_COST_MODEL = loop_cost_model(
+    json.loads(Path(__file__).with_name("loop_cost_model.json").read_text())
 )

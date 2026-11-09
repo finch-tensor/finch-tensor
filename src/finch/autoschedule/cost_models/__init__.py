@@ -18,8 +18,6 @@ from .factorize_cost_models import (
 )
 from .loop_cost_models import (
     LOOP_COST_MODEL,
-    WORKSPACE_LOOP_COST_MODEL,
-    WRITE_BASIS,
     LoopBasis,
     LoopSpaces,
     PigeonBasis,
@@ -27,6 +25,8 @@ from .loop_cost_models import (
     TransposeBasis,
     WriteBasis,
     WriteClasses,
+    loop_basis,
+    loop_cost_model,
     prefixes,
     write_class,
 )
@@ -61,8 +61,6 @@ __all__ = [
     "PROTOCOL_BASIS",
     "PROTOCOL_COST_MODEL",
     "STORAGE_BASIS",
-    "WORKSPACE_LOOP_COST_MODEL",
-    "WRITE_BASIS",
     "Affine",
     "Basis",
     "ByKind",
@@ -96,6 +94,8 @@ __all__ = [
     "level_formats",
     "level_options",
     "level_reads",
+    "loop_basis",
+    "loop_cost_model",
     "nnz_after",
     "prefixes",
     "read_options",

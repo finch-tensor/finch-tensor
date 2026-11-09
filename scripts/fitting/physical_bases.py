@@ -48,9 +48,9 @@ import numpy as np
 from finch.algebra import StaticFillFType, TensorFType, ftype, ftypes
 from finch.autoschedule import optimize_protocols, protocolize
 from finch.autoschedule.cost_models import (
+    LOOP_COST_MODEL,
     PROTOCOL_BASIS,
     PROTOCOL_COST_MODEL,
-    WORKSPACE_LOOP_COST_MODEL,
     Affine,
     Basis,
     Concat,
@@ -64,7 +64,8 @@ from finch.autoschedule.cost_models import (
     WriteBasis,
     WriteClasses,
     level_options,
-    write_class,
+    loop_basis,
+    loop_cost_model,
 )
 from finch.autoschedule.cost_models.loop_cost_models import N_WRITE_CLASSES
 from finch.autoschedule.formatter.smart_formatter import (
@@ -112,14 +113,6 @@ OPTIONS = {option.kind: option for option in LEVEL_OPTIONS}
 A, B, C = HardAlias("A"), HardAlias("B"), HardAlias("C")
 
 
-def loop_basis(classes: WriteClasses = write_class) -> Basis:
-    """The basis of the loop model, whose writes are of the classes of the
-    region cutoff of classes."""
-    return Affine(
-        Concat(PigeonBasis(), Stratify(WriteBasis(), N_WRITE_CLASSES, classes))
-    )
-
-
 BASES: dict[str, Basis] = {
     "protocol": PROTOCOL_BASIS,
     "transpose": Affine(TransposeBasis()),
@@ -147,10 +140,10 @@ def stratified(rows: np.ndarray, classes: WriteClasses) -> np.ndarray:
 def parse_models(args: list[str] | None) -> dict[str, CostModel]:
     """
     The models of NAME=PATH arguments, which fit_physical_data wrote, over the
-    models the optimizers use until they are fitted. A loop model whose
+    models the optimizers use by default. A loop model whose
     region cutoff was tuned classes its writes by it.
     """
-    models = {"protocol": PROTOCOL_COST_MODEL, "loop": WORKSPACE_LOOP_COST_MODEL}
+    models = {"protocol": PROTOCOL_COST_MODEL, "loop": LOOP_COST_MODEL}
     for arg in args or ():
         name, _, path = arg.partition("=")
         if name not in BASES or not path:
@@ -158,11 +151,12 @@ def parse_models(args: list[str] | None) -> dict[str, CostModel]:
                 f"Expected NAME=PATH with NAME of {list(BASES)}, got {arg}"
             )
         data = json.loads(Path(path).read_text())
-        basis = BASES[name]
-        if "region_cutoff" in data:
-            basis = loop_basis(WriteClasses(data["region_cutoff"]))
-        untrained = CostModel(basis, np.zeros(basis.n_features))
-        models[name] = untrained.from_json(data)
+        if name == "loop":
+            models[name] = loop_cost_model(data)
+        else:
+            basis = BASES[name]
+            untrained = CostModel(basis, np.zeros(basis.n_features))
+            models[name] = untrained.from_json(data)
     return models
 
 

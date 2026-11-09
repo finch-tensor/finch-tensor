@@ -9,7 +9,7 @@ import finch as fl
 from finch import ffuncs
 from finch.algebra import ftype
 from finch.autoschedule.cost_models import (
-    WORKSPACE_LOOP_COST_MODEL,
+    LOOP_COST_MODEL,
     Concat,
     CostModel,
     LoopBasis,
@@ -233,7 +233,7 @@ def test_loop_orderers_use_selected_model(search, orderer, inplace):
             assert (outer, inner) == (j, i)
         case _:
             pytest.fail("Expected an ordered query")
-    assert orderer().cost_model is WORKSPACE_LOOP_COST_MODEL
+    assert orderer().cost_model is LOOP_COST_MODEL
 
 
 @pytest.mark.parametrize(
@@ -264,7 +264,7 @@ def test_loop_orderers_write_outputs_in_order_when_it_pays(search):
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), Table(a, (i, j)), (j,))
     # Scattering into the output costs more than looping over i first saves.
     basis = Concat(PreferFieldBasis(i), WriteBasis())
-    writes = CostModel(basis, [1.0, 0.0, 100.0, 0.0, 0.0, 0.0, 0.0])
+    writes = CostModel(basis, [1.0, 0.0, 100.0, 0.0, 0.0])
     assert search(expr, sf, stats, (unit, i), cost_model=writes) == (unit, i, j)
 
 
