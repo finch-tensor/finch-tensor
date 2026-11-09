@@ -4,7 +4,7 @@ import numpy as np
 
 import finch as ft
 import finch.finch_logic as lgc
-from finch.algebra import StaticFillFType, ffuncs
+from finch.algebra import StaticFillFType, TensorFType, ffuncs
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.formatter.galley_formatter import GalleyFormatter
 from finch.autoschedule.formatter.smart_formatter import (
@@ -18,7 +18,10 @@ from finch.autoschedule.tensor_stats import (
     FDStatsFactory,
     StatsInterpreter,
 )
-from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
+from finch.autoschedule.tensor_stats.exact_stats import (
+    ExactStats,
+    ExactStatsFactory,
+)
 from finch.autoschedule.util import fuse_loop_order
 
 
@@ -174,7 +177,7 @@ def test_galley_makes_a_small_scattered_workspace_a_byte_map(monkeypatch):
     a, b, scratch = lgc.HardAlias("a"), lgc.HardAlias("b"), lgc.HardAlias("scratch")
     fused = lgc.FusedAlias(scratch, 1)
     factory = ExactStatsFactory()
-    stats = {
+    stats: dict[lgc.Alias, ExactStats] = {
         a: factory(ft.asarray(a_data), (t, j)),
         b: factory(ft.asarray(b_data), (j, i)),
     }
@@ -194,7 +197,10 @@ def test_galley_makes_a_small_scattered_workspace_a_byte_map(monkeypatch):
             lgc.Produces((fused,)),
         )
     )
-    bindings = {a: ft.asarray(a_data).ftype, b: ft.asarray(b_data).ftype}
+    bindings: dict[lgc.Alias, TensorFType] = {
+        a: ft.asarray(a_data).ftype,
+        b: ft.asarray(b_data).ftype,
+    }
     GalleyFormatter(capture).lower(plan, bindings, stats, factory)
     fmt = capture.last_bindings[scratch]
     assert isinstance(fmt, ft.FiberTensorFType)
