@@ -9,6 +9,7 @@ from collections import namedtuple
 from collections.abc import Iterable
 from functools import lru_cache
 from pathlib import Path
+from textwrap import dedent
 from typing import Any
 
 import numpy as np
@@ -492,34 +493,50 @@ def c_division(
     result_type = op_type.return_type(a.result_type, b.result_type)
     type_code = ctx.ctype_name(c_type(result_type))
     x, y = (f"(({type_code}){ctx(ctx.cache('div', arg))})" for arg in (a, b))
-    dtype = np_dtype(result_type)
-    rem = ctx.freshen("rem")
-    if np.issubdtype(dtype, np.floating):
+    if algebra.isdtype(result_type, "real floating"):
         ctx.add_header("#include <math.h>")
         match op_type:
             case ffuncs._TrueDivFType():
                 return f"({x} / {y})"
             case ffuncs._FloorDivFType():
                 return f"(({type_code})floor({x} / {y}))"
-        # the remainder takes the sign of the divisor, even when it's zero
-        ctx.exec(f"{ctx.feed}{type_code} {rem} = ({type_code})fmod({x}, {y});")
-        return (
-            f"({rem} != 0 ? ((({rem} < 0) != ({y} < 0)) ? {rem} + {y} : {rem})"
-            f" : ({type_code})copysign(0.0, {y}))"
-        )
+        ctx.add_header(c_float_mod(type_code))
+        return f"finch_mod_{type_code}({x}, {y})"
     match op_type:
         case ffuncs._TrueDivFType() | ffuncs._FloorDivFType():
             symbol = "/"
         case _:
             symbol = "%"
-    if not np.issubdtype(dtype, np.signedinteger):
+    if not algebra.isdtype(result_type, "signed integer"):
         return f"({x} {symbol} {y})"
     # round toward negative infinity, so the remainder has the sign of the divisor
+    rem = ctx.freshen("rem")
     ctx.exec(f"{ctx.feed}{type_code} {rem} = {x} % {y};")
     floored = f"({rem} != 0 && (({rem} < 0) != ({y} < 0)))"
     if symbol == "/":
         return f"({x} / {y} - {floored})"
     return f"({rem} + ({floored} ? {y} : 0))"
+
+
+def c_float_mod(type_code: str) -> str:
+    """The remainder half of numpy's `npy_divmod`, for one C float type."""
+    t = type_code
+    f = {"float": "f", "double": ""}[t]
+    return dedent(
+        f"""
+        static inline {t} finch_mod_{t}({t} a, {t} b) {{
+            {t} mod = fmod{f}(a, b);
+            if (mod) {{
+                if (isless(b, ({t})0) != isless(mod, ({t})0)) {{
+                    mod += b;
+                }}
+            }} else {{
+                mod = copysign{f}(0, b);
+            }}
+            return mod;
+        }}
+        """
+    )
 
 
 def c_literal(ctx: Any, val: Any) -> str:

@@ -1560,6 +1560,9 @@ def test_division_unsigned(compiler, operator, dtype, a, b):
         (np.uint8(7), np.int64(-2)),
         (np.float64(-7.5), np.float64(2.0)),
         (np.float32(7.5), np.float32(-2.0)),
+        # ffuncs.floordiv gives 10 here, where numpy's 1.0 // 0.1 gives 9
+        (np.float64(1.0), np.float64(0.1)),
+        (np.float32(1.0), np.float32(0.1)),
     ],
 )
 @pytest.mark.parametrize("compiler", DIVISION_COMPILERS)

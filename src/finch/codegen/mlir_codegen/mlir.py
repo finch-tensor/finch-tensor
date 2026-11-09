@@ -4,7 +4,7 @@ import ctypes
 import json
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import lru_cache, reduce
 from typing import Any
 
@@ -798,33 +798,40 @@ def mlir_division(
         case ffuncs._FloorDivFType() if is_float:
             quotient = emit(f"arith.divf {x}, {y} : {t}")
             return emit(f"llvm.intr.floor({quotient}) : ({t}) -> {t}")
+        case ffuncs._ModFType() if is_float:
+            return mlir_float_mod(ctx, emit, x, y, t)
         case ffuncs._TrueDivFType() | ffuncs._FloorDivFType():
             return emit(f"{mlir_function_name(op_type, result_type)} {x}, {y} : {t}")
     rem = emit(f"{mlir_function_name(op_type, result_type)} {x}, {y} : {t}")
     if MLIROperator.is_unsigned(result_type):
         return rem
-    if is_float:
-        zero = ctx.constant("0.0", t)
-        nonzero = emit(f"arith.cmpf une, {rem}, {zero} : {t}")
-        rem_neg = emit(f"arith.cmpf olt, {rem}, {zero} : {t}")
-        y_neg = emit(f"arith.cmpf olt, {y}, {zero} : {t}")
-        add = "arith.addf"
-    else:
-        zero = ctx.constant(0, t)
-        nonzero = emit(f"arith.cmpi ne, {rem}, {zero} : {t}")
-        rem_neg = emit(f"arith.cmpi slt, {rem}, {zero} : {t}")
-        y_neg = emit(f"arith.cmpi slt, {y}, {zero} : {t}")
-        add = "arith.addi"
+    zero = ctx.constant(0, t)
+    nonzero = emit(f"arith.cmpi ne, {rem}, {zero} : {t}")
+    rem_neg = emit(f"arith.cmpi slt, {rem}, {zero} : {t}")
+    y_neg = emit(f"arith.cmpi slt, {y}, {zero} : {t}")
     # a nonzero remainder with the wrong sign moves by one divisor
     differ = emit(f"arith.xori {rem_neg}, {y_neg} : i1")
     shift = emit(f"arith.andi {nonzero}, {differ} : i1")
-    shifted = emit(f"{add} {rem}, {y} : {t}")
-    result = emit(f"arith.select {shift}, {shifted}, {rem} : {t}")
-    if not is_float:
-        return result
-    # and a zero remainder takes the sign of the divisor
-    signed_zero = emit(f"arith.select {y_neg}, {ctx.constant('-0.0', t)}, {zero} : {t}")
-    return emit(f"arith.select {nonzero}, {result}, {signed_zero} : {t}")
+    shifted = emit(f"arith.addi {rem}, {y} : {t}")
+    return emit(f"arith.select {shift}, {shifted}, {rem} : {t}")
+
+
+def mlir_float_mod(
+    ctx: MLIRContext, emit: Callable[[str], str], x: str, y: str, t: str
+) -> str:
+    """The remainder half of numpy's `npy_divmod`, with selects for its branches."""
+    zero = ctx.constant("0.0", t)
+    fmod = emit(f"arith.remf {x}, {y} : {t}")
+    # move a wrong-signed remainder by one divisor; a zero takes the divisor's sign
+    nonzero = emit(f"arith.cmpf une, {fmod}, {zero} : {t}")
+    mod_neg = emit(f"arith.cmpf olt, {fmod}, {zero} : {t}")
+    y_neg = emit(f"arith.cmpf olt, {y}, {zero} : {t}")
+    differ = emit(f"arith.xori {mod_neg}, {y_neg} : i1")
+    shift = emit(f"arith.andi {nonzero}, {differ} : i1")
+    moved = emit(f"arith.addf {fmod}, {y} : {t}")
+    mod = emit(f"arith.select {shift}, {moved}, {fmod} : {t}")
+    zero_mod = emit(f"llvm.intr.copysign({zero}, {y}) : ({t}, {t}) -> {t}")
+    return emit(f"arith.select {nonzero}, {mod}, {zero_mod} : {t}")
 
 
 def mlir_getattr(fmt: FType, ctx, obj, attrs):
