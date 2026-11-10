@@ -54,6 +54,52 @@ def compute_sketch(sketch: LogicExpression) -> Table:
     return Table(Literal(result), fields)
 
 
+def store_first(sketch: LogicExpression, fields: tuple[Field, ...]) -> LogicExpression:
+    """The sketch with `fields` as its leading dimensions, in that order."""
+    order = (*fields, *(f for f in sketch.fields() if f not in fields))
+    if order == sketch.fields():
+        return sketch
+    return compute_sketch(Reorder(sketch, order))
+
+
+def join_sketches(sketches: list[LogicExpression]) -> LogicExpression:
+    """
+    Multiply sketches two at a time, so that joins share a few kernels: each
+    join puts the sketch with more fields on the left and stores the fields
+    both share first, in the same order. The joins start from the sketch with
+    the most fields and next take the sketch sharing the most fields with the
+    result, to avoid products of unrelated sketches.
+    """
+    remaining = list(sketches)
+    result = remaining.pop(
+        max(range(len(remaining)), key=lambda n: len(remaining[n].fields()))
+    )
+    while remaining:
+        joined = set(result.fields())
+        other = remaining.pop(
+            max(
+                range(len(remaining)),
+                key=lambda n: (
+                    len(joined & set(remaining[n].fields())),
+                    len(remaining[n].fields()),
+                ),
+            )
+        )
+        left, right = (
+            (result, other)
+            if len(result.fields()) >= len(other.fields())
+            else (other, result)
+        )
+        shared = tuple(f for f in left.fields() if f in set(right.fields()))
+        result = compute_sketch(
+            MapJoin(
+                Literal(ffuncs.mul),
+                (store_first(left, shared), store_first(right, shared)),
+            )
+        )
+    return result
+
+
 def _dgood1(d_n: float, frequencies: dict | None, n: float, N: float) -> float:
     if d_n == 0:
         return 0.0
@@ -401,8 +447,9 @@ class SamplingStatsFactory(
 
         base_stats = super()._mapjoin_defs(op, *join_args)
         join_args, probs = self._align_mapjoin(*join_args)
-        result_sketch = compute_sketch(
-            MapJoin(Literal(ffuncs.mul), tuple(arg.sketch for arg in join_args))
+        result_sketch = store_first(
+            join_sketches([arg.sketch for arg in join_args]),
+            tuple(base_stats.index_order),
         )
 
         return self.remask(

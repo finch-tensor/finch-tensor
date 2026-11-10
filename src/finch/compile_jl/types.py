@@ -412,9 +412,10 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
                 case SplitMaskTensor():
                     ctor = f"Finch.splitmask({int(obj.shape[1])}, {int(obj.shape[0])})"
                 case RandomMaskTensor():
-                    ctor = (
-                        f"Finch.randommask({shape}, {obj._p}; seed=UInt64({obj._seed}))"
-                    )
+                    # Finch reads the probability and seed of a random mask when
+                    # the kernel runs, so leave them out of the source to share a
+                    # kernel among masks.
+                    ctor = f"Finch.randommask({shape}, 0.0; seed=UInt64(0))"
                 case OddEvenMergeSortPartnerMaskTensor():
                     ctor = (
                         "Finch.oddevenmergesortpartnermask("
