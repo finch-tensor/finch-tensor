@@ -8,8 +8,9 @@ kind of each level.
 
 import json
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -28,9 +29,9 @@ from finch.finch_logic import (
     Follow,
     Fuse,
     Gallop,
+    HardAlias,
     Laminate,
     Literal,
-    LogicExpression,
     LogicStatement,
     Plan,
     Protocol,
@@ -341,19 +342,6 @@ def allowed_options(
     return [option for option in options if protocols <= set(option.protocols)]
 
 
-def followed(expr: LogicExpression, table: Table) -> LogicExpression:
-    """expr, where each table of the tensor and fields of table follows every
-    field it reads, as dense levels are read."""
-
-    def read(node):
-        match node:
-            case Table(tns, idxs, _) if (tns, idxs) == (table.tns, table.idxs):
-                return Table(tns, idxs, (Follow(),) * len(idxs))
-        return None
-
-    return Rewrite(PostWalk(read))(expr)
-
-
 # bindings name no position type, so positions are intp.
 POS_SIZE = np_dtype(ftypes.intp).itemsize
 
@@ -495,6 +483,42 @@ def level_reads(
                     yield ProtocolChoice(prefix, table, depth, options)
 
 
+def rescans_a_root(
+    loops: tuple[Field, ...],
+    reads: Sequence[ProtocolChoice],
+    protocols: Sequence[Protocol],
+) -> bool:
+    """
+    Whether reading reads with protocols at the last of loops, within the
+    others, steps through the root level of a table, such as a vector, which
+    has the same entries at every execution of the loop, where a sparse level
+    of another read, whose fiber the enclosing loops choose, could lead the
+    loop instead. A walk steps through the root again at every execution, and
+    so does a gallop of it beside a walk, which ends no phase, or beside no
+    other gallop; a gallop leapfrogging with that of another read doesn't.
+    The length of the root is exact while DC stats bound the other fibers by
+    the largest, so the model may price stepping through it below following
+    it, which looks up only where the others lead. Reads whose protocols the
+    program gives are not among reads.
+    """
+    roots, leads = [], []
+    for read, protocol in zip(reads, protocols, strict=True):
+        level = read.alias.nfused + read.depth
+        above = read.table.idxs[:level]
+        if read.table.idxs[level] != loops[-1]:
+            continue
+        if not above:
+            roots.append(protocol)
+        elif read.option.filters and set(above) <= set(loops):
+            leads.append(protocol)
+    leapfrogs = Gallop() in leads and Walk() not in protocols
+    return (
+        len(loops) > 1
+        and bool(leads)
+        and any(p == Walk() or (p == Gallop() and not leapfrogs) for p in roots)
+    )
+
+
 def level_accesses(
     prefix: Prefix, formats: Mapping[Alias, Sequence[LevelOption]]
 ) -> Iterator[ProtocolChoice]:
@@ -584,25 +608,41 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
             distinct = spaces.located(visited, component.fields)
         else:
             distinct = spaces.located(spaces.stepped(table), component.fields)
+            arg = loop_arg(prefix.expr)
+            galloped = []
+            for node in dict.fromkeys(PostOrderDFS(arg)):
+                match node:
+                    case Table(Alias() as tns, idxs) if (
+                        spaces.idx in idxs[tns.nfused :]
+                        and spaces.protocol(node) == Gallop()
+                    ):
+                        galloped.append(node)
             match component.protocol:
+                case Walk() if not galloped:
+                    # With no gallop to lead it, the loop merges its walks,
+                    # skipping a fiber only where they have no entries as the
+                    # expression combines them, and otherwise stepping through
+                    # every entry of each, not only those the others share.
+                    stats_factory = machine.stats_factory
+                    walked = spaces.walked(arg)
+                    # The table of the access is among the walks.
+                    assert walked is not None
+                    visits = spaces.count(
+                        stats_factory.mapjoin(
+                            ffuncs.and_,
+                            spaces.exec_space,
+                            stats_factory.support(walked),
+                            spaces.project(machine(table), (spaces.idx,)),
+                        )
+                    )
                 case Walk():
                     visits = spaces.walk(table)
                 case Gallop():
-                    # A gallop jumps at most once for each visit the loop would
-                    # make if the level were dense, and for each step of the
-                    # smallest walk among the gallops.
-                    dense = loop_spaces(
-                        replace(prefix, expr=followed(prefix.expr, table)), machine
-                    )
-                    galloped = []
-                    for node in dict.fromkeys(PostOrderDFS(loop_arg(prefix.expr))):
-                        match node:
-                            case Table() if spaces.protocol(node) == Gallop():
-                                galloped.append(node)
-                    smallest = min(
-                        (spaces.walk(node) for node in galloped), default=0.0
-                    )
-                    visits = min(dense.count(dense.visited()), smallest)
+                    # A gallop jumps once for each entry of the smallest support
+                    # among the arguments galloped at the loop, in the fibers it
+                    # enters: gallops leapfrog, and walks are stepped within
+                    # their phases.
+                    visits = min(spaces.walk(node) for node in galloped)
         return np.array(
             [
                 [
@@ -651,13 +691,54 @@ class ProtocolBasis(ByKind[ProtocolChoice, str]):
         )
 
 
+def written(prefix: Prefix, machine: StatsMachine[NS]) -> NS:
+    """
+    The stats of where the query of prefix writes its output: those of its
+    expression, with each table whose levels from the last which filters down
+    don't filter spanning their fields wholly, as the formats of prefix give
+    them. A read of such a level finds a value at every slot, so the query
+    writes wherever it reads one, whatever the value.
+    """
+    formats = prefix.formats or {}
+    stats_factory = machine.stats_factory
+    bindings = OrderedDict(machine.bindings)
+
+    def span(node):
+        match node:
+            case Table(Alias() as tns, idxs) if tns.unfused in formats:
+                # The element level, the last option, has no field.
+                levels = zip(idxs[tns.nfused :], formats[tns.unfused][:-1], strict=True)
+                dense: list[Field] = []
+                for idx, option in levels:
+                    dense = [*dense, idx] if not option.filters else []
+                if dense:
+                    stat = machine(Table(tns, idxs))
+                    kept = restrict(stats_factory, stat, set(idxs) - set(dense))
+                    spanned = stats_factory.reorder(
+                        stats_factory.mapjoin(
+                            ffuncs.or_, stats_factory.support(stat), kept
+                        ),
+                        idxs,
+                    )
+                    spanned.fill_type = stat.fill_type
+                    alias = HardAlias(f"{tns.name}[{','.join(map(str, idxs))}]")
+                    bindings[alias] = spanned
+                    return Table(alias, idxs)
+        return None
+
+    expr = Rewrite(PostWalk(span))(prefix.expr)
+    if expr == prefix.expr:
+        return machine(expr)
+    return StatsMachine(stats_factory, bindings)(expr)
+
+
 class LevelBasis(Basis[ProtocolChoice], LoopOrderedForm):
     """
     A basis whose components are the accesses, as AccessBasis lists them, and
     whose rows are the storage features of option at the accesses which write
-    a level of it: the level stores what the query writes, entered at the
-    fibers the access enters. The tensors a query reads are already stored, so
-    a read costs no storage.
+    a level of it: the level stores what the query writes, as written gives
+    it, entered at the fibers the access enters. The tensors a query reads are
+    already stored, so a read costs no storage.
     """
 
     def __init__(self, option: LevelOption):
@@ -688,7 +769,7 @@ class LevelBasis(Basis[ProtocolChoice], LoopOrderedForm):
             return np.zeros((1, self.n_features))
         stats_factory = machine.stats_factory
         idxs = component.table.idxs
-        stats = machine(component.prefix.expr)
+        stats = written(component.prefix, machine)
         if any(idx not in idxs for idx in stats.index_order):
             stats = restrict(stats_factory, stats, idxs)
         stats = stats_factory.reorder(stats, idxs)

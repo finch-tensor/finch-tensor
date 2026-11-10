@@ -16,11 +16,13 @@ from finch.autoschedule import CompilerFormLowerer, LogicCapture, NotationGenera
 from finch.autoschedule.cost_models import (
     DenseLevelOption,
     LevelOption,
+    PigeonBasis,
     ProtocolBasis,
     ProtocolChoice,
     SparseListLevelOption,
-    TransposeBasis,
+    WithCopies,
 )
+from finch.autoschedule.cost_models.loop_cost_models import transpose_copy
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
 from finch.autoschedule.loop_orderer.loop_ordering import AbstractLoopOrderer
 from finch.autoschedule.tensor_stats import DCStatsFactory
@@ -180,7 +182,8 @@ def test_inputs_are_transposed_rather_than_read_out_of_order():
     nnz = int(data.sum())
 
     # The loop orderer copies X into loop order, and the query reads the copy
-    # in order, which the transpose basis charges for the out-of-order prefix.
+    # in order. The loop model prices that copy at the out-of-order prefix, as
+    # it prices any query.
     counts, lowered = run(
         plan,
         {X: x},
@@ -195,14 +198,22 @@ def test_inputs_are_transposed_rather_than_read_out_of_order():
     assert len(reads) == 1
     assert isinstance(reads[0], Table) and reads[0].tns != X
     assert reads[0].idxs == (k, i)
-    transposed = TransposeBasis().get_features(
-        Plan((fuse_loop_order(query, (k, i)), Produces((C,)))), {}, stats, sf
+
+    def features(basis, order):
+        plan = Plan((fuse_loop_order(query, order), Produces((C,))))
+        return basis.get_features(plan, {}, stats, sf).sum(axis=0)
+
+    copy = transpose_copy(X, stats[X], (k,))
+    copy_rows = PigeonBasis().get_features(copy, {}, stats, sf).sum(axis=0)
+    # The copy iterates over every entry of X.
+    assert copy_rows[0] >= nnz
+    assert np.array_equal(
+        features(WithCopies(PigeonBasis()), (k, i)),
+        features(PigeonBasis(), (k, i)) + copy_rows,
     )
-    assert transposed.sum() == nnz
-    in_order = TransposeBasis().get_features(
-        Plan((fuse_loop_order(query, (i, k)), Produces((C,)))), {}, stats, sf
+    assert np.array_equal(
+        features(WithCopies(PigeonBasis()), (i, k)), features(PigeonBasis(), (i, k))
     )
-    assert in_order.sum() == 0
 
     # Fusing the query directly instead selects the out-of-order index with a
     # mask in an extra loop, which the loop basis doesn't see, where a copy in
@@ -302,13 +313,16 @@ def test_gallops_jump_within_the_smallest_support():
         ]
         return sum(rows)[basis.feature_names.index("sparse_list.gallop.visits")]
 
-    # Two gallops each jump at most as often as the smaller list has entries,
-    # and a gallop driven by a walk jumps once for each step of the walk.
+    # Two gallops each jump at most as often as the smaller list has entries.
+    # A walk doesn't end the phases of a gallop beside it, so the gallop jumps
+    # through every entry of its own.
     assert jumps(Gallop(), Gallop()) == 10
-    assert jumps(Walk(), Gallop()) == 5
+    assert jumps(Walk(), Gallop()) == 100
     assert jumps(Gallop(), Walk()) == 5
     assert jumps(Walk(), Follow()) == 0
     walks, _ = run(program(Walk(), Walk()), inputs, {c: ()})
     gallops, _ = run(program(Gallop(), Gallop()), inputs, {c: ()})
+    walk_gallop, _ = run(program(Walk(), Gallop()), inputs, {c: ()})
+    assert walk_gallop["while"] >= 100
     assert gallops["while"] < walks["while"]
     assert loads(gallops, "y", "idx") < loads(walks, "y", "idx")
