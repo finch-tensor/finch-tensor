@@ -8,7 +8,7 @@ from finch.algebra import Tensor, ffuncs, ftype, is_dynamic
 from finch.compile import NotationCompiler, make_extent
 from finch.compile.looplets import Run
 from finch.finch_notation.interpreter import FullView
-from finch.symbolic import Reflector, ScopedDict
+from finch.symbolic import PostOrderDFS, Reflector, ScopedDict
 from finch.tensor import BufferizedNDArray
 
 
@@ -105,13 +105,14 @@ def test_full_compiler():
             np.testing.assert_array_equal(actual, np.full((2, 3), value))
 
 
-def test_full_run_annihilator():
+def test_reads_of_a_literal_run_fold_to_the_literal():
     full = ntn.Full(ntn.Literal(0))
     access = ntn.Unwrap(
         ntn.Access(ntn.Looplet(Run(full), full.result_type), ntn.Read(), ())
     )
+    assert ntn.LoopletSimplify.simplify(access) == ntn.Literal(0)
     term = ntn.Call(ntn.Literal(ffuncs.mul), (access, ntn.Literal(5)))
-    assert ntn.LoopletSimplify.simplify(term) == access
+    assert ntn.LoopletSimplify()(term) == ntn.Literal(0)
     dynamic = ntn.Unwrap(
         ntn.Access(
             Run(ntn.Full(ntn.Variable("value", ftype(np.int64)))),  # ty: ignore[invalid-argument-type]
@@ -119,8 +120,9 @@ def test_full_run_annihilator():
             (),
         )
     )
+    assert ntn.LoopletSimplify.simplify(dynamic) is None
     term = ntn.Call(ntn.Literal(ffuncs.mul), (dynamic, ntn.Literal(5)))
-    assert ntn.LoopletSimplify.simplify(term) is None
+    assert dynamic in PostOrderDFS(ntn.LoopletSimplify()(term))
 
 
 @pytest.mark.parametrize(
@@ -142,8 +144,10 @@ def test_increments_by_the_identity_are_dropped(op, val, dropped):
         ntn.Access(ntn.Looplet(Run(full), full.result_type), ntn.Read(), ())
     )
     for rhs in (ntn.Literal(val), run):
-        expected = ntn.Block(()) if dropped else None
-        assert ntn.LoopletSimplify.simplify(ntn.Increment(lhs, rhs)) == expected
+        expected = ntn.Block(())
+        assert ntn.LoopletSimplify()(ntn.Increment(lhs, rhs)) == (
+            expected if dropped else ntn.Increment(lhs, ntn.Literal(val))
+        )
 
     # A dynamic fill may not be the identity, so its increment is kept.
     dynamic = ntn.Unwrap(
@@ -153,7 +157,9 @@ def test_increments_by_the_identity_are_dropped(op, val, dropped):
             (),
         )
     )
-    assert ntn.LoopletSimplify.simplify(ntn.Increment(lhs, dynamic)) is None
+    assert ntn.LoopletSimplify()(ntn.Increment(lhs, dynamic)) == ntn.Increment(
+        lhs, dynamic
+    )
 
 
 def test_loops_without_bodies_are_dropped():
@@ -169,6 +175,22 @@ def test_loops_without_bodies_are_dropped():
             assert kept == body
         case term:
             raise AssertionError(f"Expected the loop to be kept: {term}")
+
+
+def test_loops_over_a_run_of_the_identity_are_dropped():
+    # A sparse level lowers its gaps to a run of the fill value, so counting the
+    # nonzeros of a gap increments by ne(0.0, 0.0), which must not leave a loop.
+    i = ntn.Variable("i", ftype(np.intp))
+    tns = ntn.Variable("A", ftype(np.int64))
+    lhs = ntn.Access(tns, ntn.Update(ntn.Literal(ffuncs.add)), (i,))
+    full = ntn.Full(ntn.Literal(0.0))
+    run = ntn.Unwrap(
+        ntn.Access(ntn.Looplet(Run(full), full.result_type), ntn.Read(), (i,))
+    )
+    rhs = ntn.Call(ntn.Literal(ffuncs.ne), (run, ntn.Literal(0.0)))
+    ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(0), ntn.Literal(3)))
+    loop = ntn.Loop(i, ext, ntn.Increment(lhs, rhs))
+    assert ntn.LoopletSimplify()(loop) == ntn.Block(())
 
 
 def test_full_scalar():
