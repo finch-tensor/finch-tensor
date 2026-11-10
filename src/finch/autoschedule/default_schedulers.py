@@ -31,7 +31,7 @@ from .formatter import DefaultLogicFormatter, FDFormatter, GalleyFormatter
 from .loop_orderer import BFSLoopOrderer, DefaultLoopOrderer
 from .normalize import LogicNormalizer
 from .protocolizer import CostProtocolizer
-from .workspacer import DefaultLogicWorkspacer, LogicWorkspacer
+from .workspacer import DefaultLogicWorkspacer, LogicWorkspacer, galley_format_cost
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
@@ -204,7 +204,8 @@ COMPILE_JULIA_GALLEY = LogicNormalizer(
                                     )
                                 )
                             )
-                        )
+                        ),
+                        format_cost=galley_format_cost,
                     )
                 )
             )
