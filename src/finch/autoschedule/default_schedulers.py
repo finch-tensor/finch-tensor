@@ -221,10 +221,11 @@ COMPILE_JULIA_GALLEY = LogicNormalizer(
                     LogicWorkspacer(
                         LogicFuseMerger(
                             GalleyFormatter(
-                              LogicFillDropper(
-                                CostProtocolizer(
-                                    CompilerFormLowerer(
-                                        LogicCompiler(FinchJLCompiler())
+                                LogicFillDropper(
+                                    CostProtocolizer(
+                                        CompilerFormLowerer(
+                                            LogicCompiler(FinchJLCompiler())
+                                        )
                                     )
                                 )
                             )
