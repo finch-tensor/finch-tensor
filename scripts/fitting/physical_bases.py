@@ -13,9 +13,6 @@ examples coalesce_physical_data collects, so a new basis needs no new timings.
   re-chooses the protocols of the loops a format changes. Its model, the
   protocol cost model, is the one the formatter, the workspacer, and the
   protocol optimizer price with.
-- transpose: for a random input, every order a copy of it can be stored in,
-  which the copy reads out of order, as the loop orderer transposes an input
-  it would read out of order. No optimizer prices with its model yet.
 - loop: for a random program, every loop order, with its inputs stored in
   that order, so that the program is concordant, and the output stored as the
   program stores it, which the loops may scatter into. Each order is passed
@@ -59,15 +56,13 @@ from finch.autoschedule.cost_models import (
     FlopsBasis,
     LevelOption,
     PigeonBasis,
-    Stratify,
-    TransposeBasis,
     WriteBasis,
     WriteClasses,
+    WriteStrata,
     level_options,
     loop_basis,
     loop_cost_model,
 )
-from finch.autoschedule.cost_models.loop_cost_models import N_WRITE_CLASSES
 from finch.autoschedule.formatter.smart_formatter import (
     LEVEL_OPTIONS,
     format_ftype,
@@ -108,14 +103,13 @@ from scripts.fitting.kronecker_stats import (
     support_tensor,
 )
 
-STAGES = ("protocol", "transpose", "loop", "factorize")
+STAGES = ("protocol", "loop", "factorize")
 OPTIONS = {option.kind: option for option in LEVEL_OPTIONS}
 A, B, C = HardAlias("A"), HardAlias("B"), HardAlias("C")
 
 
 BASES: dict[str, Basis] = {
     "protocol": PROTOCOL_BASIS,
-    "transpose": Affine(TransposeBasis()),
     "loop": loop_basis(),
     "factorize": Affine(FlopsBasis()),
 }
@@ -131,7 +125,7 @@ def stratified(rows: np.ndarray, classes: WriteClasses) -> np.ndarray:
     """The rows of loop_basis(classes) of rows of TUNING_BASIS."""
     start = PigeonBasis().n_features
     end = start + WriteBasis().n_features
-    writes = Stratify(WriteBasis(), N_WRITE_CLASSES, classes)
+    writes = WriteStrata(classes)
     return np.hstack(
         [rows[:, :start], writes.transform(rows[:, start:end]), rows[:, end:]]
     )
@@ -181,7 +175,7 @@ def variant_plan(record: Mapping[str, Any], variant: Mapping[str, Any]) -> Plan:
     The plan of a variant of the program of record, under the loop order of
     the variant or of the record, reading its inputs with the protocols of the
     variant, if any. In the loop stage the inputs are stored in the loop
-    order, and in the transpose stage the copy is.
+    order.
     """
     prgm = parse_logic(record["query"])
     assert isinstance(prgm, Plan)
@@ -205,8 +199,6 @@ def variant_plan(record: Mapping[str, Any], variant: Mapping[str, Any]) -> Plan:
         return None
 
     query = Query(query.lhs, Rewrite(PostWalk(read))(query.rhs))
-    if stage == "transpose":
-        query = Query(Table(C, order), query.rhs)
     return fused_plan(query, order)
 
 

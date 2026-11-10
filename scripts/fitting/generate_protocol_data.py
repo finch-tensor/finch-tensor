@@ -1,6 +1,6 @@
 """
-Draw programs for fitting the cost models of the protocol and transpose
-stages of physical_bases, and their inputs. Each program is a random
+Draw programs for fitting the cost model of the protocol stage of
+physical_bases, and their inputs. Each program is a random
 subprogram of C_lmq += A_jlpq * B_kmpq, which loops in the order its inputs
 store their fields, and its inputs are Kronecker products of R-MAT blocks of
 drawn densities, as kronecker_stats draws them. Its variants are every option
@@ -20,7 +20,6 @@ that they match, and materialize expands them into COO tensors.
         [--stage STAGE] [--programs N] [--chunk K] [--seed S]
 """
 
-import itertools
 from typing import Any
 
 import numpy as np
@@ -52,13 +51,12 @@ from scripts.fitting.generation import (
 )
 from scripts.fitting.physical_bases import (
     OPTIONS,
-    A,
     C,
     fused_plan,
     with_subsequence,
 )
 
-STAGES = ("protocol", "transpose")
+STAGES = ("protocol",)
 # The most fields of an input, which bounds the variants of the protocol stage.
 MAX_RANK = 3
 # log2 of the most entries all the fields of a program may address, and of the
@@ -73,11 +71,9 @@ SKEW = 5
 # The draws of the seeds of the inputs of each program, of which KEEP of its
 # stage are kept as examples. In the protocol stage, the variants of the
 # examples of a program compile to the same kernels, so they are compiled
-# once for them all, and more are kept. The transpose stage chooses protocols
-# from the stats of each example, so its kernels can differ, and one is kept,
-# for more programs instead.
+# once for them all, and more are kept.
 SAMPLES = 1000
-KEEP = {"protocol": 10, "transpose": 1}
+KEEP = {"protocol": 10}
 # The most variants of a program, where a stage has too many to time: the
 # protocol stage has up to 6561.
 VARIANTS = {"protocol": 64}
@@ -208,23 +204,6 @@ def variant_space(
             return {"formats": formats, "protocols": protocols}
 
         return spaces, make
-    if stage == "transpose":
-        # C copies A, stored in each order of A's fields, under a drawn format
-        # of A and, for each order, of C, whose levels the copy may laminate.
-        A_idxs = input_fields[A]
-        formats = {A.name: [choose(rng, list(OPTIONS)) for _ in A_idxs]}
-        orders = [list(order) for order in itertools.permutations(A_idxs)]
-
-        def make(choices):
-            (order,) = choices
-            copy = Query(Table(C, tuple(order)), Table(A, A_idxs))
-            kinds = output_kinds(copy, tuple(order))
-            return {
-                "loop_order": [idx.name for idx in order],
-                "formats": {**formats, C.name: [choose(rng, k) for k in kinds]},
-            }
-
-        return [orders], make
     raise ValueError(f"Unknown stage {stage}, expected one of {STAGES}")
 
 
@@ -244,11 +223,6 @@ def program_inputs(rng, stage):
     points = [seed_lg_densities(prgm, input_fields, lg_dims, S) for S in seeds]
     query, _ = prgm.bodies
     assert isinstance(query, Query)
-    if stage == "transpose":
-        # The transpose stage copies A as it is stored, and its variants store
-        # the copy in every order.
-        query = Query(Table(C, input_fields[A]), Table(A, input_fields[A]))
-        loop_order = input_fields[A]
     spaces, make = variant_space(stage, query, input_fields, loop_order, rng)
     options, exhaustive = variants(spaces, make, rng, VARIANTS.get(stage))
     record = {

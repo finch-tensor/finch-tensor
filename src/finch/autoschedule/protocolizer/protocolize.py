@@ -19,6 +19,7 @@ from finch.autoschedule.cost_models import (
     level_formats,
     level_reads,
     read_options,
+    rescans_a_root,
 )
 from finch.autoschedule.stages import FormattedForm
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
@@ -196,6 +197,14 @@ def choose_protocols(
         cost = 0.0
         for n in range(len(loop_order)):
             loops = loop_order[: n + 1]
+            reads = [
+                read
+                for read in level_reads(
+                    Prefix(loops, merged_expr(rebuild(rhs)), lhs_idxs), formats
+                )
+                if (read.alias, read.table.idxs, read.alias.nfused + read.depth)
+                not in given
+            ]
             options = [
                 [
                     (read.alias, read.table.idxs, read.depth, proto)
@@ -207,14 +216,12 @@ def choose_protocols(
                         loop_order,
                     )
                 ]
-                for read in level_reads(
-                    Prefix(loops, merged_expr(rebuild(rhs)), lhs_idxs), formats
-                )
-                if (read.alias, read.table.idxs, read.alias.nfused + read.depth)
-                not in given
+                for read in reads
             ]
             best: tuple[float, lgc.LogicExpression] = (float("inf"), rhs)
             for choice in product(*options):
+                if rescans_a_root(loops, reads, [c[3] for c in choice]):
+                    continue
                 rhs_2 = rhs
                 for tns, idxs, depth, proto in choice:
                     rhs_2 = with_protocol(rhs_2, tns, idxs, depth, proto)
@@ -373,6 +380,8 @@ def _group_costs(
             ]
             best = dict.fromkeys(options, math.inf)
             for choice in product(*choices):
+                if rescans_a_root(loops, reads, choice):
+                    continue
                 keys = [
                     key
                     for key in options
