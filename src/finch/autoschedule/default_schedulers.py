@@ -22,6 +22,7 @@ from finch.finch_logic.stages import LogicEvaluator
 from finch.finch_notation.interpreter import NotationInterpreter
 
 from .compiler import CompilerFormLowerer, LogicCompiler
+from .drop_fills import LogicFillDropper
 from .executor import LogicExecutor
 from .factor_cache import FactorCacheEvaluator
 from .factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
@@ -220,6 +221,7 @@ COMPILE_JULIA_GALLEY = LogicNormalizer(
                     LogicWorkspacer(
                         LogicFuseMerger(
                             GalleyFormatter(
+                              LogicFillDropper(
                                 CostProtocolizer(
                                     CompilerFormLowerer(
                                         LogicCompiler(FinchJLCompiler())
