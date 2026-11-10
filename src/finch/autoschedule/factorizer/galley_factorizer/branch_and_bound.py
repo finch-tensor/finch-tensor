@@ -18,6 +18,12 @@ GalleyOptimizer = Literal["greedy", "bfs", "dfs"]
 # pruned optimizer does.
 GREEDY_COMPONENT_SIZE = 10
 
+# The relative slack on the bounds max_subquery_costs gives. The exact search
+# can reach the greedy order's cost by adding the same costs in another order,
+# which rounds differently; without slack such a sum can exceed its own bound by
+# an ulp and leave no complete order.
+BOUND_TOLERANCE = 1e-9
+
 
 def branch_and_bound(
     input_aq: AnnotatedQuery,
@@ -67,6 +73,7 @@ def branch_and_bound(
                 for vars2 in max_subquery_costs:
                     if vars2 >= new_vars:
                         bound = min(bound, max_subquery_costs[vars2])
+                bound *= 1 + BOUND_TOLERANCE
 
                 # cheapest_cost = best known cost to reach new_vars (from any path)
                 best_val = best_idx_ext.get(

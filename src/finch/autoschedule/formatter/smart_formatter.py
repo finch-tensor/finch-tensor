@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import logging
 from abc import abstractmethod
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from itertools import product
 from typing import TypeVar
+
+import numpy as np
 
 from finch import finch_logic as lgc
 from finch.algebra import (
@@ -17,14 +20,18 @@ from finch.algebra import (
 )
 from finch.autoschedule.cost_models import (
     PROTOCOL_COST_MODEL,
+    STORAGE_BASIS,
     CostModel,
+    DenseLevelOption,
+    ElementLevelOption,
     LevelOption,
     ProtocolChoice,
+    SparseListLevelOption,
     allowed_options,
     read_protocols,
     write_protocols,
 )
-from finch.autoschedule.cost_models.protocol_cost_models import FIELD_KINDS
+from finch.autoschedule.cost_models.protocol_cost_models import FIELD_KINDS, accesses
 from finch.autoschedule.protocolizer.protocolize import alias_costs, choose_protocols
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
@@ -57,6 +64,26 @@ LEVEL_BUILDERS = {
     "sparse_bytemap": sparse_bytemap,
 }
 
+# CostFormatter stores no tensor with a dense or bytemap level, which
+# allocate a slot for every index of their dimension, which it expects to take
+# this many bytes or more.
+MAX_MEMORY_UTILIZATION = 12 * 2**30
+SLOTTED_KINDS = ("dense", "sparse_bytemap")
+
+# CostFormatter stores no tensor of one level densely where it expects fewer
+# than this fraction of its slots to have entries.
+MIN_DENSE_DENSITY = 0.25
+
+# The storage features of STORAGE_BASIS which count bytes: the pointers,
+# indices and values of the levels, and the byte which flags each slot of a
+# bytemap.
+_BYTE_FEATURES = np.array(
+    [
+        float(name.endswith("_bytes") or name == "sparse_bytemap.slots")
+        for name in STORAGE_BASIS.feature_names
+    ]
+)
+
 
 def format_ftype(
     options: Sequence[LevelOption], fill_type: AbstractFillFType, shape_type
@@ -66,6 +93,70 @@ def format_ftype(
     for option, dim in reversed(list(zip(options, shape_type, strict=True))):
         lvl = LEVEL_BUILDERS[option.kind](lvl, dim)
     return fiber_tensor(lvl)
+
+
+def expected_sizes(
+    prgm: lgc.LogicStatement,
+    bindings: Mapping[lgc.Alias, TensorFType],
+    stats: Mapping[lgc.Alias, TensorStats],
+    stats_factory: StatsFactory,
+    candidates: Mapping[lgc.Alias, Sequence[tuple[LevelOption, ...]]],
+) -> dict[tuple[lgc.Alias, tuple[LevelOption, ...]], float]:
+    """
+    The bytes each alias of candidates is expected to take with the levels of
+    each of its candidates, as STORAGE_BASIS prices the levels that the
+    queries of prgm write, formatted as bindings says, in the largest of the
+    queries which write it.
+    """
+    machine = StatsMachine(stats_factory, OrderedDict(stats))
+    by_query: dict = defaultdict(float)
+    for access in accesses(prgm, bindings, machine):
+        alias = access.alias.unfused
+        if not access.write or alias not in candidates:
+            continue
+        for kinds in candidates[alias]:
+            choice = replace(access, options=[*kinds, ElementLevelOption()])
+            features = STORAGE_BASIS.get_component_features(choice, machine)
+            by_query[alias, kinds, access.prefix.expr] += float(
+                features.sum(axis=0) @ _BYTE_FEATURES
+            )
+    sizes: dict[tuple[lgc.Alias, tuple[LevelOption, ...]], float] = {}
+    for (alias, kinds, _), size in by_query.items():
+        sizes[alias, kinds] = max(sizes.get((alias, kinds), 0.0), size)
+    return sizes
+
+
+def expected_densities(
+    prgm: lgc.LogicStatement,
+    bindings: Mapping[lgc.Alias, TensorFType],
+    stats: Mapping[lgc.Alias, TensorStats],
+    stats_factory: StatsFactory,
+    aliases: Sequence[lgc.Alias],
+) -> dict[lgc.Alias, float]:
+    """
+    The fraction of the slots of the first level of each of aliases which
+    STORAGE_BASIS expects the queries of prgm that write it, formatted as
+    bindings says, to give entries, in the densest of them.
+    """
+    names = STORAGE_BASIS.feature_names
+    entries, slots = names.index("sparse_list.entries"), names.index("dense.slots")
+    sparse = [SparseListLevelOption(), ElementLevelOption()]
+    dense = [DenseLevelOption(), ElementLevelOption()]
+    machine = StatsMachine(stats_factory, OrderedDict(stats))
+    densities: dict[lgc.Alias, float] = {}
+    for access in accesses(prgm, bindings, machine):
+        alias = access.alias.unfused
+        if not access.write or access.depth != 0 or alias not in aliases:
+            continue
+        found = STORAGE_BASIS.get_component_features(
+            replace(access, options=sparse), machine
+        ).sum(axis=0)[entries]
+        room = STORAGE_BASIS.get_component_features(
+            replace(access, options=dense), machine
+        ).sum(axis=0)[slots]
+        if room > 0:
+            densities[alias] = max(densities.get(alias, 0.0), found / room)
+    return densities
 
 
 def optimize_formats(
@@ -86,7 +177,11 @@ def optimize_formats(
     The formats are found by coordinate descent: each alias in turn prices every
     product of the options its levels allow, as alias_costs prices them, for
     two sweeps or until none changes. Each starts from the first allowed option
-    of each level which filters.
+    of each level which filters. A product with a level of SLOTTED_KINDS is
+    refused where expected_sizes expects the alias to take
+    MAX_MEMORY_UTILIZATION bytes or more with it, and a dense level is refused
+    to an alias of one level which expected_densities expects to be less dense
+    than MIN_DENSE_DENSITY.
     """
     allowed = {
         alias: [
@@ -107,18 +202,44 @@ def optimize_formats(
     def ftype_of(alias, kinds):
         return format_ftype(kinds, fill_types[alias], stored[alias])
 
-    formats = {
-        alias: ftype_of(
-            alias,
-            [
-                next((option for option in level if option.filters), level[0])
-                for level in levels
-            ],
+    initial = {
+        alias: tuple(
+            next((option for option in level if option.filters), level[0])
+            for level in levels
         )
         for alias, levels in allowed.items()
     }
-
-    bindings = {**bindings, **formats}
+    bindings = {
+        **bindings,
+        **{alias: ftype_of(alias, kinds) for alias, kinds in initial.items()},
+    }
+    slotted = {
+        alias: [
+            kinds
+            for kinds in product(*levels)
+            if any(option.kind in SLOTTED_KINDS for option in kinds)
+        ]
+        for alias, levels in allowed.items()
+    }
+    sizes = expected_sizes(prgm, bindings, stats, stats_factory, slotted)
+    refused = {key for key, size in sizes.items() if size >= MAX_MEMORY_UTILIZATION}
+    vectors = [alias for alias, levels in allowed.items() if len(levels) == 1]
+    densities = expected_densities(prgm, bindings, stats, stats_factory, vectors)
+    refused |= {
+        (alias, kinds)
+        for alias in vectors
+        if densities.get(alias, 1.0) < MIN_DENSE_DENSITY
+        for kinds in product(*allowed[alias])
+        if kinds[0].kind == "dense"
+    }
+    # A refused start gives way to the first product which isn't refused.
+    for alias, levels in allowed.items():
+        if (alias, initial[alias]) in refused:
+            kinds = next(
+                (kinds for kinds in product(*levels) if (alias, kinds) not in refused),
+                initial[alias],
+            )
+            bindings[alias] = ftype_of(alias, kinds)
     # Every format prices the same loops over the same stats.
     cache: dict = {}
     _, costs = choose_protocols(
@@ -132,7 +253,8 @@ def optimize_formats(
             candidates = {
                 kinds: fmt
                 for kinds in product(*levels)
-                if (fmt := ftype_of(alias, kinds)) != bindings[alias]
+                if (alias, kinds) not in refused
+                and (fmt := ftype_of(alias, kinds)) != bindings[alias]
             }
             priced = alias_costs(
                 prgm,
