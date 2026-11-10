@@ -1,4 +1,5 @@
 import math
+from typing import Any
 
 import pytest
 
@@ -8,7 +9,11 @@ import scipy.sparse as sps
 import finch as fl
 from finch import ffuncs
 from finch.algebra import StaticFillFType, TensorFType, ftype
-from finch.autoschedule import CompilerFormLowerer, NotationGenerator
+from finch.autoschedule import (
+    CompilerFormLowerer,
+    NotationGenerator,
+    default_schedulers,
+)
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.cost_models import (
     PROTOCOL_BASIS,
@@ -20,6 +25,7 @@ from finch.autoschedule.cost_models import (
     WriteBasis,
     write_class,
 )
+from finch.autoschedule.formatter.galley_formatter import GalleyFormatter
 from finch.autoschedule.formatter.smart_formatter import CostFormatter, format_ftype
 from finch.autoschedule.loop_orderer import BFSLoopOrderer
 from finch.autoschedule.stages import LoopOrderedForm
@@ -40,6 +46,7 @@ from finch.autoschedule.workspacer import (
     add_cost_effective_workspaces,
     add_reformat,
     add_workspace,
+    galley_format_cost,
     workspace_depth,
 )
 from finch.codegen import NumbaCompiler, NumpyBuffer
@@ -54,6 +61,7 @@ from finch.finch_logic import (
     HardAlias,
     Literal,
     MapJoin,
+    MockLogicLoader,
     Plan,
     Produces,
     Query,
@@ -421,3 +429,51 @@ def test_reformats_copy_inputs_where_they_cost_less():
     # Where nothing costs, no copy pays for itself.
     free = CostModel(PROTOCOL_BASIS, np.zeros(PROTOCOL_BASIS.n_features))
     assert add_cost_effective_reformats(plan, bindings, stats, sf, free) == plan
+
+
+def test_galley_format_cost_prices_the_formats_a_galley_formatter_chooses():
+    # C[t, i] = sum_j A[t, j] B[j, i], row by row through a workspace fused
+    # over t: the formats galley_format_cost prices are those a GalleyFormatter
+    # gives the same program.
+    t, j, i = fields = (Field("t"), Field("j"), Field("i"))
+    rng = np.random.default_rng(0)
+    n = 30
+    a_data, b_data = np.zeros((n, n)), np.zeros((n, n))
+    a_data[np.arange(n), rng.integers(0, n, n)] = 1.0
+    b_data[np.arange(n), rng.integers(0, n, n)] = 1.0
+    a, b, c, ws = (HardAlias(name) for name in ("a", "b", "c", "ws"))
+    sf = DCStatsFactory()
+    stats: dict[Alias, DCStats] = {
+        a: sf(fl.asarray(a_data), (t, j)),
+        b: sf(fl.asarray(b_data), (j, i)),
+    }
+    bindings: dict[Alias, TensorFType] = {
+        a: fl.asarray(a_data).ftype,
+        b: fl.asarray(b_data).ftype,
+    }
+    rhs = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(ffuncs.mul), (Table(a, (t, j)), Table(b, (j, i)))),
+        (j,),
+    )
+    plan = Plan(
+        (
+            fuse_loop_order(Query(Table(c, (t, i)), rhs), fields),
+            Produces((c,)),
+        )
+    )
+    staged = add_workspace(plan, c, 1, ws)
+    formats, cost = galley_format_cost(staged, bindings, stats, sf, PROTOCOL_COST_MODEL)
+    _, formatted = GalleyFormatter(MockLogicLoader()).lower(
+        staged, dict(bindings), dict(stats), sf
+    )
+    assert formats == {alias: formatted[alias] for alias in (c, ws)}
+    assert cost > 0
+
+
+def test_compile_julia_galley_prices_workspaces_with_galley_formats():
+    stage: Any = default_schedulers.COMPILE_JULIA_GALLEY
+    while not isinstance(stage, LogicWorkspacer):
+        stage = stage.ctx
+    assert stage.format_cost is galley_format_cost

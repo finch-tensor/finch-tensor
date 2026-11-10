@@ -26,7 +26,6 @@ from finch.autoschedule.cost_models import (
     RowMap,
     Statement,
     Stratify,
-    TransposeBasis,
 )
 from finch.autoschedule.tensor_stats import DCStatsFactory, UniformStatsFactory
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
@@ -51,6 +50,8 @@ from finch.finch_logic import (
     TensorStats,
     Walk,
 )
+
+from .utils import TransposeBasis
 
 PIGEON = CostModel(PigeonBasis(), [1.0, 1.0, 10.0, 1.0, 0.0])
 TRANSPOSE = CostModel(TransposeBasis(), [0.5, 60.0])

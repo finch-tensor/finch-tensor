@@ -16,7 +16,6 @@ from finch.autoschedule.cost_models import (
     PigeonBasis,
     Prefix,
     Quadratic,
-    TransposeBasis,
     WriteBasis,
 )
 from finch.autoschedule.loop_orderer import loop_order_bnb, loop_order_greedy
@@ -54,6 +53,8 @@ from finch.finch_logic import (
 )
 from finch.symbolic import PostOrderDFS
 from finch.tensor import dense, element, fiber_tensor, sparse_list
+
+from .utils import TransposeBasis
 
 
 def test_bfs_and_dfs_are_no_worse_than_greedy():

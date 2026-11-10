@@ -11,11 +11,10 @@ from finch.autoschedule import DefaultLogicFactorizer
 from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
 from finch.autoschedule.cost_models import (
     LOOP_COST_MODEL,
-    Concat,
     CostModel,
     PigeonBasis,
     Prefix,
-    TransposeBasis,
+    WithCopies,
 )
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
@@ -208,11 +207,13 @@ def test_greedy_order_breaks_ties_by_field_order():
     )
 
 
-def test_greedy_avoids_transposing_a_sparse_input():
-    """``B`` is a sparse diagonal stored ``(i, j)``, so reformatting it costs far
-    more than reformatting the dense ``A`` stored ``(j, i)``. Read and write
-    costs tie, and the expression's field order puts ``j`` first, so only a
-    transpose cost can steer greedy to the cheaper ``(i, j)``.
+def test_greedy_avoids_copying_the_larger_input():
+    """``A`` is a sparse diagonal stored ``(j, i)`` and ``B`` is dense, stored
+    ``(i, j)``, so each loop order reads one of them out of order. Read and
+    write costs tie, and the expression's field order puts ``j`` first, so only
+    the copy concordize makes of the input read out of order, which the loop
+    model prices as it prices any query, can steer greedy to ``(i, j)``, which
+    copies the 16 entries of ``A`` rather than the 256 of ``B``.
     """
     sf = DCStatsFactory()
     i, j = Field("i"), Field("j")
@@ -223,26 +224,24 @@ def test_greedy_avoids_transposing_a_sparse_input():
 
     expr = MapJoin(Literal(ffuncs.mul), (Table(a, (j, i)), Table(b, (i, j))))
     bindings: dict[Alias, DCStats] = {
-        a: sf(fl.asarray(np.ones((n, n))), (j, i)),
-        b: sf(fl.asarray(diagonal), (i, j)),
+        a: sf(fl.asarray(diagonal), (j, i)),
+        b: sf(fl.asarray(np.ones((n, n))), (i, j)),
     }
     assert tuple(dict.fromkeys(expr.fields())) == (j, i)
 
-    pigeon = CostModel(PigeonBasis(), [1.0, 1.0, 10.0, 1.0, 0.0])
-    transpose = CostModel(TransposeBasis(), [0.5, 60.0])
-    model = CostModel(
-        Concat(PigeonBasis(), TransposeBasis()), [1.0, 1.0, 10.0, 1.0, 0.0, 0.5, 60.0]
-    )
+    coefficients = [1.0, 1.0, 10.0, 1.0, 0.0]
+    pigeon = CostModel(PigeonBasis(), coefficients)
+    model = CostModel(WithCopies(PigeonBasis()), coefficients)
     machine = StatsMachine(sf, dict(bindings))
     # Reads and writes alone cannot separate the two, so the field-order
-    # tie-break would pick j; transposing the sparse B is what makes that order
-    # the expensive one.
+    # tie-break would pick j; copying the dense B is what makes that order the
+    # expensive one.
     assert pigeon.predict_component_cost(
         Prefix((j,), expr), machine
     ) == pigeon.predict_component_cost(Prefix((i,), expr), machine)
-    assert transpose.predict_component_cost(
+    assert model.predict_component_cost(
         Prefix((j,), expr), machine
-    ) > transpose.predict_component_cost(Prefix((i,), expr), machine)
+    ) > model.predict_component_cost(Prefix((i,), expr), machine)
     costs = [
         sum(
             model.predict_component_cost(Prefix(order[:n], expr), machine)
