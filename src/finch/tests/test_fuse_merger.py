@@ -168,6 +168,69 @@ def test_loops_which_depend_on_each_other_stay_apart():
     assert _merged(queries, (t,), {x: (vector, (Field("i"),))}) == plan
 
 
+def _sum_of(out, tns, idx):
+    return fuse_loop_order(
+        Query(Table(out, ()), _total(ffuncs.add, 0.0, Table(tns, (idx,)), idx)), (idx,)
+    )
+
+
+def _copy(out, tns):
+    return Query(Table(out, ()), Table(tns, ()))
+
+
+def test_loops_with_statements_between_them_merge():
+    x, y = HardAlias("x"), HardAlias("y")
+    s, t, u, r = (HardAlias(name) for name in "stur")
+    i1, i2, i3 = Field("i1"), Field("i2"), Field("i3")
+    vector = fl.asarray(np.ones(4))
+    tensors = {x: (vector, (Field("i"),)), y: (vector, (Field("i"),))}
+
+    # The loop over y doesn't depend on the first loop over x, so it runs first.
+    queries = (_sum_of(s, x, i1), _sum_of(t, y, i2), _sum_of(u, x, i3))
+    match _merged(queries, (s, t, u), tensors):
+        case Plan((Fuse(idx, _) as other, Fuse(merged, Plan(bodies)), Produces())):
+            assert (idx, merged) == (i2, i1)
+            assert other == queries[1]
+            assert [body.lhs.tns for body in bodies] == [s, u]
+        case prgm:
+            raise AssertionError(f"Expected one loop over x: {prgm}")
+
+    # Copying s needs all of the first loop over x, so it runs after the merge.
+    queries = (_sum_of(s, x, i1), _copy(r, s), _sum_of(u, x, i3))
+    match _merged(queries, (r, u), tensors):
+        case Plan((Fuse(merged, Plan(bodies)), copy, Produces())):
+            assert merged == i1
+            assert copy == queries[1]
+            assert [body.lhs.tns for body in bodies] == [s, u]
+        case prgm:
+            raise AssertionError(f"Expected one loop over x: {prgm}")
+
+
+def test_loops_which_depend_through_statements_between_them_stay_apart():
+    x, s, r, t = HardAlias("x"), HardAlias("s"), HardAlias("r"), HardAlias("t")
+    i1, i2 = Field("i1"), Field("i2")
+    # The second loop reads r, a copy of s, which the first loop reduces into.
+    queries = (
+        _sum_of(s, x, i1),
+        _copy(r, s),
+        fuse_loop_order(
+            Query(
+                Table(t, ()),
+                _total(
+                    ffuncs.add,
+                    0.0,
+                    MapJoin(Literal(ffuncs.mul), (Table(x, (i2,)), Table(r, ()))),
+                    i2,
+                ),
+            ),
+            (i2,),
+        ),
+    )
+    vector = fl.asarray(np.ones(4))
+    plan = Plan((*queries, Produces((t,))))
+    assert _merged(queries, (t,), {x: (vector, (Field("i"),))}) == plan
+
+
 def test_degree_scans_of_a_matrix_run_as_one_scan():
     a, rows, cols = HardAlias("a"), HardAlias("rows"), HardAlias("cols")
     i1, j1, i2, j2 = Field("i1"), Field("j1"), Field("i2"), Field("j2")
