@@ -10,6 +10,7 @@ import numpy as np
 from finch.algebra import ffuncs
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
+from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -18,6 +19,7 @@ from finch.finch_logic import (
     Follow,
     Fuse,
     Gallop,
+    HardAlias,
     Literal,
     LogicExpression,
     LogicStatement,
@@ -29,6 +31,7 @@ from finch.finch_logic import (
     QueryInto,
     StatsFactory,
     Table,
+    TensorStats,
 )
 from finch.symbolic import PostOrderDFS, PostWalk, Rewrite, Term
 
@@ -279,6 +282,27 @@ class LoopSpaces(Generic[NS]):
                 return protocols[idxs.index(self.idx)]
         return DefaultProtocol()
 
+    def walked(self, node: LogicExpression) -> NS | None:
+        """
+        Where the walks of node at the loop have fibers with entries, over
+        parent, combined as node combines them, or None where it walks
+        nothing. A merge of walks skips a fiber only where this is empty:
+        under a product, wherever one walked fiber is; under a sum, only where
+        all are.
+        """
+        match node:
+            case MapJoin(Literal(op), args):
+                parts = [part for arg in args if (part := self.walked(arg)) is not None]
+                return self.stats_factory.mapjoin(op, *parts) if parts else None
+            case Table(Alias() as tns, idxs) if self.idx in idxs[
+                tns.nfused :
+            ] and self.protocol(node) not in (Follow(), Gallop()):
+                stat = self.nest.stats[Table(tns, idxs)]
+                projected = self.project(stat)
+                projected.fill_type = stat.fill_type
+                return projected
+        return None
+
     def extent(self, stat: NS, fields) -> float:
         """The points of stat over fields, spanning all of those it lacks."""
         count = stat.estimate_non_fill_values()
@@ -457,50 +481,95 @@ class PigeonBasis(LoopBasis, LoopOrderedForm):
         )
 
 
-class TransposeBasis(LoopBasis, LoopOrderedForm):
+def transposed(
+    component: Prefix, machine: StatsMachine[NS]
+) -> Iterator[tuple[Alias, NS]]:
     """
-    Count dense and sparse transposed entries, charging each input once per
-    query, at the first prefix whose last loop reads it out of its stored
-    order.
+    The tensor of each table which the last loop of component reads out of the
+    order it is stored in, the first time a prefix of the query does, with the
+    stats of the table.
     """
+    prefix, expr = component.prefix, component.expr
+    if not prefix:
+        return
+    match expr:
+        case Aggregate(arg=arg):
+            pass
+        case _:
+            arg = expr
+    for node in set(PostOrderDFS(arg)):
+        match node:
+            case Table(Alias() as tns, idxs) if prefix[-1] in idxs:
+                stat = machine(node)
+                order = stat.index_order
+                parent = tuple(idx for idx in prefix[:-1] if idx in order)
+                if parent == order[: len(parent)] and prefix[-1] != order[len(parent)]:
+                    yield tns, stat
+
+
+def transpose_copy(tns: Alias, stat: TensorStats, prefix: tuple[Field, ...]) -> Plan:
+    """
+    The copy concordize makes of tns, of stats stat, read out of the order it
+    is stored in under prefix, as with_copy_loop_orders orders it: in the order
+    tns stores, into a tensor which stores the fields prefix visits first, in
+    its order, and then the rest, as tns stores them.
+    """
+    order = stat.index_order
+    target = (
+        *(idx for idx in prefix if idx in order),
+        *(idx for idx in order if idx not in prefix),
+    )
+    copy = HardAlias("transposed")
+    query = Query(Table(copy, target), Table(tns, order))
+    return Plan((fuse_loop_order(query, order), Produces((copy,))))
+
+
+class WithCopies(Basis[Prefix]):
+    """
+    The rows of basis, where a prefix whose last loop reads a table out of the
+    order it is stored in, the first time a prefix of the query does, also has
+    the rows basis gives the copy concordize makes of it, so that a model of
+    basis prices transposing the table as it prices any query which scatters.
+    """
+
+    def __init__(self, basis: Basis[Prefix]):
+        self.basis = basis
 
     @property
     def n_features(self) -> int:
-        return 2
+        return self.basis.n_features
 
     @property
     def feature_names(self) -> tuple[str, ...]:
-        return ("dense_transposes", "sparse_transposes")
+        return self.basis.feature_names
+
+    @property
+    def ridge(self) -> np.ndarray:
+        return self.basis.ridge
+
+    def validate_inputs(self, *inputs):
+        self.basis.validate_inputs(*inputs)
+
+    def components(
+        self,
+        term: LogicStatement,
+        bindings: Mapping[Alias, Any],
+        machine: StatsMachine[NS],
+    ) -> Iterator[Prefix]:
+        return self.basis.components(term, bindings, machine)
 
     def get_component_features(
         self,
         component: Prefix,
         machine: StatsMachine[NS],
     ) -> np.ndarray:
-        prefix, expr = component.prefix, component.expr
-        features = np.zeros((1, self.n_features))
-        if not prefix:
-            return features
-
-        match expr:
-            case Aggregate(arg=arg):
-                pass
-            case _:
-                arg = expr
-        for node in set(PostOrderDFS(arg)):
-            match node:
-                case Table(_, idxs) if prefix[-1] in idxs:
-                    stat = machine(node)
-                case _:
-                    continue
-            order = stat.index_order
-            parent = tuple(idx for idx in prefix[:-1] if idx in order)
-            if parent == order[: len(parent)] and prefix[-1] != order[len(parent)]:
-                nnz = stat.estimate_non_fill_values()
-                space = stat.get_dim_space_size(order)
-                dense = 0 < space < float("inf") and nnz / space > 0.1
-                features[0, 0 if dense else 1] += nnz
-        return features
+        rows = [self.basis.get_component_features(component, machine)]
+        for tns, stat in transposed(component, machine):
+            copy = transpose_copy(tns, stat, component.prefix)
+            rows.append(
+                self.basis.get_features(copy, {}, {tns: stat}, machine.stats_factory)
+            )
+        return np.concatenate(rows)
 
 
 # The most entries a slice of a workspace may have, so that it can be reset and
@@ -606,18 +675,38 @@ class WriteClasses:
 write_class = WriteClasses()
 
 
+class WriteStrata(Stratify):
+    """
+    The rows of WriteBasis in the classes of classes. A write which scatters
+    into a region over the cutoff isn't staged in a workspace, but written
+    into the output where it goes, so its region costs nothing.
+    """
+
+    def __init__(self, classes: WriteClasses):
+        super().__init__(WriteBasis(), N_WRITE_CLASSES, classes)
+
+    def transform(self, rows: np.ndarray) -> np.ndarray:
+        features = super().transform(rows)
+        region = self.basis.feature_names.index("scattered_region")
+        features[:, self.basis.n_features + region] = 0.0
+        return features
+
+
 def loop_basis(classes: WriteClasses = write_class) -> Basis[Prefix]:
     """The basis of the loop model, whose writes are of the classes of the
     region cutoff of classes."""
-    return Affine(
-        Concat(PigeonBasis(), Stratify(WriteBasis(), N_WRITE_CLASSES, classes))
-    )
+    return Affine(Concat(PigeonBasis(), WriteStrata(classes)))
 
 
 def loop_cost_model(data: Mapping[str, Any]) -> CostModel[Prefix]:
     """The loop model of data, which fit_physical_data wrote, whose writes are
-    classed by its region cutoff if it was tuned."""
-    basis = loop_basis(WriteClasses(data.get("region_cutoff", write_class.region)))
+    classed by its region cutoff if it was tuned. The fit times each loop order
+    with its inputs stored in that order, so a table read out of the order it
+    is stored in costs, besides, what the model prices the copy concordize
+    makes of it at."""
+    basis = WithCopies(
+        loop_basis(WriteClasses(data.get("region_cutoff", write_class.region)))
+    )
     return CostModel(basis, np.zeros(basis.n_features)).from_json(data)
 
 
