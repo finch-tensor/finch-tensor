@@ -41,7 +41,7 @@ from finch.finch_logic import (
     Table,
     Walk,
 )
-from finch.symbolic import PostOrderDFS, PostWalk, Rewrite
+from finch.symbolic import PostOrderDFS
 from finch.tensor import (
     DenseLevelFType,
     ElementLevelFType,
