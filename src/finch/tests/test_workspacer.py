@@ -1,4 +1,5 @@
 import math
+from typing import Any
 
 import pytest
 
@@ -8,10 +9,24 @@ import scipy.sparse as sps
 import finch as fl
 from finch import ffuncs
 from finch.algebra import StaticFillFType, TensorFType, ftype
-from finch.autoschedule import CompilerFormLowerer, NotationGenerator
+from finch.autoschedule import (
+    CompilerFormLowerer,
+    NotationGenerator,
+    default_schedulers,
+)
 from finch.autoschedule.capture import LogicCapture
-from finch.autoschedule.cost_models import PROTOCOL_COST_MODEL, Prefix, WriteBasis
-from finch.autoschedule.formatter.smart_formatter import CostFormatter
+from finch.autoschedule.cost_models import (
+    PROTOCOL_BASIS,
+    PROTOCOL_COST_MODEL,
+    CostModel,
+    DenseLevelOption,
+    Prefix,
+    SparseListLevelOption,
+    WriteBasis,
+    write_class,
+)
+from finch.autoschedule.formatter.galley_formatter import GalleyFormatter
+from finch.autoschedule.formatter.smart_formatter import CostFormatter, format_ftype
 from finch.autoschedule.loop_orderer import BFSLoopOrderer
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.tensor_stats import (
@@ -27,8 +42,11 @@ from finch.autoschedule.util import fuse_loop_order
 from finch.autoschedule.workspacer import (
     LogicWorkspacer,
     add_1d_workspaces,
+    add_cost_effective_reformats,
     add_cost_effective_workspaces,
+    add_reformat,
     add_workspace,
+    galley_format_cost,
     workspace_depth,
 )
 from finch.codegen import NumbaCompiler, NumpyBuffer
@@ -43,6 +61,7 @@ from finch.finch_logic import (
     HardAlias,
     Literal,
     MapJoin,
+    MockLogicLoader,
     Plan,
     Produces,
     Query,
@@ -319,31 +338,24 @@ def test_only_small_workspaces_make_scattered_writes_cheap():
         b: UniformStats(BaseTensorStats((j, k), {j: n, k: n}, fill), nnz=4 * n),
     }
     _, rhs = _matmul(HardAlias("c"), a, b)
-    basis = WriteBasis(workspace_limit=100_000)
     machine = StatsMachine(UniformStatsFactory(), dict(stats))
 
-    def writes(order):
-        rows = [
-            basis.get_component_features(Prefix(order[:n], rhs, (i, k)), machine)
-            for n in range(len(order) + 1)
-        ]
-        totals = np.concatenate(rows).sum(axis=0)
-        return dict(zip(basis.feature_names, totals > 0, strict=True))
+    def scattered(order):
+        """Whether each prefix of order which scatters writes does so into a
+        region beyond the cutoff a workspace could hold."""
+        regions = set()
+        for n in range(1, len(order) + 1):
+            prefix = Prefix(order[:n], rhs, (i, k))
+            rows = WriteBasis().get_component_features(prefix, machine)
+            if rows[0, 1] > 0:
+                regions.add(bool(write_class(rows)[0]))
+        return regions
 
-    # Gustavson writes the rows of c in order, so a workspace for one row of n
-    # entries takes the writes which scatter.
-    assert writes((i, j, k)) == {
-        "sequential_writes": True,
-        "scatter_writes": False,
-        "workspace_writes": True,
-    }
-    # An outer product scatters from the outermost loop, so its workspace would
-    # hold all n * n entries of c.
-    assert writes((j, i, k)) == {
-        "sequential_writes": False,
-        "scatter_writes": True,
-        "workspace_writes": False,
-    }
+    # Gustavson scatters within each row of c, n entries, which a workspace
+    # for the row could hold.
+    assert scattered((i, j, k)) == {False}
+    # An outer product scatters from the outermost loop into all n * n entries.
+    assert scattered((j, i, k)) == {True}
 
 
 def test_scatter_workspaces_store_the_one_field_scattered_into():
@@ -363,3 +375,105 @@ def test_scatter_workspaces_store_the_one_field_scattered_into():
     query = fuse_loop_order(Query(Table(c, (i, k, m)), rhs), (i, j, k, m))
     plan = Plan((query, Produces((c,))))
     assert add_1d_workspaces(plan, {}) == plan
+
+
+def test_add_reformat_copies_an_input_before_the_program():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, c, copy = (HardAlias(name) for name in ("a", "b", "c", "a_copy"))
+    plan, _ = _matmul(c, a, b, (i, k, j))
+    staged = add_reformat(plan, a, (i, j), copy)
+
+    rhs = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(ffuncs.mul), (Table(copy, (i, j)), Table(b, (j, k)))),
+        (j,),
+    )
+    assert staged == Plan(
+        (
+            fuse_loop_order(Query(Table(copy, (i, j)), Table(a, (i, j))), (i, j)),
+            fuse_loop_order(Query(Table(c, (i, k)), rhs), (i, k, j)),
+            Produces((c,)),
+        )
+    )
+    tensor = fl.asarray(np.ones((2, 2)))
+    bindings: dict[Alias, TensorFType] = {a: tensor.ftype, b: tensor.ftype}
+    LoopOrderedForm.validate_inputs(staged, bindings, {}, DCStatsFactory())
+
+
+def test_reformats_copy_inputs_where_they_cost_less():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
+    rng = np.random.default_rng(0)
+    sf = DCStatsFactory()
+    stats: dict[Alias, TensorStats] = {
+        a: sf(fl.asarray(rng.random((8, 8))), (i, j)),
+        b: sf(fl.asarray(rng.random((8, 8))), (j, k)),
+    }
+    fill = StaticFillFType(np.float64(0.0))
+    shape = (ftype(np.intp),) * 2
+    bindings: dict[Alias, TensorFType] = {
+        a: format_ftype([DenseLevelOption()] * 2, fill, shape),
+        b: format_ftype([SparseListLevelOption()] * 2, fill, shape),
+    }
+    # Looping over k before j reads a once for each k, so where the visits of
+    # dense levels cost, a copy of a read once into another format pays.
+    plan, _ = _matmul(c, a, b, (i, k, j))
+    dense_visits = CostModel(
+        PROTOCOL_BASIS,
+        [float(name == "dense.follow.visits") for name in PROTOCOL_BASIS.feature_names],
+    )
+    staged = add_cost_effective_reformats(plan, bindings, stats, sf, dense_visits)
+    copy = HardAlias("a_copy")
+    assert staged == add_reformat(plan, a, (i, j), copy)
+    # Where nothing costs, no copy pays for itself.
+    free = CostModel(PROTOCOL_BASIS, np.zeros(PROTOCOL_BASIS.n_features))
+    assert add_cost_effective_reformats(plan, bindings, stats, sf, free) == plan
+
+
+def test_galley_format_cost_prices_the_formats_a_galley_formatter_chooses():
+    # C[t, i] = sum_j A[t, j] B[j, i], row by row through a workspace fused
+    # over t: the formats galley_format_cost prices are those a GalleyFormatter
+    # gives the same program.
+    t, j, i = fields = (Field("t"), Field("j"), Field("i"))
+    rng = np.random.default_rng(0)
+    n = 30
+    a_data, b_data = np.zeros((n, n)), np.zeros((n, n))
+    a_data[np.arange(n), rng.integers(0, n, n)] = 1.0
+    b_data[np.arange(n), rng.integers(0, n, n)] = 1.0
+    a, b, c, ws = (HardAlias(name) for name in ("a", "b", "c", "ws"))
+    sf = DCStatsFactory()
+    stats: dict[Alias, DCStats] = {
+        a: sf(fl.asarray(a_data), (t, j)),
+        b: sf(fl.asarray(b_data), (j, i)),
+    }
+    bindings: dict[Alias, TensorFType] = {
+        a: fl.asarray(a_data).ftype,
+        b: fl.asarray(b_data).ftype,
+    }
+    rhs = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(ffuncs.mul), (Table(a, (t, j)), Table(b, (j, i)))),
+        (j,),
+    )
+    plan = Plan(
+        (
+            fuse_loop_order(Query(Table(c, (t, i)), rhs), fields),
+            Produces((c,)),
+        )
+    )
+    staged = add_workspace(plan, c, 1, ws)
+    formats, cost = galley_format_cost(staged, bindings, stats, sf, PROTOCOL_COST_MODEL)
+    _, formatted = GalleyFormatter(MockLogicLoader()).lower(
+        staged, dict(bindings), dict(stats), sf
+    )
+    assert formats == {alias: formatted[alias] for alias in (c, ws)}
+    assert cost > 0
+
+
+def test_compile_julia_galley_prices_workspaces_with_galley_formats():
+    stage: Any = default_schedulers.COMPILE_JULIA_GALLEY
+    while not isinstance(stage, LogicWorkspacer):
+        stage = stage.ctx
+    assert stage.format_cost is galley_format_cost

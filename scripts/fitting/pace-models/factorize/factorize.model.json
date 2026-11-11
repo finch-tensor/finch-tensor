@@ -1,0 +1,12 @@
+{
+  "feature_names": [
+    "iterations",
+    "outputs",
+    "constant"
+  ],
+  "coefficients": [
+    1.9403152840775148e-10,
+    1.595582607166533e-08,
+    0.0007299191612435477
+  ]
+}

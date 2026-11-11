@@ -1,13 +1,16 @@
+from itertools import product
+
 import pytest
 
 import numpy as np
 
 import finch as fl
 from finch import ffuncs
-from finch.algebra import DynamicFillFType, StaticFillFType
+from finch.algebra import DynamicFillFType, StaticFillFType, TensorFType
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.cost_models import (
     PROTOCOL_BASIS,
+    PROTOCOL_COST_MODEL,
     STORAGE_BASIS,
     CostModel,
     DenseLevelOption,
@@ -28,6 +31,7 @@ from finch.autoschedule.formatter.smart_formatter import (
     CostFormatter,
     format_ftype,
 )
+from finch.autoschedule.protocolizer.protocolize import alias_costs, choose_protocols
 from finch.autoschedule.tensor_stats import (
     BaseTensorStats,
     DCStatsFactory,
@@ -460,3 +464,57 @@ def test_sparse_list_levels_reject_scatter_writes():
     assert allowed_options(c, 1, plan, options) == []
     assert allowed_options(c, 1, staged, options) == options
     assert allowed_options(c, 0, plan, options) == options
+
+
+def test_alias_costs_match_choosing_protocols_for_each_format():
+    # c = a b by rows, through a workspace w for each row, then d = c e, which
+    # reads e out of the order it stores its fields, so that the default
+    # protocol of a level of e is read at a loop before the level is reached.
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, c, d, e, w = (HardAlias(name) for name in "abcdew")
+    plan, _ = _matmul(c, a, b, (i, j, k))
+    staged = add_workspace(plan, c, 1, w)
+    assert isinstance(staged, Plan)
+    rhs = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(ffuncs.mul), (Table(c, (i, k)), Table(e, (k, i)))),
+        (),
+    )
+    second = fuse_loop_order(Query(Table(d, (i, k)), rhs), (i, k))
+    prgm = Plan((*staged.bodies[:-1], second, Produces((d,))))
+
+    rng = np.random.default_rng(0)
+    sf = DCStatsFactory()
+    stats: dict[Alias, TensorStats] = {
+        tns: sf(fl.asarray((rng.random((6, 6)) < 0.4) * rng.random((6, 6))), idxs)
+        for tns, idxs in ((a, (i, j)), (b, (j, k)), (e, (k, i)))
+    }
+    fill = StaticFillFType(np.float64(0.0))
+    ranks = {c: 2, w: 1, d: 2}
+
+    def formatted(alias, kinds):
+        return format_ftype(kinds, fill, (fl.ftype(np.intp),) * ranks[alias])
+
+    allowed = {
+        alias: [
+            allowed_options(alias, depth, prgm, LEVEL_OPTIONS) for depth in range(n)
+        ]
+        for alias, n in ranks.items()
+    }
+    bindings: dict[Alias, TensorFType] = {
+        **{tns: lists(2) for tns in (a, b, e)},
+        **{
+            alias: formatted(alias, [lvl[0] for lvl in lvls])
+            for alias, lvls in allowed.items()
+        },
+    }
+    _, costs = choose_protocols(prgm, bindings, stats, sf)
+    for alias, lvls in allowed.items():
+        candidates = {kinds: formatted(alias, kinds) for kinds in product(*lvls)}
+        priced = alias_costs(
+            prgm, bindings, stats, sf, PROTOCOL_COST_MODEL, alias, candidates, costs
+        )
+        for kinds, fmt in candidates.items():
+            _, expected = choose_protocols(prgm, {**bindings, alias: fmt}, stats, sf)
+            assert priced[kinds] == expected, (alias, [opt.kind for opt in kinds])

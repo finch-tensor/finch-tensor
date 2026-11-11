@@ -18,8 +18,10 @@ from finch.autoschedule.util import (
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    DefaultProtocol,
     Field,
     Fuse,
+    Gallop,
     HardAlias,
     Literal,
     LogicExpression,
@@ -147,15 +149,16 @@ def drop_internal_reorders(root: LogicStatement) -> LogicStatement:
 
 def with_copy_loop_orders(root: Plan) -> Plan:
     """
-    Set the loop order of each copy, which visits the fields of its left-hand
-    table in order and then the fields it reduces. A copy may read its argument
-    in another order, representing a transpose.
+    Set the loop order of each copy, which visits the fields of its argument in
+    the order it stores them, and then the fields only its left-hand table has.
+    A transposing copy reads its argument in order and scatters into its
+    left-hand table, rather than reading a sparse argument out of order.
     """
 
     def loop_ordered(stmt: LogicStatement) -> LogicStatement:
         match stmt:
             case Query(Table(_, lhs_idxs), Table(_, idxs)):
-                return fuse_loop_order(stmt, (*lhs_idxs, *setdiff(idxs, lhs_idxs)))
+                return fuse_loop_order(stmt, (*idxs, *setdiff(lhs_idxs, idxs)))
         return stmt
 
     return Plan(tuple(loop_ordered(body) for body in root.bodies))
@@ -237,6 +240,25 @@ def with_loop_order(
             raise ValueError(f"Expected an aggregate or in-place query, got {stmt}")
 
 
+def galloping(expr: LogicExpression) -> LogicExpression:
+    """
+    expr, with every table galloping over each field it stores. The workspacer
+    may copy an input into any format, so the loops are priced from the stats
+    of the tables alone, as if every table galloped: a loop visits where every
+    table it merges has entries, and looks each up there.
+    """
+
+    def read(node):
+        match node:
+            case Table(Alias() as tns, idxs):
+                stored = len(idxs) - tns.nfused
+                protocols = (DefaultProtocol(),) * tns.nfused + (Gallop(),) * stored
+                return Table(tns, idxs, protocols)
+        return None
+
+    return Rewrite(PostWalk(read))(expr)
+
+
 def heuristic_loop_order(plan: Plan) -> Plan:
     new_queries = []
     for query in plan.bodies[:-1]:
@@ -295,7 +317,11 @@ class AbstractLoopOrderer(LogicLoopOrderer):
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ) -> Plan:
-        pass
+        """
+        prgm, with the loop order of each query set, priced from the stats of
+        the tensors it reads alone, whatever their formats, as galloping does,
+        since the workspacer may copy its inputs into any format.
+        """
 
     def lower(
         self,

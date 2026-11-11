@@ -4,7 +4,7 @@ import numpy as np
 
 import finch as ft
 import finch.finch_logic as lgc
-from finch.algebra import StaticFillFType
+from finch.algebra import StaticFillFType, TensorFType, ffuncs
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.formatter.formatter import scalar_ftype
 from finch.autoschedule.formatter.galley_formatter import GalleyFormatter
@@ -19,7 +19,10 @@ from finch.autoschedule.tensor_stats import (
     FDStatsFactory,
     StatsInterpreter,
 )
-from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
+from finch.autoschedule.tensor_stats.exact_stats import (
+    ExactStats,
+    ExactStatsFactory,
+)
 from finch.autoschedule.util import fuse_loop_order
 
 
@@ -103,9 +106,7 @@ def test_statistics_for_alias_views_do_not_collide(monkeypatch, formatter_cls):
 
 @pytest.mark.parametrize("nfused", range(5))
 @pytest.mark.parametrize("shape", [(2, 2, 3, 4), (0, 2, 3, 4)])
-def test_galley_uses_support_projected_over_fused_dimensions(
-    monkeypatch, nfused, shape
-):
+def test_galley_formats_only_the_fields_a_workspace_stores(monkeypatch, nfused, shape):
     data = np.zeros(shape, dtype=np.float64)
     if data.size:
         data[0, 0] = 1
@@ -127,21 +128,88 @@ def test_galley_uses_support_projected_over_fused_dimensions(
     )
     GalleyFormatter(capture).lower(plan, {a: tensor.ftype}, {a: stats}, factory)
 
-    projected = np.any(data, axis=tuple(range(nfused))).astype(data.dtype)
-    projected_stats = factory(ft.asarray(projected), fields[nfused:])
-    expected = GalleyFormatter().get_tensor_ftype(
-        stats.fill_type,
-        tensor.shape_type[nfused:],
-        projected_stats,
-        factory,
-        fields[nfused:],
-    )
-    # A scratch fused over every field stores none of them, so it is a scalar.
+    fmt = capture.last_bindings[scratch]
     if nfused == len(fields):
-        expected = scalar_ftype(stats.fill_type)
-    assert capture.last_bindings[scratch] == expected
+        # A scratch fused over every field stores none of them, so it is a scalar.
+        assert fmt == scalar_ftype(stats.fill_type)
+    else:
+        # The workspace stores one level for each field it isn't fused over.
+        assert isinstance(fmt, ft.FiberTensorFType)
+        assert fmt.shape_type == tensor.shape_type[nfused:]
     assert capture.last_stats[fused].index_order == fields
     assert stats.index_order == fields
+
+
+def test_galley_formats_a_workspace_by_its_slices(monkeypatch):
+    # Each slice of the diagonal holds one value, though every slice together
+    # covers the whole of each row, so the slice it stores is sparse.
+    t, i = fields = tuple(map(lgc.Field, "ti"))
+    tensor = ft.asarray(np.eye(100))
+    a, scratch = lgc.HardAlias("a"), lgc.HardAlias("scratch")
+    fused = lgc.FusedAlias(scratch, 1)
+    factory = ExactStatsFactory()
+    capture = LogicCapture()
+    monkeypatch.setattr(capture, "ctx", lambda *args: None)
+    plan = lgc.Plan(
+        (
+            fuse_loop_order(
+                lgc.Query(lgc.Table(fused, fields), lgc.Table(a, fields)), fields
+            ),
+            lgc.Produces((fused,)),
+        )
+    )
+    GalleyFormatter(capture).lower(
+        plan, {a: tensor.ftype}, {a: factory(tensor, fields)}, factory
+    )
+    fmt = capture.last_bindings[scratch]
+    assert isinstance(fmt, ft.FiberTensorFType)
+    assert isinstance(fmt.lvl_t, ft.SparseListLevelFType)
+    assert isinstance(fmt.lvl_t.lvl_t, ft.ElementLevelFType)
+
+
+def test_galley_makes_a_small_scattered_workspace_a_byte_map(monkeypatch):
+    # C[t, i] = sum_j A[t, j] B[j, i], row by row: the loop over j comes
+    # between t and i, so each row of C is scattered into, through a workspace
+    # fused over t. A row holds a few of its 50 slots, too sparse for a dense
+    # or byte map level by density, but a slice that small is a byte map, which
+    # resets and copies out cheaply, rather than a hash.
+    t, j, i = fields = tuple(map(lgc.Field, "tji"))
+    rng = np.random.default_rng(0)
+    n = 50
+    a_data, b_data = np.zeros((n, n)), np.zeros((n, n))
+    a_data[np.arange(n), rng.integers(0, n, n)] = 1.0
+    b_data[np.arange(n), rng.integers(0, n, n)] = 1.0
+    a, b, scratch = lgc.HardAlias("a"), lgc.HardAlias("b"), lgc.HardAlias("scratch")
+    fused = lgc.FusedAlias(scratch, 1)
+    factory = ExactStatsFactory()
+    stats: dict[lgc.Alias, ExactStats] = {
+        a: factory(ft.asarray(a_data), (t, j)),
+        b: factory(ft.asarray(b_data), (j, i)),
+    }
+    capture = LogicCapture()
+    monkeypatch.setattr(capture, "ctx", lambda *args: None)
+    rhs = lgc.Aggregate(
+        lgc.Literal(ffuncs.add),
+        lgc.Literal(0.0),
+        lgc.MapJoin(
+            lgc.Literal(ffuncs.mul), (lgc.Table(a, (t, j)), lgc.Table(b, (j, i)))
+        ),
+        (j,),
+    )
+    plan = lgc.Plan(
+        (
+            fuse_loop_order(lgc.Query(lgc.Table(fused, (t, i)), rhs), fields),
+            lgc.Produces((fused,)),
+        )
+    )
+    bindings: dict[lgc.Alias, TensorFType] = {
+        a: ft.asarray(a_data).ftype,
+        b: ft.asarray(b_data).ftype,
+    }
+    GalleyFormatter(capture).lower(plan, bindings, stats, factory)
+    fmt = capture.last_bindings[scratch]
+    assert isinstance(fmt, ft.FiberTensorFType)
+    assert isinstance(fmt.lvl_t, ft.SparseByteMapLevelFType)
 
 
 @pytest.mark.parametrize("formatter_cls", [CostFormatter])

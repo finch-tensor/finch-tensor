@@ -2389,6 +2389,78 @@ def init_write(value):
     return _InitWrite(as_fill(value))
 
 
+@dataclass(unsafe_hash=True)
+class _DropFillFType(ImmutableStructFType, FinchOperatorFType):
+    fill_type: AbstractFillFType
+    arity = 1
+
+    @property
+    def struct_name(self):
+        return "DropFill"
+
+    @property
+    def struct_fields(self):
+        return [("value", self.fill_type.element_type)]
+
+    def __call__(self, value):
+        if isinstance(value, _DropFill) and value.ftype == self:
+            return value
+        raise TypeError(f"Expected a drop_fill of type {self}")
+
+    def from_fields(self, value):
+        fill = (
+            StaticFill(self.fill_type.value)
+            if is_static(self.fill_type)
+            else DynamicFill(value, self.fill_type.element_type)
+        )
+        return _DropFill(fill)
+
+    def return_type(self, *args: FType) -> FType:
+        if len(args) != 1:
+            raise TypeError("drop_fill expects one argument")
+        return args[0]
+
+
+class _DropFill(FinchOperator):
+    """
+    drop_fill(z)(x) returns x. It marks the value a query writes, so that the
+    query is compiled to write it only where it isn't z, the value which an
+    entry left unwritten has, or which leaves the entry as it was.
+    """
+
+    def __init__(self, fill: AbstractFill):
+        self.fill = fill
+
+    @property
+    def value(self):
+        return self.fill.value
+
+    @property
+    def ftype(self):
+        return _DropFillFType(self.fill.ftype)
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, _DropFill)
+            and self.fill == other.fill
+            and StaticFill(self.value) == StaticFill(other.value)
+        )
+
+    def __hash__(self):
+        return hash((type(self), self.fill, StaticFill(self.value)))
+
+    def __call__(self, x: Any):
+        return x
+
+    def __repr__(self) -> str:
+        return f"drop_fill({self.value!r})"
+
+
+def drop_fill(value):
+    # The value may be raw, which is a static fill.
+    return _DropFill(as_fill(value))
+
+
 class _OverwriteFType(SingletonOperatorFType):
     @property
     def operator(self):

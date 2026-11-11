@@ -69,6 +69,10 @@ class _StoragePool:
         free_leases = self._free[lease.key]
         free_leases.setdefault(id(lease), lease)
 
+    def clear(self) -> None:
+        """Forget the free storage, so the next leases allocate their own."""
+        self._free.clear()
+
 
 class JuliaOwnedTensor(OverrideTensor):
     """A Finch tensor handle for storage owned by the Julia runtime."""

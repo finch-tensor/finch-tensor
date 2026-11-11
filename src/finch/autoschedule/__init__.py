@@ -33,6 +33,7 @@ from .default_schedulers import (
     set_default_scheduler,
     with_default_scheduler,
 )
+from .drop_fills import LogicFillDropper, drop_fills
 from .executor import LogicExecutor
 from .factorizer.optimize import DefaultLogicFactorizer
 from .formatter.formatter import (
@@ -81,6 +82,7 @@ __all__ = [
     "LogicCompiler",
     "LogicEinsumLowerer",
     "LogicExecutor",
+    "LogicFillDropper",
     "LogicFormatter",
     "LogicFuseMerger",
     "LogicNormalizer",
@@ -101,6 +103,7 @@ __all__ = [
     "SmartFormatter",
     "Table",
     "Value",
+    "drop_fills",
     "get_default_scheduler",
     "normalize_names",
     "optimize_protocols",

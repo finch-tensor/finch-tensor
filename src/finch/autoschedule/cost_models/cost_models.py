@@ -232,49 +232,50 @@ class Affine(RowMap[C]):
 
 class Stratify(RowMap[C]):
     """
-    The features of each row of a basis, in the block of columns of the
-    regime of the row, with zeros in the blocks of the other regimes. The
-    regime of a row is the number of thresholds its feature at index feature
-    meets or exceeds. A linear model of this basis has separate coefficients
-    for each regime, so a feature can cost differently once, say, the working
-    set exceeds a cache.
+    The features of each row of a basis, in the block of columns of its
+    class, with zeros in the blocks of the other classes. classify gives the
+    class of each of rows, an integer from 0 to n_classes - 1, from its
+    features. A linear model of this basis has separate coefficients for each
+    class, so a feature can cost differently once, say, the working set
+    exceeds a cache.
     """
 
-    def __init__(self, basis: Basis[C], feature: int, thresholds: ArrayLike):
+    def __init__(
+        self,
+        basis: Basis[C],
+        n_classes: int,
+        classify: Callable[[np.ndarray], ArrayLike],
+    ):
         super().__init__(basis)
-        if not 0 <= feature < basis.n_features:
-            raise ValueError(
-                f"Expected 0 <= feature < {basis.n_features}, got {feature}"
-            )
-        self.feature = feature
-        self.thresholds = np.asarray(thresholds, dtype=float)
-        if self.thresholds.ndim != 1 or not np.all(np.diff(self.thresholds) > 0):
-            raise ValueError(f"Expected increasing thresholds, got {thresholds}")
-
-    @property
-    def n_regimes(self) -> int:
-        return len(self.thresholds) + 1
+        if n_classes < 1:
+            raise ValueError(f"Expected at least one class, got {n_classes}")
+        self.n_classes = n_classes
+        self.classify = classify
 
     @property
     def n_features(self) -> int:
-        return self.n_regimes * self.basis.n_features
+        return self.n_classes * self.basis.n_features
 
     @property
     def feature_names(self) -> tuple[str, ...]:
         return tuple(
-            f"regime{regime}.{name}"
-            for regime in range(self.n_regimes)
+            f"class{cls}.{name}"
+            for cls in range(self.n_classes)
             for name in self.basis.feature_names
         )
 
     @property
     def ridge(self) -> np.ndarray:
-        return np.tile(self.basis.ridge, self.n_regimes)
+        return np.tile(self.basis.ridge, self.n_classes)
 
     def transform(self, rows: np.ndarray) -> np.ndarray:
+        classes = np.asarray(self.classify(rows), dtype=int).reshape(len(rows))
+        if np.any((classes < 0) | (classes >= self.n_classes)):
+            raise ValueError(
+                f"Expected classes below {self.n_classes}, got {classes.max()}"
+            )
         n = self.basis.n_features
-        regime = np.searchsorted(self.thresholds, rows[:, self.feature], side="right")
-        columns = regime[:, None] * n + np.arange(n)
+        columns = classes[:, None] * n + np.arange(n)
         features = np.zeros((len(rows), self.n_features))
         np.put_along_axis(features, columns, rows, axis=1)
         return features

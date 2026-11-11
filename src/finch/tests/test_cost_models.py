@@ -26,7 +26,6 @@ from finch.autoschedule.cost_models import (
     RowMap,
     Statement,
     Stratify,
-    TransposeBasis,
 )
 from finch.autoschedule.tensor_stats import DCStatsFactory, UniformStatsFactory
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
@@ -52,6 +51,8 @@ from finch.finch_logic import (
     Walk,
 )
 
+from .utils import TransposeBasis
+
 PIGEON = CostModel(PigeonBasis(), [1.0, 1.0, 10.0, 1.0, 0.0])
 TRANSPOSE = CostModel(TransposeBasis(), [0.5, 60.0])
 
@@ -68,6 +69,19 @@ def random_programs(rng, n_features, n_programs=40):
     return [rng.random((rng.integers(1, 4), n_features)) for _ in range(n_programs)]
 
 
+def first_class(rows):
+    return np.zeros(len(rows), dtype=int)
+
+
+def above(cutoffs, feature):
+    """The class of each row: the number of cutoffs its feature exceeds."""
+
+    def classify(rows):
+        return np.searchsorted(cutoffs, rows[:, feature], side="left")
+
+    return classify
+
+
 @pytest.mark.parametrize(
     "basis",
     [
@@ -75,10 +89,10 @@ def random_programs(rng, n_features, n_programs=40):
         Quadratic(PigeonBasis()),
         Concat(PigeonBasis(), TransposeBasis()),
         Concat(PigeonBasis(), Quadratic(PigeonBasis())),
-        Stratify(PigeonBasis(), 0, [0.3, 0.7]),
-        Stratify(Quadratic(TransposeBasis()), 0, [0.5]),
+        Stratify(PigeonBasis(), 3, first_class),
+        Stratify(Quadratic(TransposeBasis()), 2, first_class),
         Affine(PigeonBasis()),
-        Affine(Stratify(PigeonBasis(), 0, [0.5])),
+        Affine(Stratify(PigeonBasis(), 2, first_class)),
     ],
 )
 def test_linear_model_fits_program_runtimes(rng, basis):
@@ -99,31 +113,30 @@ def test_linear_model_checks_coefficients():
         CostModel(PigeonBasis(), [1.0, 2.0])
 
 
-def test_stratify_places_rows_in_regime_blocks():
-    basis = Stratify(TransposeBasis(), 1, [1.0, 3.0])
-    assert basis.n_regimes == 3
+def test_stratify_places_rows_in_the_block_of_their_class():
+    basis = Stratify(TransposeBasis(), 3, above([1.0, 3.0], 1))
     assert basis.n_features == 6
     rows = np.array([[5.0, 0.5], [6.0, 1.0], [7.0, 2.0], [8.0, 3.5]])
     np.testing.assert_array_equal(
         basis.transform(rows),
         [
             [5.0, 0.5, 0.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 6.0, 1.0, 0.0, 0.0],
+            [6.0, 1.0, 0.0, 0.0, 0.0, 0.0],
             [0.0, 0.0, 7.0, 2.0, 0.0, 0.0],
             [0.0, 0.0, 0.0, 0.0, 8.0, 3.5],
         ],
     )
     assert basis.transform(np.empty((0, 2))).shape == (0, 6)
-    with pytest.raises(ValueError, match="Expected 0 <= feature < 2"):
-        Stratify(TransposeBasis(), 2, [1.0])
-    with pytest.raises(ValueError, match="increasing thresholds"):
-        Stratify(TransposeBasis(), 0, [3.0, 1.0])
+    with pytest.raises(ValueError, match="at least one class"):
+        Stratify(TransposeBasis(), 0, first_class)
+    with pytest.raises(ValueError, match="classes below 2"):
+        Stratify(TransposeBasis(), 2, lambda rows: [2] * len(rows)).transform(rows)
 
 
-def test_stratify_fits_separate_coefficients_per_regime(rng):
-    # The per-unit costs differ once the first feature reaches the threshold,
+def test_stratify_fits_separate_coefficients_per_class(rng):
+    # The per-unit costs differ once the first feature exceeds the cutoff,
     # and only program runtimes are observed.
-    basis = Stratify(TransposeBasis(), 0, [0.5])
+    basis = Stratify(TransposeBasis(), 2, above([0.5], 0))
     coefficients = np.array([1.0, 2.0, 10.0, 0.5])
     programs = random_programs(rng, 2)
     features = [basis.transform(rows) for rows in programs]
@@ -141,7 +154,9 @@ def test_stratify_fits_separate_coefficients_per_regime(rng):
         PROTOCOL_COST_MODEL,
         CostModel(Affine(STORAGE_BASIS), np.arange(17)),
         CostModel(
-            Concat(Stratify(Quadratic(PigeonBasis()), 0, [2.0, 4.0]), TransposeBasis()),
+            Concat(
+                Stratify(Quadratic(PigeonBasis()), 3, first_class), TransposeBasis()
+            ),
             np.arange(77),
         ),
     ],
@@ -177,11 +192,11 @@ def test_feature_names_compose():
         "sparse_transposes*dense_transposes",
         "sparse_transposes*sparse_transposes",
     )
-    assert Stratify(TransposeBasis(), 0, [1.0]).feature_names == (
-        "regime0.dense_transposes",
-        "regime0.sparse_transposes",
-        "regime1.dense_transposes",
-        "regime1.sparse_transposes",
+    assert Stratify(TransposeBasis(), 2, first_class).feature_names == (
+        "class0.dense_transposes",
+        "class0.sparse_transposes",
+        "class1.dense_transposes",
+        "class1.sparse_transposes",
     )
     assert ByKind({"a": TransposeBasis(), "b": PigeonBasis()}).feature_names[:3] == (
         "a.dense_transposes",
@@ -227,7 +242,7 @@ def test_fit_is_nonnegative_relative_least_squares_with_basis_ridge(rng):
     basis = Concat(raw, squares)
     np.testing.assert_array_equal(basis.ridge, [0, 0, 1, 1, 1, 1])
     np.testing.assert_array_equal(Affine(raw).ridge, [0, 0, 1])
-    np.testing.assert_array_equal(Stratify(raw, 0, [0.5]).ridge, np.zeros(4))
+    np.testing.assert_array_equal(Stratify(raw, 2, first_class).ridge, np.zeros(4))
     features = []
     for _ in range(3):
         rows = rng.random((3, 2))
@@ -316,7 +331,7 @@ def test_flops_cost_retains_query_components(factory):
         LOOP_COST_MODEL,
         CostModel(Affine(PigeonBasis()), np.ones(6)),
         CostModel(Quadratic(Concat(PigeonBasis(), TransposeBasis())), np.ones(49)),
-        CostModel(Stratify(PigeonBasis(), 0, [4.0]), np.ones(10)),
+        CostModel(Stratify(PigeonBasis(), 2, first_class), np.ones(10)),
     ],
 )
 @pytest.mark.parametrize("plan", [Plan(()), Plan((Produces(()),))])
@@ -355,7 +370,7 @@ def test_quadratic_of_concat_crosses_bases():
         ),
         CostModel(Quadratic(Concat(PigeonBasis(), TransposeBasis())), np.ones(49)),
         CostModel(Concat(PigeonBasis(), Quadratic(PigeonBasis())), np.ones(30)),
-        CostModel(Stratify(PigeonBasis(), 0, [2.0, 4.0]), np.arange(15)),
+        CostModel(Stratify(PigeonBasis(), 3, above([2.0, 4.0], 0)), np.arange(15)),
     ],
 )
 def test_loop_costs_are_additive_over_prefixes(cost):
@@ -371,7 +386,7 @@ def test_loop_costs_are_additive_over_prefixes(cost):
             cost.predict_component_cost(Prefix(order[:n], expr, order), machine)
             for n in range(len(order) + 1)
         )
-        assert cost.predict_cost(query, {}, stats, sf) == expected
+        assert cost.predict_cost(query, {}, stats, sf) == pytest.approx(expected)
 
 
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])

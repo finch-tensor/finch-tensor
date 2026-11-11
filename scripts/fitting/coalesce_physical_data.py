@@ -1,11 +1,13 @@
 """
-Collect the programs which generate_physical_data wrote to DIR/data and the
+Collect the programs which a generator wrote to DIR/data and the
 timings which time_physical_data wrote there, or those of one chunk, into one
 JSON file, DIR/examples.json by default: the record of each timed example,
-under its name, with the runtime of each of its variants which was timed, by
-its index. The inputs of an example are drawn from the seeds in its record,
-so the file is small, and fit_physical_data featurizes and fits the examples
-from it alone, anywhere, without DIR/data.
+under its name, with the runtime of each of its variants which was timed, and
+whatever else its timing saved of them, such as the formats they ran with, by
+its index. The inputs
+of an example are drawn from the seeds in its record, so the file is small,
+and fit_physical_data featurizes and fits the examples from it alone,
+anywhere, without DIR/data.
 
     pixi run -e fitting python -m scripts.fitting.coalesce_physical_data DIR
 """
@@ -14,7 +16,7 @@ import argparse
 import json
 from pathlib import Path
 
-from scripts.fitting.generate_physical_data import examples, path
+from scripts.fitting.generation import examples, path
 
 
 def coalesce(directory: Path, chunk, output: Path | None) -> None:
@@ -31,10 +33,11 @@ def coalesce(directory: Path, chunk, output: Path | None) -> None:
         timing = json.loads(path(directory, example, "timing.json").read_text())
         if not timing["runtimes"]:
             continue
-        records.append({"name": example, **record, "runtimes": timing["runtimes"]})
+        # Timings written before formats were saved have none.
+        records.append({"name": example, **record, "formats": {}, **timing})
         variants += len(timing["runtimes"])
     output = directory / "examples.json" if output is None else output
-    output.write_text(json.dumps({"examples": records}))
+    output.write_text(json.dumps({"examples": records}) + "\n")
     print(
         f"wrote {variants} timed variants of {len(records)} of {len(programs)} "
         f"programs to {output}",

@@ -12,10 +12,12 @@ from finch.autoschedule.cost_models import (
     LevelOption,
     ProtocolChoice,
 )
+from finch.autoschedule.formatter.galley_formatter import GalleyFormatter
 from finch.autoschedule.formatter.smart_formatter import (
     LEVEL_OPTIONS,
     optimize_formats,
 )
+from finch.autoschedule.protocolizer.protocolize import choose_protocols
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
@@ -29,6 +31,7 @@ from finch.finch_logic import (
     HardAlias,
     LogicLoader,
     LogicStatement,
+    MockLogicLoader,
     Plan,
     Query,
     QueryInto,
@@ -36,7 +39,7 @@ from finch.finch_logic import (
     Table,
     TensorStats,
 )
-from finch.symbolic import Namespace, PostOrderDFS
+from finch.symbolic import Namespace, PostOrderDFS, PostWalk, Rewrite
 
 
 def workspace_depth(prgm: LogicStatement, alias: Alias) -> int | None:
@@ -186,6 +189,32 @@ def format_cost(
     )
 
 
+def galley_format_cost(
+    prgm: LogicStatement,
+    bindings: Mapping[Alias, TensorFType],
+    stats: Mapping[Alias, TensorStats],
+    stats_factory: StatsFactory,
+    cost_model: CostModel[ProtocolChoice],
+    options: Sequence[LevelOption] = LEVEL_OPTIONS,
+) -> tuple[dict[Alias, TensorFType], float]:
+    """
+    format_cost with the formats GalleyFormatter chooses from the stats of each
+    alias, rather than those optimize_formats searches for. The program is
+    priced once, so a workspace costs one choice of protocols rather than a
+    search over formats; the formats are those a GalleyFormatter downstream
+    gives the program. options is unused.
+    """
+    _, formatted = GalleyFormatter(MockLogicLoader()).lower(
+        prgm, dict(bindings), dict(stats), stats_factory
+    )
+    _, costs = choose_protocols(prgm, formatted, stats, stats_factory, cost_model)
+    formats = {alias: fmt for alias, fmt in formatted.items() if alias not in bindings}
+    return formats, sum(costs)
+
+
+FormatCost = Callable[..., tuple[dict[Alias, TensorFType], float]]
+
+
 def is_dense(stats: TensorStats) -> bool:
     assert isinstance(stats, NumericStats)
     return stats.estimate_non_fill_values() >= 0.5 * math.prod(stats.dim_sizes.values())
@@ -198,6 +227,7 @@ def add_cost_effective_workspaces(
     stats_factory: StatsFactory,
     cost_model: CostModel[ProtocolChoice],
     options: Sequence[LevelOption] = LEVEL_OPTIONS,
+    format_cost: FormatCost = format_cost,
 ) -> Plan:
     """
     Add workspaces that improve cost, as defined by the format_cost function.
@@ -231,14 +261,108 @@ def add_cost_effective_workspaces(
     return stage_workspaces(prgm, bindings, keep)
 
 
+def add_reformat(
+    prgm: Plan, alias: HardAlias, idxs: tuple[Field, ...], copy: HardAlias
+) -> Plan:
+    """
+    Copy alias into copy before prgm, looping over idxs, the fields of a table
+    which reads alias, in the order alias stores them, and read copy wherever
+    prgm reads alias, so that the formatter may store copy in any format.
+    """
+
+    def read(node):
+        match node:
+            case Table(tns, idxs_2, protocols) if tns == alias:
+                return Table(copy, idxs_2, protocols)
+        return None
+
+    reformat = fuse_loop_order(Query(Table(copy, idxs), Table(alias, idxs)), idxs)
+    reads = Rewrite(PostWalk(read))(prgm)
+    assert isinstance(reads, Plan)
+    return Plan((reformat, *reads.bodies))
+
+
+def stage_reformats(
+    prgm: Plan,
+    bindings: Mapping[Alias, TensorFType],
+    keep: Callable[[Plan, Plan, HardAlias, HardAlias], bool],
+) -> Plan:
+    """
+    Copy each input of bindings which prgm reads, and doesn't write, into a
+    new alias before prgm, as add_reformat does, if keep, given prgm, the
+    program with the copy, the input, and the copy, keeps it. A scalar has no
+    levels to store otherwise.
+    """
+    prgm = flatten_plans(prgm)
+    spc = Namespace(prgm)
+    reads: dict[HardAlias, tuple[Field, ...]] = {}
+    written: set[Alias] = set()
+    for node in PostOrderDFS(prgm):
+        match node:
+            case Query(Table(Alias() as lhs, _), _) | QueryInto(
+                Table(Alias() as lhs, _), _, _
+            ):
+                written.add(lhs.unfused)
+            case Table(HardAlias() as tns, idxs) if tns in bindings and idxs:
+                reads.setdefault(tns, idxs)
+    for alias, idxs in reads.items():
+        if alias in written:
+            continue
+        copy = HardAlias(spc.freshen(alias.name, "copy"))
+        staged = add_reformat(prgm, alias, idxs, copy)
+        if keep(prgm, staged, alias, copy):
+            prgm = staged
+    return prgm
+
+
+def add_cost_effective_reformats(
+    prgm: Plan,
+    bindings: Mapping[Alias, TensorFType],
+    stats: Mapping[Alias, TensorStats],
+    stats_factory: StatsFactory,
+    cost_model: CostModel[ProtocolChoice],
+    options: Sequence[LevelOption] = LEVEL_OPTIONS,
+    format_cost: FormatCost = format_cost,
+) -> Plan:
+    """
+    Copy the inputs of prgm into new formats, as stage_reformats does, where
+    the program costs less with the copy under cost_model, once format_cost
+    formats the copy, keeping the formats of the other aliases prgm defines.
+    """
+    # The formats and cost of the program so far, found when a copy is first
+    # priced, and updated with each copy kept.
+    formats: dict[Alias, TensorFType] | None = None
+    cost = math.inf
+
+    def keep(prgm, staged, alias, copy) -> bool:
+        nonlocal formats, cost
+        if formats is None:
+            formats, cost = format_cost(
+                prgm, bindings, stats, stats_factory, cost_model, options
+            )
+        staged_formats, staged_cost = format_cost(
+            staged, {**bindings, **formats}, stats, stats_factory, cost_model, options
+        )
+        if staged_cost < cost:
+            formats, cost = {**formats, **staged_formats}, staged_cost
+            return True
+        return False
+
+    return stage_reformats(prgm, bindings, keep)
+
+
 class LogicWorkspacer(LoopOrderedForm, LogicLoader):
     """
     Pass a program in LoopOrderedForm to ctx, after redirecting the queries
     which scatter into their outputs into workspaces where they cost less
-    under cost_model, by default PROTOCOL_COST_MODEL, as add_cost_effective_workspaces
-    does. A loop orderer wraps it, so that the copies out of workspaces aren't
-    propagated, and the formatter it wraps should price programs with the same
-    model.
+    under cost_model, by default PROTOCOL_COST_MODEL, as
+    add_cost_effective_workspaces does, and then copying its inputs into new
+    formats where that costs less, as add_cost_effective_reformats does. A
+    loop orderer wraps it, so that the copies aren't propagated, and the
+    formatter it wraps should price programs with the same model. format_cost
+    prices a program with the formats its formatter would choose: format_cost
+    searches them as a CostFormatter does, and galley_format_cost takes those
+    of a GalleyFormatter, far more cheaply.
     """
 
     def __init__(
@@ -246,12 +370,14 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
         ctx: LogicLoader,
         cost_model: CostModel[ProtocolChoice] | None = None,
         options: Sequence[LevelOption] = LEVEL_OPTIONS,
+        format_cost: FormatCost = format_cost,
     ):
         self.ctx = ctx
         if cost_model is None:
             cost_model = PROTOCOL_COST_MODEL
         self.cost_model = cost_model
         self.options = options
+        self.format_cost = format_cost
 
     def lower(
         self,
@@ -262,7 +388,22 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
     ) -> tuple[AssemblyLibrary, dict[Alias, TensorFType]]:
         assert isinstance(prgm, Plan)
         prgm = add_cost_effective_workspaces(
-            prgm, bindings, stats, stats_factory, self.cost_model, self.options
+            prgm,
+            bindings,
+            stats,
+            stats_factory,
+            self.cost_model,
+            self.options,
+            self.format_cost,
+        )
+        prgm = add_cost_effective_reformats(
+            prgm,
+            bindings,
+            stats,
+            stats_factory,
+            self.cost_model,
+            self.options,
+            self.format_cost,
         )
         return self.ctx(prgm, bindings, stats, stats_factory)
 

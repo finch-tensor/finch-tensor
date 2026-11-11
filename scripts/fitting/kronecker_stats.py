@@ -186,6 +186,27 @@ def kronecker_rmat(
     return KroneckerTensor(lg_shape, blocks, block_bits, dtype, idx_type)
 
 
+def support_tensor(stats: KroneckerStats, dtype, idx_type) -> KroneckerTensor:
+    """
+    The KroneckerTensor of the support of stats, stored in its index order,
+    which must be one term or none, as the supports of sums of products are.
+    """
+    if len(stats.terms) > 1:
+        raise ValueError(f"Expected one term, got a union of {len(stats.terms)}")
+    lg_shape = [lg_size(stats.dim_sizes[idx]) for idx in stats.index_order]
+    shapes = block_shapes(lg_shape, stats.block_bits)
+    # A block of extent 1 along a digit is the same along all of it.
+    blocks = [
+        np.broadcast_to(block, shape)
+        for block, shape in zip(
+            stats.terms[0] if stats.terms else [np.zeros(s, bool) for s in shapes],
+            shapes,
+            strict=True,
+        )
+    ]
+    return KroneckerTensor(lg_shape, blocks, stats.block_bits, dtype, idx_type)
+
+
 def stats_block_shapes(stats: BaseTensorStats, block_bits: int):
     lg_shape = [lg_size(stats.dim_sizes[idx]) for idx in stats.index_order]
     return block_shapes(lg_shape, block_bits)

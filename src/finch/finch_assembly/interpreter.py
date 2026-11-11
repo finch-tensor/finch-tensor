@@ -229,16 +229,21 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
             case asm.Call(f, args):
                 f_e = self(f)
                 args_e = [self(arg) for arg in args]
+
                 if isinstance(prgm.result_type, FDTypeUnsignedInteger):
                     # Unsigned arithmetic wraps, as in compiled code.
                     with np.errstate(over="ignore"):
                         return f_e(*args_e)
+
                 return f_e(*args_e)
             case asm.Load(buf, idx):
                 buf_e = self(buf)
                 idx_e = self(idx)
                 if self.mode.debug and not 0 <= idx_e < buf_e.length():
-                    raise AssertionError(f"Buffer index {idx_e} is out of bounds")
+                    raise AssertionError(
+                        f"Buffer index {idx_e} ({buf}[{idx}]) is out of bounds"
+                        " for array of length {buf_e.length()}"
+                    )
                 return buf_e.load(idx_e)
             case asm.Store(buf, idx, val):
                 buf_e = self(buf)

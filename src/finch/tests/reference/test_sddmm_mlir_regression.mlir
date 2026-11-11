@@ -293,9 +293,9 @@ module {
       memref.store %v_279, %v_278[%v_276] : memref<?xf64>
     }
     %v_280 = llvm.mlir.undef : !llvm.struct<(i64, i64)>
-    %v_281 = arith.index_cast %v_155 : index to i64
+    %v_281 = arith.index_cast %v_163 : index to i64
     %v_282 = llvm.insertvalue %v_281, %v_280[0] : !llvm.struct<(i64, i64)>
-    %v_283 = arith.index_cast %v_155 : index to i64
+    %v_283 = arith.index_cast %v_163 : index to i64
     %v_284 = llvm.insertvalue %v_283, %v_282[1] : !llvm.struct<(i64, i64)>
     %v_285 = llvm.getelementptr %_eye[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(!llvm.struct<(i64, i64)>)>
     llvm.store %v_284, %v_285 : !llvm.struct<(i64, i64)>, !llvm.ptr
@@ -307,23 +307,23 @@ module {
     %v_291 = llvm.load %v_290 : !llvm.ptr -> !llvm.struct<(i64, i64)>
     %v_292 = llvm.extractvalue %v_291[1] : !llvm.struct<(i64, i64)>
     %v_293 = arith.index_cast %v_292 : i64 to index
-    scf.for %v_294 = %v_272 to %v_155 step %v_246 {
-      %v_295 = arith.muli %v_253, %v_294 : index
-      scf.for %v_296 = %v_272 to %v_163 step %v_246 {
-        %v_297 = arith.muli %v_257, %v_296 : index
-        %v_298 = arith.addi %v_295, %v_297 : index
+    scf.for %v_294 = %v_272 to %v_163 step %v_246 {
+      scf.for %v_295 = %v_272 to %v_155 step %v_246 {
+        %v_296 = arith.muli %v_253, %v_295 : index
+        %v_297 = arith.muli %v_294, %v_155 : index
+        %v_298 = arith.addi %v_297, %v_295 : index
         %v_299 = arith.maxsi %v_272, %v_294 : index
         %v_300 = arith.addi %v_246, %v_294 : index
-        %v_301 = arith.minsi %v_155, %v_300 : index
+        %v_301 = arith.minsi %v_163, %v_300 : index
         scf.for %v_302 = %v_299 to %v_301 step %v_246 {
-          %v_303 = arith.muli %v_296, %v_155 : index
-          %v_304 = arith.addi %v_303, %v_302 : index
+          %v_303 = arith.muli %v_257, %v_302 : index
+          %v_304 = arith.addi %v_296, %v_303 : index
           %v_305 = llvm.load %v_181 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
           %v_306 = builtin.unrealized_conversion_cast %v_305 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
           %v_307 = llvm.load %v_150 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
           %v_308 = builtin.unrealized_conversion_cast %v_307 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-          %v_309 = memref.load %v_308[%v_304] : memref<?xf64>
-          memref.store %v_309, %v_306[%v_298] : memref<?xf64>
+          %v_309 = memref.load %v_308[%v_298] : memref<?xf64>
+          memref.store %v_309, %v_306[%v_304] : memref<?xf64>
         }
       }
     }

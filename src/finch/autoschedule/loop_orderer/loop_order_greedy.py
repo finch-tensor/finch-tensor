@@ -1,7 +1,8 @@
 from collections.abc import Mapping
 from typing import Generic, TypeVar
 
-from finch.autoschedule.cost_models import WORKSPACE_LOOP_COST_MODEL, CostModel, Prefix
+from finch.autoschedule.cost_models import LOOP_COST_MODEL, CostModel, Prefix
+from finch.autoschedule.protocolizer.protocolize import merged_expr
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.autoschedule.tensor_stats.stats_interpreter import (
     StatsInterpreter,
@@ -21,7 +22,7 @@ from finch.finch_logic import (
     Table,
 )
 
-from .loop_ordering import AbstractLoopOrderer, with_loop_order
+from .loop_ordering import AbstractLoopOrderer, galloping, with_loop_order
 
 NS = TypeVar("NS", bound=NumericStats)
 
@@ -36,7 +37,7 @@ def greedy_loop_order(
 ) -> tuple[Field, ...]:
     """Build a loop order by appending the cheapest candidate prefix."""
     if cost_model is None:
-        cost_model = WORKSPACE_LOOP_COST_MODEL
+        cost_model = LOOP_COST_MODEL
     machine = StatsMachine(stats_factory, dict(stats_bindings))
     match expr:
         case Aggregate(arg=arg):
@@ -72,12 +73,10 @@ def set_greedy_loop_order(
         match query:
             case QueryInto(_, _, Literal()):
                 new_queries.append(query)
-            case Query(Table(_, out_idxs), Aggregate() as arg) | QueryInto(
-                Table(_, out_idxs), _, arg
+            case Query(Table(_, out_idxs), Aggregate()) | QueryInto(
+                Table(_, out_idxs), _, _
             ):
-                match query:
-                    case QueryInto():
-                        arg = query.as_query().rhs
+                arg = galloping(merged_expr(query))
                 idxs_2 = greedy_loop_order(
                     arg, stats_factory, stats_bindings, out_idxs, cost_model=cost_model
                 )
@@ -100,9 +99,7 @@ class GreedyLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         cost_model: CostModel[Prefix] | None = None,
     ):
         super().__init__(ctx)
-        self.cost_model = (
-            cost_model if cost_model is not None else WORKSPACE_LOOP_COST_MODEL
-        )
+        self.cost_model = cost_model if cost_model is not None else LOOP_COST_MODEL
 
     def set_loop_orders(
         self,
