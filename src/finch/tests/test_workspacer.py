@@ -52,6 +52,7 @@ from finch.autoschedule.workspacer import (
     galley_format_cost,
     workspace_depth,
 )
+from finch.autoschedule.workspacer.workspacer import format_cost
 from finch.codegen import NumbaCompiler, NumpyBuffer
 from finch.compile import NotationCompiler
 from finch.finch_assembly import AssemblySimplify, LowerPackedStructSlots
@@ -609,8 +610,13 @@ def test_galley_format_cost_prices_the_formats_a_galley_formatter_chooses():
     assert cost > 0
 
 
-def test_compile_julia_galley_prices_workspaces_with_galley_formats():
+def test_compile_julia_galley_prices_workspaces_with_the_formats_it_searches():
+    # COMPILE_JULIA_GALLEY chooses formats with a CostFormatter, so its
+    # workspacer prices workspaces with the formats such a search finds.
     stage: Any = default_schedulers.COMPILE_JULIA_GALLEY
     while not isinstance(stage, LogicWorkspacer):
         stage = stage.ctx
-    assert stage.format_cost is galley_format_cost
+    assert stage.format_cost is format_cost
+    while not isinstance(stage, (CostFormatter, GalleyFormatter)):
+        stage = stage.ctx
+    assert isinstance(stage, CostFormatter)
