@@ -79,7 +79,9 @@ from finch.tensor import (
     ElementLevel,
     FiberTensor,
     SparseListLevel,
+    Temp0DFType,
     element,
+    temp_0d,
 )
 
 
@@ -388,7 +390,11 @@ def test_accumulators_hold_each_entry_an_inner_loop_reduces_into():
     plan, rhs = _matmul(c, a, b, (i, k, j))
     assert accumulator_depth(plan, c) == 2
     acc = FusedAlias(HardAlias("c_acc"), 2)
-    staged = add_accumulators(plan, {})
+    tensor = fl.asarray(np.ones((2, 2)))
+    bindings: dict[Alias, TensorFType] = {a: tensor.ftype, b: tensor.ftype}
+    staged, formats = add_accumulators(plan, bindings)
+    # The accumulator holds one element, which the kernel keeps to itself.
+    assert formats == {acc.unfused: temp_0d(element(0.0, ftype(np.float64)))}
     assert staged == Plan(
         (
             Fuse(
@@ -406,8 +412,6 @@ def test_accumulators_hold_each_entry_an_inner_loop_reduces_into():
             Produces((c,)),
         )
     )
-    tensor = fl.asarray(np.ones((2, 2)))
-    bindings: dict[Alias, TensorFType] = {a: tensor.ftype, b: tensor.ftype}
     LoopOrderedForm.validate_inputs(staged, bindings, {}, DCStatsFactory())
 
     # Where j scatters into c, or c is written in the innermost loop, no
@@ -415,7 +419,7 @@ def test_accumulators_hold_each_entry_an_inner_loop_reduces_into():
     for order in ((i, j, k), (j, i, k)):
         plan, _ = _matmul(c, a, b, order)
         assert accumulator_depth(plan, c) is None
-        assert add_accumulators(plan, {}) == plan
+        assert add_accumulators(plan, bindings) == (plan, {})
     elementwise = Plan(
         (
             fuse_loop_order(Query(Table(c, (i, j)), Table(a, (i, j))), (i, j)),
@@ -531,9 +535,10 @@ def test_workspacer_accumulates_row_sums_which_merge_into_one_pass():
             assert (lhs_1, lhs_2) == (s, t)
         case prgm:
             raise AssertionError(f"Expected one pass over a: {prgm}")
-    # Each accumulator stores only its element.
+    # Each accumulator stores only its element, which the kernel keeps to itself.
     for acc in (s_acc, t_acc):
         fmt = capture.last_bindings[acc.unfused]
+        assert isinstance(fmt, Temp0DFType)
         assert fmt.ndim == 0
 
     program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)

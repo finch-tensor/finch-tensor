@@ -17,7 +17,7 @@ from finch.algebra.ftypes import FDTypeNumpy, FType, TupleFType
 from finch.finch_assembly import BufferFType
 from finch.tensor import DenseLevelFType, ElementLevelFType, LevelFType
 from finch.tensor.bufferized_ndarray import BufferizedNDArrayFType
-from finch.tensor.fiber_tensor import FiberTensorFType
+from finch.tensor.fiber_tensor import FiberTensorFType, Temp0DFType
 from finch.tensor.level.sparse_bytemap_level import SparseByteMapLevelFType
 from finch.tensor.level.sparse_coo_level import SparseCOOLevelFType
 from finch.tensor.level.sparse_hash_level import SparseHashLevelFType
@@ -360,26 +360,6 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
     )
 
 
-def local_scalar_constructor_str(ftype: FType) -> str | None:
-    """
-    Julia source text constructing a Finch scalar which may stand in for a
-    tensor of `ftype` that a kernel keeps to itself, if `ftype` stores one
-    element, and None otherwise. Finch.jl keeps the value of a scalar in a
-    local variable, where it loads and stores the element of a zero
-    dimensional tensor at each update, which LLVM can't keep in a register
-    when the kernel writes other arrays which might alias it.
-    """
-    match ftype:
-        case ScalarFType():
-            fill = ftype.fill_type
-        case FiberTensorFType(lvl_t=ElementLevelFType() as lvl_t):
-            fill = lvl_t.fill_type
-        case _:
-            return None
-    fill_str = _julia_literal(fill)
-    return f"{scalar_type_str(fill, ftype.element_type)}({fill_str})"
-
-
 def ftype_to_jl_constructor_str(ftype: FType) -> str:
     """Julia source text constructing a minimal instance of `ftype`, for
     embedding directly in generated kernel source (see compiler.py)."""
@@ -387,6 +367,14 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
         elem_t = _leaf_type_str(ftype.element_type)
         fill = _julia_literal(ftype.fill_type)
         return f"Finch.Tensor(Finch.ElementLevel({fill}, {_buffer_ctor_str(elem_t)}))"
+    if isinstance(ftype, Temp0DFType):
+        # A kernel keeps a Temp0D to itself, so it may be a Finch scalar,
+        # whose value Finch.jl keeps in a variable. Finch.jl loads and
+        # stores the element of a zero dimensional tensor at every update,
+        # which LLVM can't keep in a register when the kernel writes other
+        # arrays which might alias it.
+        fill = _julia_literal(ftype.fill_type)
+        return f"{scalar_type_str(ftype.fill_type, ftype.element_type)}({fill})"
     if isinstance(ftype, FiberTensorFType):
         return f"Finch.Tensor({_level_constructor_str(ftype.lvl_t)})"
     if isinstance(ftype, BufferizedNDArrayFType):
