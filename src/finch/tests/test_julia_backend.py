@@ -1,6 +1,7 @@
 import pytest
 
 import numpy as np
+import scipy.sparse as sps
 
 import finch as ft
 import finch.finch_notation as ntn
@@ -1262,3 +1263,27 @@ def test_register_julia_op_maps_and_defines_once():
     assert compiler._JULIA_OPS[op.ftype] == "finch_test_twice"
     assert int(jl.finch_test_twice(3)) == 6
     del compiler._JULIA_OPS[op.ftype]
+
+
+def test_julia_kernels_keep_their_own_scalars_in_finch_scalars():
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA_GALLEY
+
+    # Two row sums of a CSR matrix run in one loop over its rows, each summing
+    # into a workspace which stores nothing, and which the kernel neither
+    # reads before resetting nor returns, so Finch.jl keeps it in a variable.
+    rng = np.random.default_rng(0)
+    data = rng.random((20, 30)) * (rng.random((20, 30)) < 0.3)
+    data[3] = 0.0
+    x = ft.defer(ft.asarray(sps.csr_array(data)))
+    with with_default_scheduler(COMPILE_JULIA_GALLEY):
+        sums, squares = ft.compute((ft.sum(x, axis=1), ft.sum(x * x, axis=1)))
+    np.testing.assert_allclose(np.asarray(sums), data.sum(axis=1))
+    np.testing.assert_allclose(np.asarray(squares), (data * data).sum(axis=1))
+
+    stage = COMPILE_JULIA_GALLEY
+    while not isinstance(stage, LogicCompiler):
+        stage = stage.ctx
+    codes = [kernel.jl_code for kernel in stage.ctx_load.runtime._kernels.values()]
+    # Each is constructed for the Finch kernel, and for each call of it.
+    assert any(code.count("Finch.Scalar{0.0, Float64}(0.0)") == 4 for code in codes)
