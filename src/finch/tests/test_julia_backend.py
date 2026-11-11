@@ -1270,8 +1270,7 @@ def test_julia_kernels_keep_their_own_scalars_in_finch_scalars():
     from finch.autoschedule import COMPILE_JULIA_GALLEY
 
     # Two row sums of a CSR matrix run in one loop over its rows, each summing
-    # into a workspace which stores nothing, and which the kernel neither
-    # reads before resetting nor returns, so Finch.jl keeps it in a variable.
+    # into a Temp0D accumulator, which Finch.jl keeps in a variable.
     rng = np.random.default_rng(0)
     data = rng.random((20, 30)) * (rng.random((20, 30)) < 0.3)
     data[3] = 0.0
@@ -1285,5 +1284,5 @@ def test_julia_kernels_keep_their_own_scalars_in_finch_scalars():
     while not isinstance(stage, LogicCompiler):
         stage = stage.ctx
     codes = [kernel.jl_code for kernel in stage.ctx_load.runtime._kernels.values()]
-    # Each is constructed for the Finch kernel, and for each call of it.
-    assert any(code.count("Finch.Scalar{0.0, Float64}(0.0)") == 4 for code in codes)
+    # Each accumulator is a Temp0D, which the Finch kernel keeps in a scalar.
+    assert any(code.count("Finch.Scalar{0.0, Float64}(0.0)") == 2 for code in codes)
