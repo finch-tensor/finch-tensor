@@ -119,6 +119,68 @@ def add_workspace(
     return prgm
 
 
+def accumulator_depth(prgm: LogicStatement, alias: Alias) -> int | None:
+    """
+    Return the number of fields of the query defining alias, when it writes
+    each of them in loop order and then reduces over further loops, so that
+    each element it writes stays fixed across those loops. A workspace fused
+    over every field then stores nothing, and holds the running value of one
+    element. Only an alias which one Query defines, and nothing updates, has
+    an accumulator.
+    """
+    writes: list[tuple[LogicStatement, tuple[Field, ...]]] = []
+
+    def visit(node: LogicStatement, loops: tuple[Field, ...]):
+        match node:
+            case Plan(bodies):
+                for body in bodies:
+                    visit(body, loops)
+            case Fuse(idx, body):
+                visit(body, (*loops, idx))
+            case Query(Table(Alias() as lhs, _), _) | QueryInto(
+                Table(Alias() as lhs, _), _, _
+            ) if lhs.unfused == alias:
+                writes.append((node, loops))
+
+    visit(prgm, ())
+    match writes:
+        case [(Query(Table(HardAlias(), idxs), _), loops)] if loops[
+            : len(idxs)
+        ] == idxs and len(loops) > len(idxs):
+            return len(idxs)
+    return None
+
+
+def add_accumulators(prgm: Plan, bindings: Mapping[Alias, TensorFType]) -> Plan:
+    """
+    Redirect each query of prgm which reduces into an output whose fields are
+    its outermost loops, as accumulator_depth finds, into a workspace fused
+    over all of them, as add_workspace does. The workspace stores no fields,
+    so it is declared before the loops it reduces over, accumulates the value
+    of one element of the output, and is copied into it once those loops end.
+    A backend may keep such a workspace in a register, where it would load and
+    store the output in every iteration, and could not keep it there when
+    another output might alias it. The inputs of bindings have no
+    accumulators.
+    """
+    prgm = flatten_plans(prgm)
+    spc = Namespace(prgm)
+    outputs: dict[HardAlias, None] = {}
+    for node in PostOrderDFS(prgm):
+        match node:
+            case Query(Table(HardAlias() as lhs, _), _) if lhs not in bindings:
+                outputs[lhs] = None
+    for alias in outputs:
+        depth = accumulator_depth(prgm, alias)
+        if depth is None:
+            continue
+        acc = HardAlias(spc.freshen(alias.name, "acc"))
+        staged = add_workspace(prgm, alias, depth, acc)
+        assert isinstance(staged, Plan)
+        prgm = staged
+    return prgm
+
+
 def stage_workspaces(
     prgm: Plan,
     bindings: Mapping[Alias, TensorFType],
@@ -362,7 +424,10 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
     formatter it wraps should price programs with the same model. format_cost
     prices a program with the formats its formatter would choose: format_cost
     searches them as a CostFormatter does, and galley_format_cost takes those
-    of a GalleyFormatter, far more cheaply.
+    of a GalleyFormatter, far more cheaply. Last, unless accumulators is
+    False, each query which reduces into fixed elements of its output across
+    its inner loops accumulates each element in a workspace which stores
+    nothing, as add_accumulators does, without pricing it.
     """
 
     def __init__(
@@ -371,8 +436,10 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
         cost_model: CostModel[ProtocolChoice] | None = None,
         options: Sequence[LevelOption] = LEVEL_OPTIONS,
         format_cost: FormatCost = format_cost,
+        accumulators: bool = True,
     ):
         self.ctx = ctx
+        self.accumulators = accumulators
         if cost_model is None:
             cost_model = PROTOCOL_COST_MODEL
         self.cost_model = cost_model
@@ -405,6 +472,8 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
             self.options,
             self.format_cost,
         )
+        if self.accumulators:
+            prgm = add_accumulators(prgm, bindings)
         return self.ctx(prgm, bindings, stats, stats_factory)
 
 

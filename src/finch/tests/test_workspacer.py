@@ -27,6 +27,7 @@ from finch.autoschedule.cost_models import (
 )
 from finch.autoschedule.formatter.galley_formatter import GalleyFormatter
 from finch.autoschedule.formatter.smart_formatter import CostFormatter, format_ftype
+from finch.autoschedule.fuse_merger import LogicFuseMerger
 from finch.autoschedule.loop_orderer import BFSLoopOrderer
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.tensor_stats import (
@@ -41,7 +42,9 @@ from finch.autoschedule.tensor_stats.uniform_stats import UniformStats
 from finch.autoschedule.util import fuse_loop_order
 from finch.autoschedule.workspacer import (
     LogicWorkspacer,
+    accumulator_depth,
     add_1d_workspaces,
+    add_accumulators,
     add_cost_effective_reformats,
     add_cost_effective_workspaces,
     add_reformat,
@@ -375,6 +378,135 @@ def test_scatter_workspaces_store_the_one_field_scattered_into():
     query = fuse_loop_order(Query(Table(c, (i, k, m)), rhs), (i, j, k, m))
     plan = Plan((query, Produces((c,))))
     assert add_1d_workspaces(plan, {}) == plan
+
+
+def test_accumulators_hold_each_entry_an_inner_loop_reduces_into():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
+    # An inner product reduces over j into c[i, k], which j leaves fixed.
+    plan, rhs = _matmul(c, a, b, (i, k, j))
+    assert accumulator_depth(plan, c) == 2
+    acc = FusedAlias(HardAlias("c_acc"), 2)
+    staged = add_accumulators(plan, {})
+    assert staged == Plan(
+        (
+            Fuse(
+                i,
+                Fuse(
+                    k,
+                    Plan(
+                        (
+                            Fuse(j, Query(Table(acc, (i, k)), rhs)),
+                            Query(Table(c, (i, k)), Table(acc, (i, k))),
+                        )
+                    ),
+                ),
+            ),
+            Produces((c,)),
+        )
+    )
+    tensor = fl.asarray(np.ones((2, 2)))
+    bindings: dict[Alias, TensorFType] = {a: tensor.ftype, b: tensor.ftype}
+    LoopOrderedForm.validate_inputs(staged, bindings, {}, DCStatsFactory())
+
+    # Where j scatters into c, or c is written in the innermost loop, no
+    # entry stays fixed across a loop.
+    for order in ((i, j, k), (j, i, k)):
+        plan, _ = _matmul(c, a, b, order)
+        assert accumulator_depth(plan, c) is None
+        assert add_accumulators(plan, {}) == plan
+    elementwise = Plan(
+        (
+            fuse_loop_order(Query(Table(c, (i, j)), Table(a, (i, j))), (i, j)),
+            Produces((c,)),
+        )
+    )
+    assert accumulator_depth(elementwise, c) is None
+
+
+def test_workspacer_accumulates_row_sums_which_merge_into_one_pass():
+    # Two sums of each row of a, accumulated in workspaces which store nothing,
+    # still merge into one loop over a, which copies each sum once per row.
+    i, j, j_2 = Field("i"), Field("j"), Field("j_2")
+    a, s, t = HardAlias("a"), HardAlias("s"), HardAlias("t")
+    rng = np.random.default_rng(0)
+    data = rng.random((6, 5)) * (rng.random((6, 5)) < 0.5)
+    tensor = fl.asarray(data)
+    sf = DCStatsFactory()
+    stats: dict[Alias, TensorStats] = {a: sf(tensor, (i, j))}
+    sums = (
+        Query(
+            Table(s, (i,)),
+            Aggregate(Literal(ffuncs.add), Literal(0.0), Table(a, (i, j)), (j,)),
+        ),
+        Query(
+            Table(t, (i,)),
+            Aggregate(
+                Literal(ffuncs.add),
+                Literal(0.0),
+                MapJoin(Literal(ffuncs.mul), (Table(a, (i, j_2)), Table(a, (i, j_2)))),
+                (j_2,),
+            ),
+        ),
+    )
+    plan = Plan(
+        (
+            fuse_loop_order(sums[0], (i, j)),
+            fuse_loop_order(sums[1], (i, j_2)),
+            Produces((s, t)),
+        )
+    )
+    capture = LogicCapture()
+    scheduler = LogicWorkspacer(
+        LogicFuseMerger(GalleyFormatter(CompilerFormLowerer(capture))),
+        format_cost=galley_format_cost,
+    )
+    scheduler(plan, {a: tensor.ftype}, stats, sf)
+    s_acc, t_acc = FusedAlias(HardAlias("s_acc"), 1), FusedAlias(HardAlias("t_acc"), 1)
+    match capture.last_prgm:
+        case Plan(
+            (
+                Fuse(
+                    _,
+                    Plan(
+                        (
+                            Fuse(
+                                _,
+                                Plan(
+                                    (
+                                        Query(Table(acc_1, _), _),
+                                        Query(Table(acc_2, _), _),
+                                    )
+                                ),
+                            ),
+                            Query(Table(lhs_1, _), Table(src_1, _)),
+                            Query(Table(lhs_2, _), Table(src_2, _)),
+                        )
+                    ),
+                ),
+                Produces(_),
+            )
+        ):
+            assert (acc_1, acc_2, src_1, src_2) == (s_acc, t_acc, s_acc, t_acc)
+            assert (lhs_1, lhs_2) == (s, t)
+        case prgm:
+            raise AssertionError(f"Expected one pass over a: {prgm}")
+    # Each accumulator stores only its element.
+    for acc in (s_acc, t_acc):
+        fmt = capture.last_bindings[acc.unfused]
+        assert fmt.ndim == 0
+
+    program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
+    compiler = NotationCompiler(
+        NumbaCompiler(), ctx_transforms=(LowerPackedStructSlots(), AssemblySimplify())
+    )
+    args = [
+        tensor if var == a else fmt.construct((0,) * fmt.ndim)
+        for var, fmt in capture.last_bindings.items()
+    ]
+    result_s, result_t = compiler(program).main(*args)
+    np.testing.assert_allclose(result_s.to_numpy(), data.sum(axis=1))
+    np.testing.assert_allclose(result_t.to_numpy(), (data * data).sum(axis=1))
 
 
 def test_add_reformat_copies_an_input_before_the_program():
