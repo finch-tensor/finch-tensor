@@ -618,3 +618,32 @@ def test_cost_protocolizer_states_the_protocols_it_chooses():
         *with_workspaces(program, *bindings.values())
     )
     np.testing.assert_array_equal(dense_values(result.lvl), data_x * data_y)
+
+
+def test_a_merge_of_walks_skips_the_arguments_it_does_not_walk():
+    # x ** 2 walks only x: the literal exponent has no fibers, and the merge
+    # steps through every entry of x, 3 in each of rows 0-3.
+    sf = ExactStatsFactory()
+    i, j = Field("i"), Field("j")
+    x, c = HardAlias("x"), HardAlias("c")
+    xd = np.zeros((10, 10))
+    xd[:4, :3] = 0.5
+    stats: dict[Alias, TensorStats] = {x: sf(fl.asarray(xd), (i, j))}
+    expr = Aggregate(
+        Literal(ffuncs.add),
+        Literal(0.0),
+        MapJoin(Literal(ffuncs.pow), (Table(x, (i, j)), Literal(2.0))),
+        (j,),
+    )
+    plan = Plan((fuse_loop_order(Query(Table(c, (i,)), expr), (i, j)), Produces((c,))))
+    lst = SparseListLevelOption()
+    basis = ProtocolBasis()
+    names = basis.feature_names
+    machine = StatsMachine(sf, dict(stats))
+    visits = {}
+    for component in basis.components(plan, {x: [lst, lst]}, machine):
+        match component:
+            case ProtocolChoice(prefix=Prefix(prefix=(_, _))) as access:
+                row = basis.get_component_features(access, machine)[0]
+                visits[access.alias.name] = row[names.index("sparse_list.walk.visits")]
+    assert visits == {"x": 12}
