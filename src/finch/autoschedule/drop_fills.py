@@ -143,7 +143,11 @@ def drop_fills(prgm: Plan, bindings: Mapping[Alias, TensorFType]) -> Plan:
                 if is_static(fill) and drops(
                     ffuncs.overwrite, fill.value, (), bindings[tns.unfused]
                 ):
-                    return Query(lhs, dropping_fill(arg, fill.value))
+                    arg = dropping_fill(arg, fill.value)
+                    init = Literal(fill.value)
+                    return Query(
+                        lhs, Aggregate(Literal(ffuncs.overwrite), init, arg, ())
+                    )
         return stmt
 
     return Plan(tuple(rewrite(body, ()) for body in prgm.bodies))

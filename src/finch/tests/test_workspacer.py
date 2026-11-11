@@ -43,6 +43,7 @@ from finch.autoschedule.util import fuse_loop_order
 from finch.autoschedule.workspacer import (
     LogicWorkspacer,
     accumulator_depth,
+    accumulator_pays,
     add_1d_workspaces,
     add_accumulators,
     add_cost_effective_reformats,
@@ -422,6 +423,45 @@ def test_accumulators_hold_each_entry_an_inner_loop_reduces_into():
         )
     )
     assert accumulator_depth(elementwise, c) is None
+
+
+@pytest.mark.parametrize(("nnz", "pays"), [(1000, False), (500_000, True)])
+def test_accumulators_pay_where_their_loops_visit_every_point(nnz, pays):
+    # c[i, j] = sum_k a[i, j] * b[i, k] * d[k, j], an SDDMM, loops over the
+    # entries of the sparse rows of a, but an accumulator for each (i, j) is
+    # reset and copied at every point, so it pays only where a is dense enough
+    # that the reduction visits as many terms as c has points.
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a, b, d, c = (HardAlias(name) for name in "abdc")
+    n, m = 1000, 4
+    fill = StaticFillFType(np.float64(0.0))
+    sizes = {i: n, j: n, k: m}
+
+    def uniform(fields, count):
+        dims = {idx: sizes[idx] for idx in fields}
+        return UniformStats(BaseTensorStats(fields, dims, fill), nnz=count)
+
+    stats: dict[Alias, TensorStats] = {
+        a: uniform((i, j), nnz),
+        b: uniform((i, k), n * m),
+        d: uniform((k, j), m * n),
+    }
+    shape = (ftype(np.intp),) * 2
+    dense = format_ftype([DenseLevelOption()] * 2, fill, shape)
+    rows = format_ftype([DenseLevelOption(), SparseListLevelOption()], fill, shape)
+    bindings: dict[Alias, TensorFType] = {a: rows, b: dense, d: dense}
+    terms = MapJoin(
+        Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (i, k)), Table(d, (k, j)))
+    )
+    query = Query(
+        Table(c, (i, j)), Aggregate(Literal(ffuncs.add), Literal(0.0), terms, (k,))
+    )
+    plan = Plan((fuse_loop_order(query, (i, j, k)), Produces((c,))))
+    sf = UniformStatsFactory()
+    assert accumulator_pays(plan, query, bindings, stats, sf) == pays
+    # Where a stores its rows densely, the loops visit every point anyway.
+    bindings[a] = dense
+    assert accumulator_pays(plan, query, bindings, stats, sf)
 
 
 def test_workspacer_accumulates_row_sums_which_merge_into_one_pass():

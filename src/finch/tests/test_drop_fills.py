@@ -106,7 +106,15 @@ def test_a_copy_out_of_an_accumulator_drops_fills():
     copy = Query(Table(C, (i,)), Table(acc, (i,)))
     scalar = fiber_tensor(element(0.0))
     dropped = drop_fills(plan(copy), {A: DENSE_ROWS, acc.unfused: scalar, C: LIST})
-    drop = Query(Table(C, (i,)), dropping_fill(Table(acc, (i,)), FILL))
+    drop = Query(
+        Table(C, (i,)),
+        Aggregate(
+            Literal(ffuncs.overwrite),
+            Literal(FILL),
+            dropping_fill(Table(acc, (i,)), FILL),
+            (),
+        ),
+    )
     assert dropped == plan(drop)
     # A dense C stores every entry, fills or not.
     assert drop_fills(plan(copy), {A: DENSE_ROWS, acc.unfused: scalar, C: DENSE}) == (
