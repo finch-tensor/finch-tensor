@@ -7,7 +7,7 @@ from typing import Any, Generic
 
 import numpy as np
 
-from finch.algebra import ffuncs
+from finch.algebra import ffuncs, is_annihilator
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.util import fuse_loop_order
@@ -293,7 +293,23 @@ class LoopSpaces(Generic[NS]):
         match node:
             case MapJoin(Literal(op), args):
                 parts = [part for arg in args if (part := self.walked(arg)) is not None]
-                return self.stats_factory.mapjoin(op, *parts) if parts else None
+                if not parts:
+                    return None
+                if len(parts) == len(args):
+                    return self.stats_factory.mapjoin(op, *parts)
+                # Some arguments aren't walked (literals, follows, gallops), so
+                # op can't be applied to the parts alone, as in x ** 2. Combine
+                # their supports as op would: each part whose fill annihilates
+                # op restricts the merge alone, and the others together.
+                sf = self.stats_factory
+                joins = []
+                unions = []
+                for part in parts:
+                    annihilates = is_annihilator(op.ftype, part.fill_type)
+                    (joins if annihilates else unions).append(sf.support(part))
+                if unions:
+                    joins.append(sf.mapjoin(ffuncs.or_, *unions))
+                return sf.mapjoin(ffuncs.and_, *joins)
             case Table(Alias() as tns, idxs) if self.idx in idxs[
                 tns.nfused :
             ] and self.protocol(node) not in (Follow(), Gallop()):
