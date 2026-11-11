@@ -788,7 +788,7 @@ class NumbaContext(Context):
                             self,
                             *(asm.Literal(v) for v in value),
                         )
-                    case float() if not np.isfinite(value):
+                    case float() | np.floating() if not np.isfinite(value):
                         if np.isnan(value):
                             return "numpy.nan"
                         return "numpy.inf" if value > 0 else "-numpy.inf"
