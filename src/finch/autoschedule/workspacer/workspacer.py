@@ -12,6 +12,7 @@ from finch.autoschedule.cost_models import (
     LevelOption,
     ProtocolChoice,
 )
+from finch.autoschedule.drop_fills import stores_densely
 from finch.autoschedule.formatter.galley_formatter import GalleyFormatter
 from finch.autoschedule.formatter.smart_formatter import (
     LEVEL_OPTIONS,
@@ -24,6 +25,7 @@ from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.util import flatten_plans, fuse_loop_order
 from finch.finch_assembly import AssemblyLibrary
 from finch.finch_logic import (
+    Aggregate,
     Alias,
     Field,
     Fuse,
@@ -151,34 +153,78 @@ def accumulator_depth(prgm: LogicStatement, alias: Alias) -> int | None:
     return None
 
 
-def add_accumulators(prgm: Plan, bindings: Mapping[Alias, TensorFType]) -> Plan:
+def add_accumulators(
+    prgm: Plan,
+    bindings: Mapping[Alias, TensorFType],
+    keep: Callable[[Plan, Query], bool] | None = None,
+) -> Plan:
     """
     Redirect each query of prgm which reduces into an output whose fields are
     its outermost loops, as accumulator_depth finds, into a workspace fused
-    over all of them, as add_workspace does. The workspace stores no fields,
-    so it is declared before the loops it reduces over, accumulates the value
-    of one element of the output, and is copied into it once those loops end.
-    A backend may keep such a workspace in a register, where it would load and
-    store the output in every iteration, and could not keep it there when
-    another output might alias it. The inputs of bindings have no
-    accumulators.
+    over all of them, as add_workspace does, if keep, given prgm and the
+    query, keeps it. The workspace stores no fields, so it is declared before
+    the loops it reduces over, accumulates the value of one element of the
+    output, and is copied into it once those loops end. A backend may keep
+    such a workspace in a register, where it would load and store the output
+    in every iteration, and could not keep it there when another output might
+    alias it. The inputs of bindings have no accumulators.
     """
     prgm = flatten_plans(prgm)
     spc = Namespace(prgm)
-    outputs: dict[HardAlias, None] = {}
+    outputs: dict[HardAlias, Query] = {}
     for node in PostOrderDFS(prgm):
         match node:
             case Query(Table(HardAlias() as lhs, _), _) if lhs not in bindings:
-                outputs[lhs] = None
-    for alias in outputs:
+                outputs[lhs] = node
+    for alias, query in outputs.items():
         depth = accumulator_depth(prgm, alias)
-        if depth is None:
+        if depth is None or (keep is not None and not keep(prgm, query)):
             continue
         acc = HardAlias(spc.freshen(alias.name, "acc"))
         staged = add_workspace(prgm, alias, depth, acc)
         assert isinstance(staged, Plan)
         prgm = staged
     return prgm
+
+
+def accumulator_pays(
+    prgm: Plan,
+    query: Query,
+    bindings: Mapping[Alias, TensorFType],
+    stats: Mapping[Alias, TensorStats],
+    stats_factory: StatsFactory,
+) -> bool:
+    """
+    Whether an accumulator for query, as add_accumulators adds, costs no more
+    than the loops of query already do. Its reset and copy run at every point
+    of the loops over the fields of the output, which a sparse input would
+    otherwise skip, so those loops visit every point. They already do where
+    every table of query stores each of those fields in a dense level, and
+    otherwise visiting every point costs no more than the reduction does when
+    the output has at most as many points as the terms the reduction visits.
+    """
+    fields = query.lhs.idxs
+    rhs = query.rhs
+    arg = rhs.arg if isinstance(rhs, Aggregate) else rhs
+    dense = True
+    for node in PostOrderDFS(arg):
+        match node:
+            case Table(Alias() as tns, idxs):
+                for depth, idx in enumerate(idxs):
+                    if idx in fields and not (
+                        tns in bindings and stores_densely(bindings[tns], depth)
+                    ):
+                        dense = False
+    if dense:
+        return True
+    machine = StatsMachine(stats_factory, OrderedDict(stats))
+    machine(prgm)
+    output = machine.bindings[query.lhs.tns]
+    assert isinstance(output, NumericStats)
+    terms = machine(arg)
+    assert isinstance(terms, NumericStats)
+    points = math.prod(output.dim_sizes.values())
+    return points <= terms.estimate_non_fill_values()
 
 
 def stage_workspaces(
@@ -427,7 +473,8 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
     of a GalleyFormatter, far more cheaply. Last, unless accumulators is
     False, each query which reduces into fixed elements of its output across
     its inner loops accumulates each element in a workspace which stores
-    nothing, as add_accumulators does, without pricing it.
+    nothing, as add_accumulators does, where accumulator_pays finds that its
+    copy costs no more than its loops do.
     """
 
     def __init__(
@@ -473,7 +520,11 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
             self.format_cost,
         )
         if self.accumulators:
-            prgm = add_accumulators(prgm, bindings)
+
+            def keep(prgm: Plan, query: Query) -> bool:
+                return accumulator_pays(prgm, query, bindings, stats, stats_factory)
+
+            prgm = add_accumulators(prgm, bindings, keep)
         return self.ctx(prgm, bindings, stats, stats_factory)
 
 
