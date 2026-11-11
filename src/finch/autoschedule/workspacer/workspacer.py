@@ -4,7 +4,7 @@ import math
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
 
-from finch.algebra import ftype, ftypes
+from finch.algebra import ftype, ftypes, is_static
 from finch.algebra.tensor import TensorFType
 from finch.autoschedule.cost_models import (
     PROTOCOL_COST_MODEL,
@@ -42,6 +42,7 @@ from finch.finch_logic import (
     TensorStats,
 )
 from finch.symbolic import Namespace, PostOrderDFS, PostWalk, Rewrite
+from finch.tensor import element, temp_0d
 
 
 def workspace_depth(prgm: LogicStatement, alias: Alias) -> int | None:
@@ -157,34 +158,43 @@ def add_accumulators(
     prgm: Plan,
     bindings: Mapping[Alias, TensorFType],
     keep: Callable[[Plan, Query], bool] | None = None,
-) -> Plan:
+) -> tuple[Plan, dict[Alias, TensorFType]]:
     """
     Redirect each query of prgm which reduces into an output whose fields are
     its outermost loops, as accumulator_depth finds, into a workspace fused
     over all of them, as add_workspace does, if keep, given prgm and the
     query, keeps it. The workspace stores no fields, so it is declared before
     the loops it reduces over, accumulates the value of one element of the
-    output, and is copied into it once those loops end. A backend may keep
-    such a workspace in a register, where it would load and store the output
-    in every iteration, and could not keep it there when another output might
-    alias it. The inputs of bindings have no accumulators.
+    output, and is copied into it once those loops end. Return the program
+    and the format of each workspace, a Temp0D, which a backend may keep in a
+    register, where it would load and store the output in every iteration,
+    and could not keep it there when another output might alias it. Only an
+    output with a static fill, which isn't an input of bindings, has one.
     """
     prgm = flatten_plans(prgm)
     spc = Namespace(prgm)
+    fills = prgm.infer_fill_type({var: fmt.fill_type for var, fmt in bindings.items()})
     outputs: dict[HardAlias, Query] = {}
     for node in PostOrderDFS(prgm):
         match node:
             case Query(Table(HardAlias() as lhs, _), _) if lhs not in bindings:
                 outputs[lhs] = node
+    formats: dict[Alias, TensorFType] = {}
     for alias, query in outputs.items():
+        fill = fills[alias]
         depth = accumulator_depth(prgm, alias)
-        if depth is None or (keep is not None and not keep(prgm, query)):
+        if (
+            depth is None
+            or not is_static(fill)
+            or (keep is not None and not keep(prgm, query))
+        ):
             continue
         acc = HardAlias(spc.freshen(alias.name, "acc"))
         staged = add_workspace(prgm, alias, depth, acc)
         assert isinstance(staged, Plan)
         prgm = staged
-    return prgm
+        formats[acc] = temp_0d(element(fill, fill.element_type))
+    return prgm, formats
 
 
 def accumulator_pays(
@@ -524,7 +534,8 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
             def keep(prgm: Plan, query: Query) -> bool:
                 return accumulator_pays(prgm, query, bindings, stats, stats_factory)
 
-            prgm = add_accumulators(prgm, bindings, keep)
+            prgm, formats = add_accumulators(prgm, bindings, keep)
+            bindings = {**bindings, **formats}
         return self.ctx(prgm, bindings, stats, stats_factory)
 
 

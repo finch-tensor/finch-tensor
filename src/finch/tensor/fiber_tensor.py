@@ -479,3 +479,49 @@ def fiber_tensor(lvl: LevelFType) -> FiberTensorFType:
         An instance of a fiber tensor format.
     """
     return FiberTensorFType(lvl)
+
+
+@dataclass
+class Temp0D(FiberTensor):
+    """
+    A zero dimensional temporary which a kernel keeps to itself: the kernel
+    resets it before every read, and never returns it, so the value it is
+    passed doesn't matter. A backend may keep it in a variable of its own.
+    """
+
+    @property
+    def ftype(self):
+        return Temp0DFType(self.lvl.ftype, self._device)
+
+
+@dataclass(unsafe_hash=True)
+class Temp0DFType(FiberTensorFType):
+    """
+    The format of a Temp0D, a zero dimensional fiber tensor of one element
+    level, which a kernel resets before every read and never returns.
+    """
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not isinstance(self.lvl_t, levels.ElementLevelFType):
+            raise TypeError(f"A Temp0D stores one element, not {self.lvl_t}")
+
+    @property
+    def struct_name(self):
+        return "Temp0DFType"
+
+    def with_fill(self, fill_type: AbstractFillFType) -> Temp0DFType:
+        return Temp0DFType(self.lvl_t.with_fill(fill_type), self._device)
+
+    def construct(self, shape: tuple[int, ...], fill_value: Any = None) -> Temp0D:
+        tns = super().construct(shape, fill_value)
+        return Temp0D(tns.lvl, tns.pos, tns._device)
+
+    def from_fields(self, *args) -> Temp0D:
+        lvl, shape, pos = args
+        return Temp0D(lvl, pos, self.device)
+
+
+def temp_0d(lvl: levels.ElementLevelFType) -> Temp0DFType:
+    """The format of a Temp0D whose element level has the format lvl."""
+    return Temp0DFType(lvl)

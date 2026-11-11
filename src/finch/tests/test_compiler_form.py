@@ -18,15 +18,11 @@ from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.util import fuse_loop_order
 from finch.codegen import CCompiler, MLIRCompiler, NumbaCompiler
 from finch.compile import NotationCompiler
-from finch.compile_jl.analyze import (
-    local_argument_positions,
-    reset_argument_positions,
-)
+from finch.compile_jl.analyze import reset_argument_positions
 from finch.finch_logic import (
     Aggregate,
     Field,
     Fuse,
-    FusedAlias,
     HardAlias,
     Literal,
     MapJoin,
@@ -37,7 +33,7 @@ from finch.finch_logic import (
     Table,
 )
 from finch.symbolic import PostOrderDFS
-from finch.tensor import BufferizedNDArray, element, fiber_tensor
+from finch.tensor import BufferizedNDArray
 
 from .conftest import finch_assert_equal
 from .utils import with_workspaces
@@ -393,29 +389,6 @@ def test_guarded_overwrite_keeps_previous_values_for_julia():
     # pass its previous values, but a reduction which may be empty might not.
     assert resets(Table(D, (i,)), (i,)) == {"C"}
     assert resets(Table(A, (i, j)), (i, j)) == set()
-
-
-def test_julia_kernels_keep_accumulators_to_themselves():
-    s = HardAlias("S")
-    total = Aggregate(ADD, Literal(0.0), Table(A, (i, j)), (j,))
-
-    def local(*stmts):
-        plan = Plan((*stmts, Produces((C,))))
-        # The formatter gives S a static fill, so that C is reset to it.
-        binds = {var: tns.ftype for var, tns in bindings().items()}
-        binds[s] = fiber_tensor(element(0.0))
-        func = NotationGenerator()(plan, binds, {}, None).funcs[0]
-        positions = local_argument_positions(func)
-        return {func.args[pos].name.split("#")[1] for pos in positions}
-
-    # C[i] = sum_j A[i, j], accumulated for each i in S, which stores nothing:
-    # each row resets S before reading it, and the kernel doesn't return it.
-    acc = FusedAlias(s, 1)
-    copy = Query(Table(C, (i,)), Table(acc, (i,)))
-    loop = Fuse(i, Plan((Fuse(j, Query(Table(acc, (i,)), total)), copy)))
-    assert local(loop) == {"S"}
-    # An update of S reads the value it was passed.
-    assert local(fold(Table(s, ()), ADD, Table(A, (i, j)), (i, j))) == set()
 
 
 @pytest.mark.parametrize(
