@@ -435,6 +435,100 @@ class SamplingStatsFactory(
         )
         return aligned, probs
 
+    def _join_size(self, left, right, shared) -> float:
+        """The exact number of entries of left * right: the sum over the
+        shared coordinates of their entry counts in each sketch."""
+        import finch
+
+        def counts(sketch):
+            nonzero = MapJoin(
+                Literal(ffuncs.astype(finch.intp)),
+                (MapJoin(Literal(ffuncs.ne), (sketch, Literal(0))),),
+            )
+            rest = tuple(f for f in sketch.fields() if f not in shared)
+            if not rest:
+                return nonzero
+            return Aggregate(Literal(ffuncs.add), Literal(np.intp(0)), nonzero, rest)
+
+        total = compute_sketch(
+            Aggregate(
+                Literal(ffuncs.add),
+                Literal(np.intp(0)),
+                MapJoin(Literal(ffuncs.mul), (counts(left), counts(right))),
+                tuple(shared),
+            )
+        )
+        match total:
+            case Table(Literal(tensor), _):
+                return float(np.asarray(tensor.to_numpy()).reshape(-1)[0])
+        raise TypeError("expected a materialized count")
+
+    def _downsample(self, sketch, old_probs, new_probs, dim_sizes):
+        """The sketch with each field whose probability fell masked at its new
+        probability, under that field's seed."""
+        tables = []
+        for f in sketch.fields():
+            if new_probs[f] != old_probs[f]:
+                size = int(dim_sizes[f])
+                seed = self._seeds.get((f, size))
+                mask = (
+                    self._get_mask(f, size, new_probs[f])
+                    if seed is None
+                    else RandomMaskTensor(size, new_probs[f], seed=seed, dtype=np.intp)
+                )
+                tables.append(mask_table(f, mask))
+        if not tables:
+            return sketch
+        return compute_sketch(MapJoin(Literal(ffuncs.mul), (sketch, *tables)))
+
+    def _join_capped(self, sketches, probs, dim_sizes):
+        """join_sketches, but each pairwise join whose output would exceed the
+        budget first samples its fields down. The masks nest (a lower
+        probability keeps a subset under the same seed), so this is the
+        sample the lower probabilities would have drawn from the start.
+        Returns the joined sketch and the updated per-field probabilities."""
+        probs = dict(probs)
+        remaining = list(sketches)
+        result = remaining.pop(
+            max(range(len(remaining)), key=lambda n: len(remaining[n].fields()))
+        )
+        while remaining:
+            joined = set(result.fields())
+            other = remaining.pop(
+                max(
+                    range(len(remaining)),
+                    key=lambda n: (
+                        len(joined & set(remaining[n].fields())),
+                        len(remaining[n].fields()),
+                    ),
+                )
+            )
+            left, right = (
+                (result, other)
+                if len(result.fields()) >= len(other.fields())
+                else (other, result)
+            )
+            shared = tuple(f for f in left.fields() if f in set(right.fields()))
+            size = self._join_size(left, right, shared)
+            if size > self.sample_nnz:
+                halvings = math.ceil(math.log2(size / self.sample_nnz))
+                fields = list(dict.fromkeys((*left.fields(), *right.fields())))
+                new = dict(probs)
+                for _ in range(halvings):
+                    f = max(fields, key=lambda f: (new[f], dim_sizes[f]))
+                    new[f] *= 0.5
+
+                left = self._downsample(left, probs, new, dim_sizes)
+                right = self._downsample(right, probs, new, dim_sizes)
+                probs = new
+            result = compute_sketch(
+                MapJoin(
+                    Literal(ffuncs.mul),
+                    (store_first(left, shared), store_first(right, shared)),
+                )
+            )
+        return result, probs
+
     def _mapjoin_join(
         self, op: FinchOperator, *join_args: SamplingStats
     ) -> SamplingStats:
@@ -447,10 +541,10 @@ class SamplingStatsFactory(
 
         base_stats = super()._mapjoin_defs(op, *join_args)
         join_args, probs = self._align_mapjoin(*join_args)
-        result_sketch = store_first(
-            join_sketches([arg.sketch for arg in join_args]),
-            tuple(base_stats.index_order),
+        joined, probs = self._join_capped(
+            [arg.sketch for arg in join_args], probs, base_stats.dim_sizes
         )
+        result_sketch = store_first(joined, tuple(base_stats.index_order))
 
         return self.remask(
             SamplingStats(
