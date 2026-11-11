@@ -19,6 +19,7 @@ from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import PostWalk, Rewrite
 from finch.tensor.patterns import FillTensorFType, PatternTensorFType
 
+from .analyze import local_argument_positions
 from .julia import jl
 from .runtime import DefaultFinchJLRuntime, FinchJLRuntime
 from .types import (
@@ -27,6 +28,7 @@ from .types import (
     _zero_value,
     ftype_to_jl_constructor_str,
     ftype_to_jl_type_str,
+    local_scalar_constructor_str,
 )
 
 _JULIA_OPS = {
@@ -206,6 +208,9 @@ class FinchJLGenerator:
         self.used_extents: set[str] = set()
         self.constants: dict[str, ntn.Literal] = {}
         self.declares: list[tuple[int, tuple]] = []
+        # The position of each argument which the kernel keeps to itself in a
+        # Finch scalar, and the Julia source text which constructs it.
+        self.local_scalars: dict[int, str] = {}
 
     def __call__(self, prgm: ntn.Module | ntn.Function) -> str:
         self.pack_dict.clear()
@@ -216,7 +221,20 @@ class FinchJLGenerator:
         self.used_extents.clear()
         self.constants.clear()
         self.declares.clear()
+        self.local_scalars.clear()
         return self.generate_julia(prgm)
+
+    def wrapper(self, name: str, kernel: str, nargs: int) -> str:
+        """
+        Julia source text for a function `name`, which takes the `nargs`
+        arguments of the Julia kernel `kernel` and calls it with a fresh Finch
+        scalar in place of each argument it keeps to itself.
+        """
+        params = [f"a{pos}" for pos in range(nargs)]
+        args = [self.local_scalars.get(pos, param) for pos, param in enumerate(params)]
+        return (
+            f"function {name}({','.join(params)})\n    {kernel}({','.join(args)})\nend"
+        )
 
     def emit_name(self, sym: str) -> str:
         return self.names.setdefault(sym, f"v{len(self.names)}")
@@ -254,20 +272,26 @@ class FinchJLGenerator:
                     if isinstance(arg, ntn.Variable):
                         self.arg_positions[arg.name] = pos
                         self.emit_name(arg.name)
+                # A tensor of one element which the kernel keeps to itself is
+                # a Finch scalar, whose value Finch.jl keeps in a variable.
+                for pos in local_argument_positions(prgm):
+                    ctor = local_scalar_constructor_str(args[pos].result_type)
+                    if ctor is not None:
+                        self.local_scalars[pos] = ctor
                 body_str = self.generate_julia(body, nestingLvl + 2)
                 self.extents = [
                     ext for ext in self.extents if ext[0] in self.used_extents
                 ]
                 arg_strs = []
                 proto_lines = []
-                for arg in args:
+                for pos, arg in enumerate(args):
                     match arg:
                         case ntn.Variable(sym, type_):
                             arg_name = self.emit_name(sym)
-                            proto_lines.append(
-                                f"        {arg_name} = "
-                                f"{ftype_to_jl_constructor_str(type_)}"
-                            )
+                            ctor = self.local_scalars.get(pos)
+                            if ctor is None:
+                                ctor = ftype_to_jl_constructor_str(type_)
+                            proto_lines.append(f"        {arg_name} = {ctor}")
                             arg_strs.append(arg_name)
                         case _:
                             raise NotImplementedError
@@ -567,7 +591,20 @@ class FinchJLCompiler(NotationCompiler):
             kernel = self.runtime.get_cached_kernel(key)
             if kernel is None:
                 func_name = f"kernel_{uuid.uuid4().hex}"
-                jl_code = generated_prgm.replace(func.name.name, func_name, 1)
+                if generator.local_scalars:
+                    # The kernel is passed every argument, and replaces those
+                    # it keeps to itself with scalars before the Finch kernel.
+                    inner = f"{func_name}_scalars"
+                    nargs = len(func.args) + len(extents)
+                    jl_code = (
+                        "begin\n"
+                        + generated_prgm.replace(func.name.name, inner, 1)
+                        + "\n"
+                        + generator.wrapper(func_name, inner, nargs)
+                        + "\nend"
+                    )
+                else:
+                    jl_code = generated_prgm.replace(func.name.name, func_name, 1)
                 jl.seval(jl_code)
                 kernel = FinchJLKernel(
                     jl_code,

@@ -109,3 +109,60 @@ def returned_argument_positions(function: ntn.Function) -> tuple[int, ...]:
     ):
         raise ValueError("Julia kernels must return formal arguments")
     return tuple(positions[value.name] for value in values)
+
+
+def _read_before_reset(node: Any, names: set[str], reset: bool) -> tuple[bool, bool]:
+    """
+    Whether running node may read a tensor of names before it is reset, given
+    whether it is reset beforehand, and whether it is reset afterwards. A loop
+    or if statement may skip its body, so it leaves the tensor as it found it.
+    """
+    match node:
+        case ntn.Block(bodies):
+            for body in bodies:
+                read, reset = _read_before_reset(body, names, reset)
+                if read:
+                    return True, reset
+            return False, reset
+        case ntn.Loop(_, extent, body):
+            if not reset and _references(extent, names):
+                return True, reset
+            read, _ = _read_before_reset(body, names, reset)
+            return read, reset
+        case ntn.If(condition, body):
+            if not reset and _references(condition, names):
+                return True, reset
+            read, _ = _read_before_reset(body, names, reset)
+            return read, reset
+        case ntn.IfElse(condition, then_body, else_body):
+            if not reset and _references(condition, names):
+                return True, reset
+            then_read, then_reset = _read_before_reset(then_body, names, reset)
+            else_read, else_reset = _read_before_reset(else_body, names, reset)
+            return then_read or else_read, then_reset and else_reset
+        case ntn.Declare(tensor, init, _, _) if (
+            isinstance(tensor, (ntn.Variable, ntn.Slot)) and tensor.name in names
+        ):
+            return not reset and _references(init, names), True
+        case ntn.Unpack() | ntn.Repack() | ntn.Freeze() | ntn.Thaw():
+            # These move a tensor between modes, but don't read its values.
+            return False, reset
+        case _:
+            return not reset and _references(node, names), reset
+
+
+def local_argument_positions(function: ntn.Function) -> tuple[int, ...]:
+    """
+    Return the arguments whose values neither enter nor leave the kernel: it
+    doesn't return them, and resets them before every read. A kernel may keep
+    these in storage of its own rather than the arguments it is passed.
+    """
+    returned = set(returned_argument_positions(function))
+    return tuple(
+        position
+        for position, argument in enumerate(function.args)
+        if position not in returned
+        and not _read_before_reset(
+            function.body, _argument_aliases(function, argument), False
+        )[0]
+    )

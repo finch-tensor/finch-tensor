@@ -1,7 +1,9 @@
 from .workspacer import (
     DefaultLogicWorkspacer,
     LogicWorkspacer,
+    accumulator_depth,
     add_1d_workspaces,
+    add_accumulators,
     add_cost_effective_reformats,
     add_cost_effective_workspaces,
     add_reformat,
@@ -15,7 +17,9 @@ from .workspacer import (
 __all__ = [
     "DefaultLogicWorkspacer",
     "LogicWorkspacer",
+    "accumulator_depth",
     "add_1d_workspaces",
+    "add_accumulators",
     "add_cost_effective_reformats",
     "add_cost_effective_workspaces",
     "add_reformat",

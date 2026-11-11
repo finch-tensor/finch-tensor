@@ -360,6 +360,26 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
     )
 
 
+def local_scalar_constructor_str(ftype: FType) -> str | None:
+    """
+    Julia source text constructing a Finch scalar which may stand in for a
+    tensor of `ftype` that a kernel keeps to itself, if `ftype` stores one
+    element, and None otherwise. Finch.jl keeps the value of a scalar in a
+    local variable, where it loads and stores the element of a zero
+    dimensional tensor at each update, which LLVM can't keep in a register
+    when the kernel writes other arrays which might alias it.
+    """
+    match ftype:
+        case ScalarFType():
+            fill = ftype.fill_type
+        case FiberTensorFType(lvl_t=ElementLevelFType() as lvl_t):
+            fill = lvl_t.fill_type
+        case _:
+            return None
+    fill_str = _julia_literal(fill)
+    return f"{scalar_type_str(fill, ftype.element_type)}({fill_str})"
+
+
 def ftype_to_jl_constructor_str(ftype: FType) -> str:
     """Julia source text constructing a minimal instance of `ftype`, for
     embedding directly in generated kernel source (see compiler.py)."""
