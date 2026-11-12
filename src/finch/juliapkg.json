@@ -5,7 +5,7 @@
       "uuid": "9177782c-1635-4eb9-9bfb-d9dfa25e6bce",
       "version": "2.2.0",
       "url": "https://github.com/finch-tensor/Finch.jl",
-      "rev": "41425cdee46966e674863ba9016732dee4a99e46"
+      "rev": "84eed4b5ba5b8808d71a2d7d6faaa33eaa863065"
     },
     "HDF5": {
       "uuid": "f67ccb44-e63f-5c2f-98bd-6dc0ccc4ba2f",

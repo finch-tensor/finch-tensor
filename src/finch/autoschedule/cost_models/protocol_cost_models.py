@@ -607,7 +607,7 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
         iterations = spaces.iterations()
         if component.write and component.alias.nfused:
             # There is some minimal work done every time a workspace is
-            # declared or copied out, regardless of actual writes. We model 
+            # declared or copied out, regardless of actual writes. We model
             # this as at least 1 write per declare.
             fused = table.idxs[: component.alias.nfused]
             last = max(prefix.prefix.index(idx) for idx in fused)
