@@ -323,6 +323,102 @@ class ShortCircuitScalar(OverrideTensor):
         return ShortCircuitScalarFType(self._fill, self._element_type)
 
 
+@dataclass(frozen=True, eq=False)
+class LocalScalarFType(TensorFType):
+    """
+    The type of a scalar a kernel keeps in a local variable while it runs, so
+    reads and updates of it inside loops do not go through memory. The Julia
+    backend passes it as a Finch.Scalar.
+    """
+
+    _fill_value: AbstractFill
+    _element_type: FType
+
+    @property
+    def fill_value(self) -> AbstractFill:
+        return self._fill_value
+
+    def with_fill(self, fill_value: AbstractFill) -> LocalScalarFType:
+        return replace(self, _fill_value=fill_value)
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return ()
+
+    @property
+    def level_format_properties(self) -> list[FormatProperty]:
+        return []
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        if not isinstance(other, LocalScalarFType):
+            return False
+        return (
+            builtins.bool(np.all(ffuncs.same(self._fill_value, other._fill_value)))
+            and self._element_type == other._element_type
+        )
+
+    def __hash__(self):
+        return hash((ffuncs.samehash(self._fill_value), self._element_type))
+
+    def construct(self, shape: tuple) -> LocalScalar:
+        return LocalScalar(self.fill_value, self.element_type)
+
+    def __call__(self, val: Any) -> LocalScalar:
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+
+class LocalScalar(OverrideTensor):
+    """
+    A scalar holding its fill, which a kernel keeps in a local variable. See
+    LocalScalarFType.
+    """
+
+    def __init__(self, fill_value, element_type: FType):
+        self._fill = as_fill(fill_value)
+        self._element_type = element_type
+
+    def with_fill(self, fill_value: AbstractFill) -> LocalScalar:
+        return LocalScalar(fill_value, self._element_type)
+
+    def item(self):
+        return self._fill.value
+
+    def to_numpy(self):
+        return np.asarray(self._fill.value, dtype=self._element_type)
+
+    def to_scipy(self):
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
+
+    @property
+    def shape(self):
+        return ()
+
+    @property
+    def fill_value(self) -> Any:
+        return self._fill.value
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        return ()
+
+    @property
+    def ftype(self):
+        return LocalScalarFType(self._fill, self._element_type)
+
+
 class IndexTensor(OverrideTensor):
     """
     A tensor that has a specific shape and returns the linear (flattened) index used

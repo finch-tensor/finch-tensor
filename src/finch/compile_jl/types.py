@@ -19,6 +19,7 @@ from finch.tensor.patterns import (
     ChunkMaskTensor,
     EyeTensor,
     FillTensorFType,
+    LocalScalarFType,
     LowerTriangleTensor,
     OddEvenMergeSortLowerMaskTensor,
     OddEvenMergeSortPartnerMaskTensor,
@@ -287,16 +288,17 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
         )
     if isinstance(level_ftype, SparseHashLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
-        dim_t = _leaf_type_str(level_ftype.dimension_type)
-        single_writer = "true" if level_ftype.single_writer else "false"
-        tbl_entry_t = f"Tuple{{{pos_t},{dim_t},{pos_t}}}"
-        # interop.py derives Ti from `np.asarray(dimension).item()`, which
-        # (like DenseLevel above) always yields plain Julia Int (Int64).
+        # Finch 1.8's SparseHashLevel{Ti}(lvl, shape, subtables, pos_multiplier,
+        # ptr, tbl_ctrl, tbl, key, perm, tbl_count), whose key records are
+        # (parent, index, state byte). It has no single-writer parameter, so
+        # level_ftype.single_writer is unused. Ti is plain Julia Int, as for
+        # DenseLevel above.
         return (
-            f"Finch.SparseHashLevel{{Int,{single_writer}}}("
+            f"Finch.SparseHashLevel{{Int}}("
             f"{_level_constructor_str(level_ftype.lvl_t)}, 1, 1, "
-            f"{_plus_one_ctor_str(pos_t)}, UInt8[], {tbl_entry_t}[], {pos_t}[], "
-            f"{_plus_one_ctor_str(pos_t)})"
+            f"Finch.SPARSE_HASH_POS_MULTIPLIER, {_plus_one_ctor_str(pos_t)}, "
+            f"UInt8[], {pos_t}[], Tuple{{{pos_t},Int,UInt8}}[], {pos_t}[], "
+            f"zeros(Int, 1))"
         )
     raise NotImplementedError(
         f"ftype_to_jl_constructor_str: unsupported level ftype "
@@ -326,6 +328,9 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
     if isinstance(ftype, FillTensorFType):
         # Matches interop.py, which passes a fill tensor as a Finch scalar.
         return f"{scalar_type_str(ftype.fill_value, ftype.element_type)}()"
+    if isinstance(ftype, LocalScalarFType):
+        fill = _julia_literal(ftype.fill_value)
+        return f"{scalar_type_str(ftype.fill_value, ftype.element_type)}({fill})"
     if isinstance(ftype, ShortCircuitScalarFType):
         return (
             f"{short_circuit_scalar_type_str(ftype.fill_value, ftype.element_type)}()"
