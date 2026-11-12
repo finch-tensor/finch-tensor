@@ -4,14 +4,15 @@ Converted from Julia.
 Removed general cache. Both alias_hash and cost_cache
 """
 
-from collections import OrderedDict, deque
+import heapq
+from collections import OrderedDict
 from typing import Literal
 
 from finch.finch_logic import Query
 
 from .annotated_query import AnnotatedQuery
 
-GalleyOptimizer = Literal["greedy", "bfs", "dfs"]
+GalleyOptimizer = Literal["greedy", "bfs", "dfs", "best-first"]
 
 # A component of this many indices or more takes the greedy order rather than
 # an exact search, whose cost grows exponentially with it, as Galley.jl's
@@ -136,15 +137,20 @@ def branch_and_bound(
     return (optimal_orders[component_set], optimal_subquery_costs)
 
 
-def branch_and_bound_dfs(
+def branch_and_bound_best_first(
     input_aq: AnnotatedQuery,
     component: list,
 ) -> tuple:
     """
-    Exact branch-and-bound via iterative DFS (cheapest child expanded first).
+    Exact branch-and-bound, expanding the cheapest reached state first.
+
+    States are sets of reduced indices. Step costs are non-negative, so the
+    first time a set is popped it was reached by its cheapest route: each set
+    is expanded at most once, and the search stops when the full component
+    pops. A child's query is only copied and reduced when it is popped.
 
     Returns ``((order, queries, aq, cost), optimal_subquery_costs)`` where the
-    second element is an empty ``OrderedDict`` (greedy bounds use layered BnB).
+    second element is an empty ``OrderedDict``.
 
     Raises
     ------
@@ -152,63 +158,90 @@ def branch_and_bound_dfs(
         If no complete elimination order exists for ``component``.
     """
     component_set = frozenset(component)
-    memo: dict[frozenset, float] = {frozenset(): 0.0}
-    best_complete = float("inf")
-    best_state: tuple[list, list, AnnotatedQuery, float] | None = None
+    best_cost: dict[frozenset, float] = {frozenset(): 0.0}
+    expanded: set[frozenset] = set()
+    tie = 0
+    heap: list[tuple] = [(0.0, tie, frozenset(), [], [], input_aq, None)]
 
-    stack: deque[tuple[frozenset, list, list, AnnotatedQuery, float]] = deque()
-    stack.append((frozenset(), [], [], input_aq, 0.0))
-
-    while stack:
-        vars_key, order, queries, aq, cost = stack.popleft()
-
-        if cost > memo.get(vars_key, float("inf")):
+    while heap:
+        cost, _, vars_key, order, queries, aq, idx = heapq.heappop(heap)
+        if vars_key in expanded or cost > best_cost[vars_key]:
             continue
+        if idx is not None:
+            aq = aq.copy()
+            queries = [*queries, aq.reduce_idx(idx)]
+            order = [*order, idx]
+        expanded.add(vars_key)
 
         if vars_key == component_set:
-            if cost < best_complete:
-                best_complete = cost
-                best_state = (order, queries, aq, cost)
-            continue
+            return ((order, queries, aq, cost), OrderedDict())
 
-        if cost >= best_complete:
-            continue
-
-        reducible_in_comp = aq.get_reducible_idxs_for_component(component)
-        children: list[tuple[frozenset, list, list, AnnotatedQuery, float]] = []
-        for idx in reducible_in_comp:
-            _, _, _, reduced_vars = aq.get_reduce_query(idx)
-            step_cost = aq.get_cost_of_reduce_idx(idx)
-            new_cost = cost + step_cost
+        for next_idx in aq.get_reducible_idxs_for_component(component):
+            _, _, _, reduced_vars = aq.get_reduce_query(next_idx)
             new_vars = vars_key | frozenset(reduced_vars)
-
-            # Getting all supersets and getting min cost
-            sup_best = float("inf")
-            # for v, c in max_subquery_costs.items():
-            #    if v >= new_vars:
-            #        sup_best = min(sup_best, c)
-            for v, c in memo.items():
-                if v >= new_vars:
-                    sup_best = min(sup_best, c)
-            if best_complete < float("inf"):
-                sup_best = min(sup_best, best_complete)
-            prev_best = memo.get(new_vars, float("inf"))
-
-            if new_cost > sup_best:
+            if new_vars in expanded:
                 continue
-            if new_cost >= prev_best:
+            new_cost = cost + aq.get_cost_of_reduce_idx(next_idx)
+
+            if not new_cost < best_cost.get(new_vars, float("inf")):
                 continue
+            best_cost[new_vars] = new_cost
+            tie += 1
+            heapq.heappush(
+                heap, (new_cost, tie, new_vars, order, queries, aq, next_idx)
+            )
 
-            memo[new_vars] = new_cost
-            new_aq = aq.copy()
-            reduce_query = new_aq.reduce_idx(idx)
-            new_order = list(order) + [idx]
-            new_queries = list(queries) + [reduce_query]
-            children.append((new_vars, new_order, new_queries, new_aq, new_cost))
+    raise RuntimeError(
+        "branch_and_bound_best_first: no complete reduction order for component "
+        f"{component!r}; reducible idxs on input: "
+        f"{input_aq.get_reducible_idxs()!r}"
+    )
 
-        children.sort(key=lambda x: x[4])
-        for ch in reversed(children):
-            stack.appendleft(ch)
+
+def branch_and_bound_dfs(
+    input_aq: AnnotatedQuery,
+    component: list,
+) -> tuple:
+    """
+    Raises
+    ------
+    RuntimeError
+        If no complete elimination order exists for ``component``.
+    """
+    component_set = frozenset(component)
+    best_cost: dict[frozenset, float] = {frozenset(): 0.0}
+    best_complete = float("inf")
+    best_state: tuple[list, list, AnnotatedQuery, float] | None = None
+    tie = 0
+    heap: list[tuple] = [(0, 0.0, tie, frozenset(), [], [], input_aq, None)]
+
+    while heap:
+        _, cost, _, vars_key, order, queries, aq, idx = heapq.heappop(heap)
+        if cost > best_cost[vars_key] or not cost < best_complete:
+            continue
+        if idx is not None:
+            aq = aq.copy()
+            queries = [*queries, aq.reduce_idx(idx)]
+            order = [*order, idx]
+
+        if vars_key == component_set:
+            best_complete = cost
+            best_state = (order, queries, aq, cost)
+            continue
+
+        for next_idx in aq.get_reducible_idxs_for_component(component):
+            _, _, _, reduced_vars = aq.get_reduce_query(next_idx)
+            new_vars = vars_key | frozenset(reduced_vars)
+            new_cost = cost + aq.get_cost_of_reduce_idx(next_idx)
+            limit = min(best_cost.get(new_vars, float("inf")), best_complete)
+            if not new_cost < limit:
+                continue
+            best_cost[new_vars] = new_cost
+            tie += 1
+            heapq.heappush(
+                heap,
+                (-len(new_vars), new_cost, tie, new_vars, order, queries, aq, next_idx),
+            )
 
     if best_state is None:
         raise RuntimeError(
@@ -231,7 +264,8 @@ def pruned_query_to_plan(
     * ``"greedy"`` — ``k=1`` (also used automatically for a component of at
       least ``GREEDY_COMPONENT_SIZE`` indices).
     * ``"bfs"`` — greedy ``k=1`` for bounds, then BFS BnB.
-    * ``"dfs"`` — DFS BnB.
+    * ``"dfs"`` — depth-first BnB (deepest state first, cheapest among equals).
+    * ``"best-first"`` — best-first (uniform-cost) BnB.
 
     Returns ``(queries, total_cost)``.
     """
@@ -265,6 +299,10 @@ def pruned_query_to_plan(
 
         if optimizer == "dfs":
             (exact_order, _, _, exact_cost), _ = branch_and_bound_dfs(cur_aq, component)
+        elif optimizer == "best-first":
+            (exact_order, _, _, exact_cost), _ = branch_and_bound_best_first(
+                cur_aq, component
+            )
         else:
             (
                 (greedy_order, _, _, _greedy_cost),
