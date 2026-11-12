@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 import numpy as np
@@ -35,6 +37,7 @@ from finch.compile.lower import make_extent
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.compile_jl.interop import jl_tensor_to_python, tensor_to_jl
 from finch.compile_jl.julia import jl, julia_available
+from finch.compile_jl.runtime import DefaultFinchJLRuntime
 from finch.finch_assembly import AssemblyKernelFType
 from finch.tensor import BufferizedNDArray
 from finch.tensor.patterns import (
@@ -1280,9 +1283,13 @@ def test_julia_kernels_keep_their_own_scalars_in_finch_scalars():
     np.testing.assert_allclose(np.asarray(sums), data.sum(axis=1))
     np.testing.assert_allclose(np.asarray(squares), (data * data).sum(axis=1))
 
-    stage = COMPILE_JULIA_GALLEY
+    stage: Any = COMPILE_JULIA_GALLEY
     while not isinstance(stage, LogicCompiler):
         stage = stage.ctx
-    codes = [kernel.jl_code for kernel in stage.ctx_load.runtime._kernels.values()]
+    loader = stage.ctx_load
+    assert isinstance(loader, FinchJLCompiler)
+    runtime = loader.runtime
+    assert isinstance(runtime, DefaultFinchJLRuntime)
+    codes = [kernel.jl_code for kernel in runtime._kernels.values()]
     # Each accumulator is a Temp0D, which the Finch kernel keeps in a scalar.
     assert any(code.count("Finch.Scalar{0.0, Float64}(0.0)") == 2 for code in codes)
