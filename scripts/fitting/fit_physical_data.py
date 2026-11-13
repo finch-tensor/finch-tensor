@@ -112,28 +112,45 @@ def learning_curve(basis, features, runtimes, examples, rng, n_points=12):
 def plot_learning_curve(sizes, scores, medians, n_test, n_features, path) -> None:
     # Only the fitting environment has matplotlib, and only plots need it.
     import matplotlib.pyplot as plt
+    from matplotlib.ticker import LogFormatter
 
-    fig, ax = plt.subplots()
+    # R^2 and regret share the training sizes but not a scale, so each gets a
+    # panel, and the legend sits above both rather than over the lines.
+    fig, (ax, regret_ax) = plt.subplots(
+        2, 1, sharex=True, figsize=(7, 6), layout="constrained"
+    )
     # A model fitted to a few programs can score far below zero, so scores
     # below -1 are drawn at -1 and marked.
     sizes, scores = np.asarray(sizes), np.asarray(scores)
     clipped = np.maximum(scores, -1)
-    ax.plot(sizes, clipped, marker="o", label="relative R^2")
+    ax.plot(sizes, clipped, marker="o", label="relative $R^2$")
     low = scores < -1
     if low.any():
-        ax.plot(sizes[low], clipped[low], "v", color="C3", label="relative R^2 < -1")
-    ax.axvline(n_features, color="gray", linestyle="--", label="# features")
-    ax.set_xscale("log")
+        ax.plot(sizes[low], clipped[low], "v", color="C3", label="relative $R^2 < -1$")
     ax.set_ylim(-1.05, 1.05)
-    ax.set_xlabel("# examples trained on")
-    ax.set_ylabel(f"relative R^2 on {n_test} held-out examples")
-    regret_ax = ax.twinx()
+    ax.set_ylabel(f"relative $R^2$ on\n{n_test} held-out examples")
     regret_ax.plot(sizes, medians, marker="s", color="C2", label="median regret")
     regret_ax.set_yscale("log")
-    regret_ax.set_ylabel("median regret of the held-out examples")
-    regret_ax.legend(loc="lower right")
-    ax.legend(loc="lower left")
-    fig.savefig(path, dpi=150, bbox_inches="tight")
+    # Regrets sit near 1, where scientific notation hides the digits that differ.
+    regret_ax.yaxis.set_major_formatter(LogFormatter(labelOnlyBase=False))
+    regret_ax.yaxis.set_minor_formatter(LogFormatter(labelOnlyBase=False))
+    regret_ax.set_ylabel("median regret of\nthe held-out examples")
+    regret_ax.set_xscale("log")
+    regret_ax.set_xlabel("# examples trained on")
+    ax.axvline(n_features, color="gray", linestyle="--", label="# features")
+    regret_ax.axvline(n_features, color="gray", linestyle="--")
+    for panel in (ax, regret_ax):
+        panel.grid(alpha=0.3)
+    handles, labels = ax.get_legend_handles_labels()
+    regret_handles, regret_labels = regret_ax.get_legend_handles_labels()
+    fig.legend(
+        handles + regret_handles,
+        labels + regret_labels,
+        loc="outside upper center",
+        ncols=len(labels + regret_labels),
+        frameon=False,
+    )
+    fig.savefig(path, dpi=300)
     plt.close(fig)
 
 
