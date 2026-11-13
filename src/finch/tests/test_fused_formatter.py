@@ -6,6 +6,7 @@ import finch as ft
 import finch.finch_logic as lgc
 from finch.algebra import StaticFillFType, TensorFType, ffuncs
 from finch.autoschedule.capture import LogicCapture
+from finch.autoschedule.formatter.formatter import scalar_ftype
 from finch.autoschedule.formatter.galley_formatter import GalleyFormatter
 from finch.autoschedule.formatter.smart_formatter import (
     CostFormatter,
@@ -127,10 +128,14 @@ def test_galley_formats_only_the_fields_a_workspace_stores(monkeypatch, nfused, 
     )
     GalleyFormatter(capture).lower(plan, {a: tensor.ftype}, {a: stats}, factory)
 
-    # The workspace stores one level for each field it isn't fused over.
     fmt = capture.last_bindings[scratch]
-    assert isinstance(fmt, ft.FiberTensorFType)
-    assert fmt.shape_type == tensor.shape_type[nfused:]
+    if nfused == len(fields):
+        # A scratch fused over every field stores none of them, so it is a scalar.
+        assert fmt == scalar_ftype(stats.fill_type)
+    else:
+        # The workspace stores one level for each field it isn't fused over.
+        assert isinstance(fmt, ft.FiberTensorFType)
+        assert fmt.shape_type == tensor.shape_type[nfused:]
     assert capture.last_stats[fused].index_order == fields
     assert stats.index_order == fields
 

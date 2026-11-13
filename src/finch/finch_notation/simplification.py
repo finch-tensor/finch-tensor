@@ -1,7 +1,8 @@
 from finch import finch_notation as ntn
 from finch.algebra import FinchOperatorFType, is_identity
 from finch.compile import looplets
-from finch.symbolic import simplify_rules
+from finch.compile.lower import only_resets_scalars
+from finch.symbolic import PostOrderDFS, simplify_rules
 from finch.symbolic.rewriters import Chain, Fixpoint, PostWalk, Rewrite
 from finch.symbolic.stage import UnvalidatedForm
 
@@ -45,4 +46,55 @@ class LoopletSimplify(UnvalidatedForm, NotationTransform):
                 return ntn.Block(())
             case ntn.Loop(_, _, ntn.Block(())):
                 return ntn.Block(())
+            # A scalar which a loop body declares is a temporary of each
+            # iteration, so a loop which only resets temporaries does nothing.
+            case ntn.Loop(_, _, body) if only_resets_scalars(body):
+                return ntn.Block(())
+            case ntn.Block(bodies) if any(isinstance(b, ntn.Block) for b in bodies):
+                return ntn.Block(
+                    tuple(
+                        stmt
+                        for body in bodies
+                        for stmt in (
+                            body.bodies if isinstance(body, ntn.Block) else (body,)
+                        )
+                    )
+                )
+            # A scalar declared with a literal reads as the literal until it is
+            # written again.
+            case ntn.Block(bodies):
+                for n, body in enumerate(bodies):
+                    match body:
+                        case ntn.Declare(tns, ntn.Literal() as val, _, ()):
+                            rest = known_reads(tns, val, bodies[n + 1 :])
+                            if rest != bodies[n + 1 :]:
+                                return ntn.Block((*bodies[: n + 1], *rest))
         return None
+
+
+def known_reads(
+    tns: ntn.NotationExpression,
+    val: ntn.Literal,
+    stmts: tuple[ntn.NotationStatement, ...],
+) -> tuple[ntn.NotationStatement, ...]:
+    """stmts, whose reads of tns, before the first which may write it, are val."""
+
+    def writes(stmt):
+        for node in PostOrderDFS(stmt):
+            match node:
+                case (
+                    ntn.Access(var, ntn.Update(), _)
+                    | ntn.Declare(var, _, _, _)
+                    | ntn.Thaw(var, _)
+                ) if var == tns:
+                    return True
+        return False
+
+    def read(node):
+        match node:
+            case ntn.Unwrap(ntn.Access(var, ntn.Read(), ())) if var == tns:
+                return val
+        return None
+
+    n = next((n for n, stmt in enumerate(stmts) if writes(stmt)), len(stmts))
+    return (*(Rewrite(PostWalk(read))(stmt) for stmt in stmts[:n]), *stmts[n:])

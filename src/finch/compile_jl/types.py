@@ -364,9 +364,8 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
     """Julia source text constructing a minimal instance of `ftype`, for
     embedding directly in generated kernel source (see compiler.py)."""
     if isinstance(ftype, ScalarFType):
-        elem_t = _leaf_type_str(ftype.element_type)
-        fill = _julia_literal(ftype.fill_type)
-        return f"Finch.Tensor(Finch.ElementLevel({fill}, {_buffer_ctor_str(elem_t)}))"
+        # Both keep a static fill apart from the value, which kernels update.
+        return f"{scalar_type_str(ftype.fill_type, ftype.element_type)}()"
     if isinstance(ftype, FiberTensorFType):
         return f"Finch.Tensor({_level_constructor_str(ftype.lvl_t)})"
     if isinstance(ftype, BufferizedNDArrayFType):

@@ -16,6 +16,7 @@ from finch.autoschedule import (
     default_schedulers,
 )
 from finch.autoschedule.capture import LogicCapture
+from finch.autoschedule.cse_extractor import CSEExtractor, extract_common_reads
 from finch.autoschedule.factorizer.optimize import DefaultLogicFactorizer
 from finch.autoschedule.formatter import DefaultLogicFormatter
 from finch.autoschedule.fuse_merger import LogicFuseMerger, merge_sibling_fuses
@@ -36,6 +37,7 @@ from finch.finch_logic import (
     Alias,
     Field,
     Fuse,
+    FusedAlias,
     HardAlias,
     Literal,
     LogicSimplify,
@@ -47,6 +49,7 @@ from finch.finch_logic import (
     TensorStats,
 )
 from finch.symbolic import PostOrderDFS, Reflector
+from finch.tensor import Scalar
 
 
 def _merged(queries, outputs, tensors):
@@ -300,7 +303,9 @@ def test_lp_norms_compile_as_one_scan_and_one_loop_per_axis(compiler, monkeypatc
     scheduler = LogicNormalizer(
         LogicExecutor(
             DefaultLogicFactorizer(
-                LogicSimplify(DefaultLoopOrderer(LogicFuseMerger(capture)))
+                LogicSimplify(
+                    DefaultLoopOrderer(LogicFuseMerger(CSEExtractor(capture)))
+                )
             ),
             stats_factory=FDStatsFactory(),
         )
@@ -340,7 +345,7 @@ def test_reads_of_one_tensor_in_a_merged_loop_share_one_walk():
             Produces((rows, cols)),
         )
     )
-    plan = merge_sibling_fuses(plan, lambda _: True)
+    plan = extract_common_reads(merge_sibling_fuses(plan, lambda _: True))
     assert isinstance(plan, Plan)
     data = np.array([[2.0, 0, 3, 0], [0, 0, 0, 0], [1, 5, 0, 7]])
     bindings = {
@@ -348,13 +353,20 @@ def test_reads_of_one_tensor_in_a_merged_loop_share_one_walk():
         rows: fl.asarray(np.zeros(0, dtype=np.int64)),
         cols: fl.asarray(np.zeros(0, dtype=np.int64)),
     }
+    # Both scans read a through one scalar temporary.
+    (temp,) = {
+        node.alias for node in PostOrderDFS(plan) if isinstance(node, FusedAlias)
+    }
+    bindings[temp] = Scalar(np.float64(0.0))
     ftypes: dict[Alias, TensorFType] = {var: val.ftype for var, val in bindings.items()}
     CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
     program = NotationGenerator()(plan, ftypes, {}, None)
-    asm_program = NotationCompiler(Reflector())(program)  # ty: ignore[invalid-argument-type]
+    asm_program = AssemblySimplify()(
+        NotationCompiler(Reflector())(program)  # ty: ignore[invalid-argument-type]
+    )
 
-    # The rows of a are walked once, so the walk splits each row into its gaps
-    # and its entries, rather than into the four cases of two walks.
+    # The rows of a are walked once, rather than coiterated as two walks, and
+    # the temporary is zero in the gaps, so only the entries of a row are visited.
     walks = []
     for node in PostOrderDFS(asm_program):
         match node:
@@ -363,8 +375,94 @@ def test_reads_of_one_tensor_in_a_merged_loop_share_one_walk():
             ):
                 walks.append(bodies)
     assert len(walks) == 1
-    assert sum(isinstance(child, asm.ForLoop) for child in walks[0]) == 2
+    assert sum(isinstance(child, asm.ForLoop) for child in walks[0]) == 1
 
-    row_degrees, col_degrees = NumbaCompiler()(asm_program).main(*bindings.values())
+    row_degrees, col_degrees = NumbaCompiler()(asm_program).main(*bindings.values())[:2]
     np.testing.assert_array_equal(row_degrees.to_numpy(), np.count_nonzero(data, 1))
     np.testing.assert_array_equal(col_degrees.to_numpy(), np.count_nonzero(data, 0))
+
+
+def test_reads_shared_by_a_merged_loop_go_through_one_temporary():
+    a, rows, cols = HardAlias("a"), HardAlias("rows"), HardAlias("cols")
+    i, j = Field("i"), Field("j")
+    nonzero = MapJoin(Literal(ffuncs.ne), (Table(a, (i, j)), Literal(0.0)))
+    plan = Plan(
+        (
+            Fuse(
+                i,
+                Fuse(
+                    j,
+                    Plan(
+                        (
+                            Query(Table(rows, (i,)), _total(ffuncs.add, 0, nonzero, j)),
+                            Query(Table(cols, (j,)), _total(ffuncs.add, 0, nonzero, i)),
+                        )
+                    ),
+                ),
+            ),
+            Produces((rows, cols)),
+        )
+    )
+    match extract_common_reads(plan):
+        case Plan(
+            (
+                Fuse(
+                    _,
+                    Fuse(
+                        _,
+                        Plan(
+                            (
+                                Query(Table(FusedAlias(tmp, 2) as temp, (_, _)), read),
+                                Query(_, row_rhs),
+                                Query(_, col_rhs),
+                            )
+                        ),
+                    ),
+                ),
+                Produces(),
+            )
+        ):
+            assert read == Table(a, (i, j))
+            for rhs in (row_rhs, col_rhs):
+                tables = [n for n in PostOrderDFS(rhs) if isinstance(n, Table)]
+                assert tables == [Table(temp, (i, j))]
+            assert tmp != a
+        case prgm:
+            raise AssertionError(f"Expected one read of a into a temporary: {prgm}")
+
+
+def test_reads_go_through_a_temporary_in_the_loop_of_their_fields():
+    a, x, y = HardAlias("a"), HardAlias("x"), HardAlias("y")
+    i, j = Field("i"), Field("j")
+
+    def query(x_i):
+        args = (Table(a, (i, j)), x_i, x_i)
+        return Query(
+            Table(y, (i,)),
+            _total(ffuncs.add, 0.0, MapJoin(Literal(ffuncs.mul), args), j),
+        )
+
+    # a is read once, so it stays, and x twice along i only, so it is read
+    # once for each i, outside the loop over j.
+    plan = Plan((Fuse(i, Fuse(j, query(Table(x, (i,))))), Produces((y,))))
+    match extract_common_reads(plan):
+        case Plan(
+            (
+                Fuse(
+                    _,
+                    Plan(
+                        (
+                            Query(Table(FusedAlias(_, 1) as temp, _), read),
+                            Fuse(_, body),
+                        )
+                    ),
+                ),
+                Produces(),
+            )
+        ):
+            assert read == Table(x, (i,))
+            assert body == query(Table(temp, (i,)))
+        case prgm:
+            raise AssertionError(f"Expected x to be read once for each i: {prgm}")
+    single = Plan((Fuse(i, Fuse(j, query(Literal(2.0)))), Produces((y,))))
+    assert extract_common_reads(single) == single

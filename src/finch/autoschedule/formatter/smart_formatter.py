@@ -48,7 +48,7 @@ from finch.tensor import (
 )
 from finch.util.logging import LOG_LOGIC_POST_OPT
 
-from .formatter import LogicFormatter
+from .formatter import LogicFormatter, scalar_ftype, stores_nothing
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
@@ -341,12 +341,15 @@ class SmartFormatter(LogicFormatter):
                             ftype(dim) if dim is not None else ftypes.intp
                             for dim in shape_types[alias][nfused:]
                         )
-                        bindings[alias] = self.get_tensor_ftype(
-                            fill_types[alias],
-                            shape_type,
-                            rhs_stats,
-                            rhs_stats.index_order[:nfused],
-                        )
+                        if stores_nothing(lhs, shape_types[alias]):
+                            bindings[alias] = scalar_ftype(fill_types[alias])
+                        else:
+                            bindings[alias] = self.get_tensor_ftype(
+                                fill_types[alias],
+                                shape_type,
+                                rhs_stats,
+                                rhs_stats.index_order[:nfused],
+                            )
 
                     return node
                 case lgc.Produces():
@@ -487,7 +490,10 @@ class CostFormatter(LogicFormatter):
                             f"Cannot change the rank of allocated tensor {alias}."
                         )
                     if alias not in bindings and alias not in stored_shape_types:
-                        stored_shape_types[alias] = shape_type
+                        if stores_nothing(lhs, shape_types[alias]):
+                            bindings[alias] = scalar_ftype(fill_types[alias])
+                        else:
+                            stored_shape_types[alias] = shape_type
                 case lgc.Produces():
                     return
                 case _:

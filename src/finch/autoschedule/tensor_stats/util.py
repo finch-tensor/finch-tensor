@@ -77,11 +77,15 @@ def get_lp_norms(
         (Table(Literal(arr), fields), Literal(arr.fill_value)),
     )
 
+    # The degree queries come before the norm queries, so that the Fuse nodes of
+    # their scans of arr are siblings, which LogicFuseMerger runs as one scan,
+    # as it does the norms of each degree sequence.
+    degree_bodies: list[Query] = []
     bodies: list[Query] = []
     outputs: list[Alias] = []
     for dim, field in enumerate(fields):
         degrees = HardAlias(f"degrees_{dim}")
-        bodies.append(
+        degree_bodies.append(
             Query(
                 Table(degrees, (field,)),
                 Aggregate(
@@ -120,7 +124,7 @@ def get_lp_norms(
             bodies.append(Query(Table(out, ()), rhs))
             outputs.append(out)
 
-    prgm = Plan((*bodies, Produces(tuple(outputs))))
+    prgm = Plan((*degree_bodies, *bodies, Produces(tuple(outputs))))
     results = NON_RECURSIVE_SCHEDULER(prgm)
 
     flat: list[float] = []

@@ -838,6 +838,15 @@ def lower_looplets(
     ctx_3(ext, body)
 
 
+def only_resets_scalars(stmt: ntn.NotationStatement) -> bool:
+    match stmt:
+        case ntn.Block(bodies):
+            return all(only_resets_scalars(body) for body in bodies)
+        case ntn.Declare(_, _, _, ()) | ntn.Freeze() | ntn.Thaw():
+            return True
+    return False
+
+
 class LoopletPass(ABC):
     @property
     @abstractmethod
@@ -845,6 +854,12 @@ class LoopletPass(ABC):
 
     def __init__(self):
         self.looplet_simplify = ntn.LoopletSimplify()
+
+    def simplify_body(self, body):
+        body = self.looplet_simplify(body)
+        # A loop body which only resets the temporaries of its iterations does
+        # nothing.
+        return ntn.Block(()) if only_resets_scalars(body) else body
 
     def __lt__(self, other):
         assert isinstance(other, LoopletPass)
