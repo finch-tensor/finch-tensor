@@ -128,6 +128,79 @@ def add_workspace(
 
 def accumulator_depth(prgm: LogicStatement, alias: Alias) -> int | None:
     """
+    Return the number of fields of the query defining alias, when it writes
+    each of them in loop order and then reduces over further loops, so that
+    each element it writes stays fixed across those loops. A workspace fused
+    over every field then stores nothing, and holds the running value of one
+    element. Only an alias which one Query defines, and nothing updates, has
+    an accumulator.
+    """
+    writes: list[tuple[LogicStatement, tuple[Field, ...]]] = []
+
+    def visit(node: LogicStatement, loops: tuple[Field, ...]):
+        match node:
+            case Plan(bodies):
+                for body in bodies:
+                    visit(body, loops)
+            case Fuse(idx, body):
+                visit(body, (*loops, idx))
+            case Query(Table(Alias() as lhs, _), _) | QueryInto(
+                Table(Alias() as lhs, _), _, _
+            ) if lhs.unfused == alias:
+                writes.append((node, loops))
+
+    visit(prgm, ())
+    match writes:
+        case [(Query(Table(HardAlias(), idxs), _), loops)] if loops[
+            : len(idxs)
+        ] == idxs and len(loops) > len(idxs):
+            return len(idxs)
+    return None
+
+
+def add_accumulators(
+    prgm: Plan,
+    bindings: Mapping[Alias, TensorFType],
+) -> tuple[Plan, dict[Alias, TensorFType]]:
+    """
+    Redirect each query of prgm which reduces into an output whose fields are
+    its outermost loops, as accumulator_depth finds, into a workspace fused
+    over all of them, as add_workspace does. The workspace stores no fields,
+    so it is declared before the loops it reduces over, accumulates the value
+    of one element of the output, and is copied into it once those loops end.
+    Return the program and the format of each workspace, a Temp0D, which a
+    backend may keep in a register, where it would load and store the output
+    in every iteration, and could not keep it there when another output might
+    alias it. Where a sparse input leaves nothing to accumulate, the reset and
+    the copy of the fill write nothing, so a backend which reads a declared
+    tensor as its fill until it is written skips them, as the loops would
+    without the workspace. Only an output with a static fill, which isn't an
+    input of bindings, has one.
+    """
+    prgm = flatten_plans(prgm)
+    spc = Namespace(prgm)
+    fills = prgm.infer_fill_type({var: fmt.fill_type for var, fmt in bindings.items()})
+    outputs: dict[HardAlias, None] = {}
+    for node in PostOrderDFS(prgm):
+        match node:
+            case Query(Table(HardAlias() as lhs, _), _) if lhs not in bindings:
+                outputs[lhs] = None
+    formats: dict[Alias, TensorFType] = {}
+    for alias in outputs:
+        fill = fills[alias]
+        depth = accumulator_depth(prgm, alias)
+        if depth is None or not is_static(fill):
+            continue
+        acc = HardAlias(spc.freshen(alias.name, "acc"))
+        staged = add_workspace(prgm, alias, depth, acc)
+        assert isinstance(staged, Plan)
+        prgm = staged
+        formats[acc] = temp_0d(element(fill, fill.element_type))
+    return prgm, formats
+
+
+def accumulator_depth(prgm: LogicStatement, alias: Alias) -> int | None:
+    """
     Return the number of fields of the query defining alias, when they are
     its outermost loops, in any order, and it reduces over further loops, so
     that each element it writes stays fixed across those loops, even where it
