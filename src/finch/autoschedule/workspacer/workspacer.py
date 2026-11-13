@@ -79,42 +79,48 @@ def add_workspace(
     prgm: LogicStatement, alias: HardAlias, depth: int, ws: HardAlias
 ) -> LogicStatement:
     """
-    Redirect the query which defines alias into ws, fused over its first depth
-    fields. Right after the statement within depth Fuse nodes which holds the
-    query, ws is copied into alias in order.
+    Redirect the query which defines alias into ws, fused over the first depth
+    loops enclosing the query, which are fields of alias in any order. ws lists
+    those fields in loop order, and then the others in the order of alias.
+    Right after the statement within depth Fuse nodes which holds the query,
+    ws is copied into alias in order.
     """
     fused = FusedAlias(ws, depth)
 
     # Each rewrite returns the copy until the depth where it is inserted.
     def rewrite(
-        node: LogicStatement, nloops: int
+        node: LogicStatement, loops: tuple[Field, ...]
     ) -> tuple[LogicStatement, LogicStatement | None]:
         match node:
             case Plan(bodies):
                 stmts: list[LogicStatement] = []
                 pending = None
                 for body in bodies:
-                    body, copy = rewrite(body, nloops)
+                    body, copy = rewrite(body, loops)
                     stmts.append(body)
-                    if copy is not None and nloops == depth:
+                    if copy is not None and len(loops) == depth:
                         stmts.append(copy)
                     elif copy is not None:
                         pending = copy
                 return Plan(tuple(stmts)), pending
             case Fuse(idx, body):
-                body, copy = rewrite(body, nloops + 1)
-                if copy is not None and nloops + 1 == depth:
+                body, copy = rewrite(body, (*loops, idx))
+                if copy is not None and len(loops) + 1 == depth:
                     return Fuse(idx, Plan((body, copy))), None
                 return Fuse(idx, body), copy
             case Query(Table(lhs, idxs), rhs) if lhs == alias:
-                copy = fuse_loop_order(
-                    Query(Table(alias, idxs), Table(fused, idxs)), idxs[depth:]
+                ws_idxs = (
+                    *loops[:depth],
+                    *(idx for idx in idxs if idx not in loops[:depth]),
                 )
-                return Query(Table(fused, idxs), rhs), copy
+                copy = fuse_loop_order(
+                    Query(Table(alias, idxs), Table(fused, ws_idxs)), ws_idxs[depth:]
+                )
+                return Query(Table(fused, ws_idxs), rhs), copy
             case _:
                 return node, None
 
-    prgm, copy = rewrite(prgm, 0)
+    prgm, copy = rewrite(prgm, ())
     if copy is not None:
         prgm = Plan((prgm, copy))
     return prgm
@@ -122,12 +128,12 @@ def add_workspace(
 
 def accumulator_depth(prgm: LogicStatement, alias: Alias) -> int | None:
     """
-    Return the number of fields of the query defining alias, when it writes
-    each of them in loop order and then reduces over further loops, so that
-    each element it writes stays fixed across those loops. A workspace fused
-    over every field then stores nothing, and holds the running value of one
-    element. Only an alias which one Query defines, and nothing updates, has
-    an accumulator.
+    Return the number of fields of the query defining alias, when they are
+    its outermost loops, in any order, and it reduces over further loops, so
+    that each element it writes stays fixed across those loops, even where it
+    scatters into alias. A workspace fused over every field then stores
+    nothing, and holds the running value of one element. Only an alias which
+    one Query defines, and nothing updates, has an accumulator.
     """
     writes: list[tuple[LogicStatement, tuple[Field, ...]]] = []
 
@@ -145,9 +151,9 @@ def accumulator_depth(prgm: LogicStatement, alias: Alias) -> int | None:
 
     visit(prgm, ())
     match writes:
-        case [(Query(Table(HardAlias(), idxs), _), loops)] if loops[
-            : len(idxs)
-        ] == idxs and len(loops) > len(idxs):
+        case [(Query(Table(HardAlias(), idxs), _), loops)] if set(
+            loops[: len(idxs)]
+        ) == set(idxs) and len(loops) > len(idxs):
             return len(idxs)
     return None
 
