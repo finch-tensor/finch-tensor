@@ -144,9 +144,11 @@ def drop_fills(prgm: Plan, bindings: Mapping[Alias, TensorFType]) -> Plan:
                     ffuncs.overwrite, fill.value, (), bindings[tns.unfused]
                 ):
                     arg = dropping_fill(arg, fill.value)
-                    init = Literal(fill.value)
                     return Query(
-                        lhs, Aggregate(Literal(ffuncs.overwrite), init, arg, ())
+                        lhs,
+                        Aggregate(
+                            Literal(ffuncs.overwrite), Literal(fill.value), arg, ()
+                        ),
                     )
         return stmt
 

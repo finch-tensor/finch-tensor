@@ -370,11 +370,9 @@ def tensor_to_jl(obj, pin_fill: bool = False):
     if is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor):
         return obj
     if isinstance(obj, Temp0D):
-        # A kernel resets a Temp0D before reading it, and keeps it in a
-        # Finch scalar of its format, as types.py constructs.
-        fmt = obj.ftype
-        scalar_t = jl.seval(jl_dtypes.scalar_type_str(fmt.fill_type, fmt.element_type))
-        return scalar_t(_as_julia_scalar(obj.fill_value))
+        # A kernel resets a Temp0D before reading it, so it is passed the Finch
+        # scalar types.py constructs for its format, whatever its value.
+        return jl.seval(jl_dtypes.ftype_to_jl_constructor_str(obj.ftype))
     if isinstance(obj, FiberTensor):
         if obj.pos != 0:
             raise ValueError("Only root-position FiberTensor objects can use Julia")

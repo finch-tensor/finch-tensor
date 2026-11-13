@@ -214,9 +214,6 @@ COMPILE_JULIA = LogicNormalizer(
     )
 )
 
-# Formats are searched under the protocol cost model, as the workspacer prices
-# them, rather than chosen by Galley's rules, which store intermediates that a
-# later query walks as SparseByteMaps and sort the positions of large outputs.
 COMPILE_JULIA_GALLEY = LogicNormalizer(
     LogicExecutor(
         GalleyLogicFactorizer(
