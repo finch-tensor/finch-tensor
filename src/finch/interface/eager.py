@@ -17,6 +17,9 @@ from . import lazy
 from .fuse import compute
 
 EighResult = namedtuple("EighResult", ["eigenvalues", "eigenvectors"])
+LstsqResult = namedtuple(
+    "LstsqResult", ["solution", "residuals", "rank", "singular_values"]
+)
 QRResult = namedtuple("QRResult", ["Q", "R"])
 SlogdetResult = namedtuple("SlogdetResult", ["sign", "logabsdet"])
 SVDResult = namedtuple("SVDResult", ["U", "S", "Vh"])
@@ -34,7 +37,7 @@ def _warn_compute(x, op_name: str):
 
 
 def full(
-    shape: int | tuple[int, ...],
+    shape: int | np.integer | tuple[int, ...],
     fill_value: bool | complex,
     *,
     dtype: Any | None = None,
@@ -43,15 +46,21 @@ def full(
     return compute(lazy.full(shape, fill_value, dtype=dtype, device=device))
 
 
-def zeros(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+def zeros(
+    shape: int | np.integer | tuple[int, ...], *, dtype: Any | None = None, device=None
+):
     return compute(lazy.zeros(shape, dtype=dtype, device=device))
 
 
-def ones(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+def ones(
+    shape: int | np.integer | tuple[int, ...], *, dtype: Any | None = None, device=None
+):
     return compute(lazy.ones(shape, dtype=dtype, device=device))
 
 
-def empty(shape: int | tuple[int, ...], *, dtype: Any | None = None, device=None):
+def empty(
+    shape: int | np.integer | tuple[int, ...], *, dtype: Any | None = None, device=None
+):
     return compute(lazy.empty(shape, dtype=dtype, device=device))
 
 
@@ -602,6 +611,20 @@ def eigvalsh(x, /, *, k=None, rtol=None, atol=None):
         )
     x = to_numpy(lazy.asarray(x))
     return lazy.asarray(np.linalg.eigvalsh(x))
+
+
+def lstsq(x1, x2, /, *, rcond=None):
+    x1 = _warn_compute(x1, "lstsq")
+    x2 = _warn_compute(x2, "lstsq")
+    x1 = to_numpy(lazy.asarray(x1))
+    x2 = to_numpy(lazy.asarray(x2))
+    solution, residuals, rank, singular_values = np.linalg.lstsq(x1, x2, rcond=rcond)
+    return LstsqResult(
+        lazy.asarray(solution),
+        lazy.asarray(residuals),
+        int(rank),
+        lazy.asarray(singular_values),
+    )
 
 
 def matrix_rank(x, /, *, rtol=None, atol=None):
@@ -1540,7 +1563,9 @@ def reshape(x, /, shape: tuple, *, copy=None):
     if isinstance(x, lazy.LazyTensor):
         return lazy.reshape(x, shape, copy=copy)
     if not hasattr(x, "reshape"):
-        raise NotImplementedError(f"Object of type {type(x)} does not support reshape")
+        # Tensors without a reshape of their own (FiberTensor, results Julia
+        # owns) reshape lazily, like the other eager operations.
+        return compute(lazy.reshape(x, shape, copy=copy))
     return x.reshape(shape, copy=copy)
 
 

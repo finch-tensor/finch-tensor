@@ -455,7 +455,7 @@ def test_jit_two_independent_ops_inserted_code(file_regression):
     [
         pytest.param(ConstantScalar(2.0), 0, id="constant_scalar"),
         pytest.param(1.0, 0, id="specializable_literal"),
-        pytest.param(2.0, 1, id="runtime_literal"),
+        pytest.param(3.0, 1, id="runtime_literal"),
     ],
 )
 def test_a_constant_operand_is_not_bound_as_a_tensor(operand, bound):

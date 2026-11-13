@@ -14,6 +14,7 @@ from finch.algebra.fill import (
     StaticFillFType,
 )
 from finch.algebra.ftypes import FDTypeNumpy, FType, TupleFType
+from finch.finch_assembly import BufferFType
 from finch.tensor import DenseLevelFType, ElementLevelFType, LevelFType
 from finch.tensor.bufferized_ndarray import BufferizedNDArrayFType
 from finch.tensor.fiber_tensor import FiberTensorFType
@@ -43,6 +44,7 @@ from finch.tensor.patterns import (
 )
 from finch.tensor.scalar import ScalarFType
 
+from .buffer import MinusOneBufferFType
 from .julia import get_jl
 
 _py_bool = bool
@@ -231,6 +233,11 @@ def _julia_literal(value: Any) -> str:
     if isinstance(value, tuple):
         elts = [_julia_literal(elt) for elt in value]
         return f"({', '.join(elts)}{',' if len(elts) == 1 else ''})"
+    if isinstance(value, complex | np.complexfloating):
+        # Python writes complex numbers as `1j`, which Julia reads as a name.
+        # complex() of two Float32s is a ComplexF32, as of two Float64s.
+        real, imag = _julia_literal(value.real), _julia_literal(value.imag)
+        return f"complex({real}, {imag})"
     literal = str(value)
     if isinstance(value, (float, np.floating)):
         if math.isinf(value):
@@ -265,6 +272,23 @@ def _buffer_ctor_str(
     return f"Finch.PlusOneVector({buffer}, {tuple(i + 1 for i in index_fields)})"
 
 
+def _index_buffer_ctor_str(
+    buffer_type: BufferFType,
+    elem_type_str: str | None = None,
+    *,
+    index_fields: tuple[int, ...] | None = None,
+) -> str:
+    """Julia source text for an index buffer, as level_to_jl passes it."""
+    if elem_type_str is None:
+        elem_type_str = _leaf_type_str(buffer_type.element_type)
+    match buffer_type:
+        case MinusOneBufferFType():
+            # A buffer imported from Julia is passed back as its 1-based self.
+            return _buffer_ctor_str(elem_type_str)
+        case _:
+            return _buffer_ctor_str(elem_type_str, offset=1, index_fields=index_fields)
+
+
 def _level_constructor_str(level_ftype: LevelFType) -> str:
     """
     Julia source text that constructs a minimal (empty-buffer, but real --
@@ -285,47 +309,50 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
         # *buffers* actually preserve dimension_type/position_type.
         return f"Finch.DenseLevel({_level_constructor_str(level_ftype.lvl_t)}, 1)"
     if isinstance(level_ftype, SparseListLevelFType):
-        pos_t = _leaf_type_str(level_ftype.position_type)
         dim_t = _leaf_type_str(level_ftype.dimension_type)
         return (
-            f"Finch.SparseListLevel({_level_constructor_str(level_ftype.lvl_t)}, "
-            f"1, {_buffer_ctor_str(pos_t, offset=1)}, "
-            f"{_buffer_ctor_str(dim_t, offset=1)})"
+            f"Finch.SparseListLevel{{{dim_t}}}("
+            f"{_level_constructor_str(level_ftype.lvl_t)}, "
+            f"1, {_index_buffer_ctor_str(level_ftype.ptr_type)}, "
+            f"{_index_buffer_ctor_str(level_ftype.idx_type)})"
         )
     if isinstance(level_ftype, SparseByteMapLevelFType):
-        pos_t = _leaf_type_str(level_ftype.position_type)
         dim_t = _leaf_type_str(level_ftype.dimension_type)
         return (
             f"Finch.SparseByteMapLevel{{{dim_t}}}("
             f"{_level_constructor_str(level_ftype.lvl_t)}, "
-            f"1, {_buffer_ctor_str(pos_t, offset=1)}, {_buffer_ctor_str('Bool')}, "
-            f"{_buffer_ctor_str(pos_t, offset=1)})"
+            f"1, {_index_buffer_ctor_str(level_ftype.ptr_type)}, "
+            f"{_buffer_ctor_str('Bool')}, "
+            f"{_index_buffer_ctor_str(level_ftype.srt_type)})"
         )
     if isinstance(level_ftype, SparseCOOLevelFType):
-        pos_t = _leaf_type_str(level_ftype.position_type)
-        dim_ts = [
-            _leaf_type_str(t)
-            for t in level_ftype.coo_shape_tuple_type.struct_fieldtypes
-        ]
-        dims = ",".join("1" for _ in dim_ts)
-        idxs = ",".join(_buffer_ctor_str(t, offset=1) for t in dim_ts)
+        dims = ",".join("1" for _ in range(level_ftype.coo_ndim))
+        # Julia's COO lists its dims fastest first, Python's slowest first
+        idxs = ",".join(
+            _index_buffer_ctor_str(t)
+            for t in reversed(level_ftype.tbl_tuple_type.struct_fieldtypes)
+        )
         return (
             f"Finch.SparseCOOLevel{{{level_ftype.coo_ndim}}}("
             f"{_level_constructor_str(level_ftype.lvl_t)}, ({dims},), "
-            f"{_buffer_ctor_str(pos_t, offset=1)}, ({idxs},))"
+            f"{_index_buffer_ctor_str(level_ftype.ptr_type)}, ({idxs},))"
         )
     if isinstance(level_ftype, SparseHashLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
         dim_t = _leaf_type_str(level_ftype.dimension_type)
         key_entry_t = f"Tuple{{{pos_t},{dim_t},UInt8}}"
+        key = _index_buffer_ctor_str(
+            level_ftype.key_type, key_entry_t, index_fields=(0, 1)
+        )
         return (
             f"Finch.SparseHashLevel{{{dim_t}}}("
             f"{_level_constructor_str(level_ftype.lvl_t)}, 1, 1, "
             f"Finch.SPARSE_HASH_POS_MULTIPLIER, "
-            f"{_buffer_ctor_str(pos_t, offset=1)}, {_buffer_ctor_str('UInt8')}, "
-            f"{_buffer_ctor_str(pos_t, offset=1)}, "
-            f"{_buffer_ctor_str(key_entry_t, offset=1, index_fields=(0, 1))}, "
-            f"{_buffer_ctor_str(pos_t, offset=1)}, FinchInterop.Buffer(Int[0]))"
+            f"{_index_buffer_ctor_str(level_ftype.ptr_type)}, "
+            f"{_buffer_ctor_str('UInt8')}, "
+            f"{_index_buffer_ctor_str(level_ftype.tbl_type)}, {key}, "
+            f"{_index_buffer_ctor_str(level_ftype.perm_type)}, "
+            "FinchInterop.Buffer(Int[0]))"
         )
     raise NotImplementedError(
         f"ftype_to_jl_constructor_str: unsupported level ftype "

@@ -134,7 +134,6 @@ class StepperPass(LoopletPass):
         ext: SymbolicExtent,
         body,
     ) -> None:
-
         def stepper_body(ctx, node: ntn.NotationNode):
             match node:
                 case ntn.Access(
@@ -267,26 +266,36 @@ class SequencePass(LoopletPass):
         found_seqs = list({id(seq): seq for seq in found_seqs}.values())
 
         def sequence_node(
-            node: ntn.NotationNode, heads: set[Sequence], tails: set[Sequence]
+            node: ntn.NotationNode,
+            heads: set[Sequence],
+            tails: set[Sequence],
+            parts: dict[int, Looplet],
         ):
             match node:
                 case ntn.Access(
                     ntn.Looplet(Sequence() as tns, type_), mode, (j, *idxs)
                 ) if j == idx:
-                    if tns in heads:
-                        new_tns = tns.head(ctx, idx)  # type: ignore[call-arg]
-                    elif tns in tails:
-                        new_tns = tns.tail(ctx, idx)
-                    else:
-                        raise Exception(f"Seq: {tns} not present.")
-                    return ntn.Access(ntn.Looplet(new_tns, type_), mode, (j, *idxs))
+                    # Every access of a sequence shares its part, so that the
+                    # accesses of one tensor are lowered once.
+                    if id(tns) not in parts:
+                        if tns in heads:
+                            parts[id(tns)] = tns.head(ctx, idx)  # type: ignore[call-arg]
+                        elif tns in tails:
+                            parts[id(tns)] = tns.tail(ctx, idx)
+                        else:
+                            raise Exception(f"Seq: {tns} not present.")
+                    return ntn.Access(
+                        ntn.Looplet(parts[id(tns)], type_), mode, (j, *idxs)
+                    )
 
         variations = self.get_sequence_variations(ctx, found_seqs, [], [], ext)
         blocks = []
 
         for v in variations:
             heads, tails, subext_start, subext_end = v
-            sub_body = PostWalk(partial(sequence_node, heads=heads, tails=tails))(body)
+            sub_body = PostWalk(
+                partial(sequence_node, heads=heads, tails=tails, parts={})
+            )(body)
             subext = SymbolicExtent(subext_start, subext_end)
             sub_ctx = ctx.scope()
             sub_ctx(subext, self.looplet_simplify(sub_body))
@@ -464,19 +473,26 @@ class JumperPass(LoopletPass):
         phase = SymbolicExtent(idx_start, phase_end)
 
         def lower_phase(leader: Jumper | None):
+            # Every access of a jumper shares its looplet in the phase, so that
+            # the accesses of one tensor are lowered once.
+            looplets: dict[int, Looplet] = {}
+
             def jumper_node(node):
                 match node:
                     case ntn.Access(
                         ntn.Looplet(Jumper() as jumper, type_), mode, (j, *idxs)
                     ) if j == idx:
-                        if jumper is leader:
-                            looplet: Looplet = Thunk(
-                                body=lambda ctx, ext: jumper.chunk,
-                                epilogue=lambda ctx, idx: jumper.next(ctx),
-                            )
-                        else:
-                            looplet = jumper.stepper()
-                        return ntn.Access(ntn.Looplet(looplet, type_), mode, (j, *idxs))
+                        if id(jumper) not in looplets:
+                            if jumper is leader:
+                                looplets[id(jumper)] = Thunk(
+                                    body=lambda ctx, ext: jumper.chunk,
+                                    epilogue=lambda ctx, idx: jumper.next(ctx),
+                                )
+                            else:
+                                looplets[id(jumper)] = jumper.stepper()
+                        return ntn.Access(
+                            ntn.Looplet(looplets[id(jumper)], type_), mode, (j, *idxs)
+                        )
                 return None
 
             ctx_3 = ctx_2.scope()

@@ -38,6 +38,7 @@ nary_ops = {
     ffuncs.max: "maximum",
 }
 unary_ops = {
+    ffuncs.logical_not: "logical_not",
     ffuncs.pos: "positive",
     ffuncs.neg: "negative",
     ffuncs.invert: "bitwise_invert",

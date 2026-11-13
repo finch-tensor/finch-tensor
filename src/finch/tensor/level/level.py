@@ -47,6 +47,15 @@ class LevelFType(FType, ABC):
         # dataclass levels must override.
         return replace(self, _lvl_t=self.lvl_t.with_fill(fill_type))  # type: ignore[type-var]
 
+    @property
+    def supports_reassembly(self) -> bool:
+        """
+        Whether assembling previously assembled positions resets them to the
+        fill, and declaring the level does nothing else. A parent may then reset
+        only the positions it wrote instead of declaring the level again.
+        """
+        return False
+
     def lower_fill(self, lvl_expr):
         """Assembly expression reading the runtime fill from the leaf level's
         fill field, descending from this level's struct expression."""

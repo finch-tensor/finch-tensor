@@ -1643,6 +1643,7 @@ def test_linalg_inv_lazy_warns_and_computes():
         "eigh",
         "eigvalsh",
         "matrix_rank",
+        "lstsq",
         "lu",
         "pinv",
         "qr",
@@ -1689,6 +1690,20 @@ def test_linalg_new_eager_methods_use_numpy_fallback():
         finch.linalg.svdvals(x),
         np.linalg.svd(x, compute_uv=False),
     )
+
+
+def test_linalg_lstsq_uses_numpy_fallback():
+    # Overdetermined, as in gmres's least-squares solve of its Hessenberg matrix.
+    x = np.array([[1.0, 0.0], [1.0, 1.0], [1.0, 2.0]])
+    b = np.array([1.0, 2.0, 2.0])
+    solution, residuals, rank, singular_values = np.linalg.lstsq(x, b)
+
+    result = finch.linalg.lstsq(finch.asarray(x), finch.asarray(b))
+
+    finch_assert_allclose(result.solution, solution)
+    finch_assert_allclose(result.residuals, residuals)
+    assert result.rank == rank
+    finch_assert_allclose(result.singular_values, singular_values)
 
 
 def test_linalg_cross_uses_lazy_formula():
@@ -2448,3 +2463,11 @@ def test_eager_compute():
     )
     finch_assert_equal(eager_result, x)
     finch_assert_equal(lazy_result, (2 * eager_tensor))
+
+
+def test_creation_takes_a_dimension_of_a_shape():
+    # lsqr: `xp.zeros(A.shape[1])`. A tensor's dimensions are NumPy integers,
+    # which full took for a sequence of dimensions.
+    a = finch.asarray(np.ones((2, 3)))
+    finch_assert_equal(finch.zeros(a.shape[1]), np.zeros(3))
+    finch_assert_equal(finch.ones(np.int32(2)), np.ones(2))

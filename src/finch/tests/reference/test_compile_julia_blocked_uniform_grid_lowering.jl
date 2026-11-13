@@ -1,6 +1,6 @@
 # Finch kernel
 eval(let
-        v0 = Finch.Tensor(Finch.DenseLevel(Finch.SparseListLevel(Finch.ElementLevel(0, FinchInterop.Buffer(Int64[])), 1, Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), Finch.PlusOneVector(FinchInterop.Buffer(Int64[]))), 1))
+        v0 = Finch.Tensor(Finch.DenseLevel(Finch.SparseListLevel{Int64}(Finch.ElementLevel(0, FinchInterop.Buffer(Int64[])), 1, Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), Finch.PlusOneVector(FinchInterop.Buffer(Int64[]))), 1))
         v1 = Finch.window(Finch.splitmask(1, 1), Finch.Extent(1, 1), Finch.Extent(1, 1))
         v2 = Finch.window(Finch.splitmask(1, 1), Finch.Extent(1, 1), Finch.Extent(1, 1))
         v3 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, FinchInterop.Buffer(Int64[])), 1), 1))

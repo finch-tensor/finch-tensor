@@ -92,7 +92,8 @@ def level_to_jl(level: Level, pin_fill: bool = False):
         case SparseListLevel(lvl=lvl, dimension=dimension, ptr=ptr, idx=idx):
             if ptr is None or idx is None:
                 raise ValueError("SparseListLevel must have ptr and idx buffers")
-            return jl.SparseListLevel(
+            constructor = jl.SparseListLevel[jl_dtypes.to_jl_type(ftype(dimension))]
+            return constructor(
                 level_to_jl(lvl, pin_fill),
                 int(dimension),
                 _buffer_to_jl(cast(Buffer, ptr), offset=1),
@@ -233,7 +234,7 @@ def jl_level_to_python(jl_lvl) -> Level:
     if jl.isa(jl_lvl, jl.Finch.SparseListLevel):
         return SparseListLevel(
             jl_level_to_python(jl_lvl.lvl),
-            np.intp(int(jl_lvl.shape)),
+            jl_dtypes.to_fl_dtype(jl.first(jl.typeof(jl_lvl).parameters))(jl_lvl.shape),
             _jl_index_buffer_to_python(jl_lvl.ptr),
             _jl_index_buffer_to_python(jl_lvl.idx),
         )

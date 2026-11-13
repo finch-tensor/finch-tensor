@@ -32,6 +32,7 @@ from .default_schedulers import (
     set_default_scheduler,
     with_default_scheduler,
 )
+from .drop_fills import LogicFillDropper, drop_fills
 from .executor import LogicExecutor
 from .factorizer.optimize import DefaultLogicFactorizer
 from .formatter.formatter import (
@@ -40,10 +41,17 @@ from .formatter.formatter import (
     LogicFormatter,
 )
 from .formatter.smart_formatter import FDFormatter, SmartFormatter
+from .fuse_merger import LogicFuseMerger
 from .loop_orderer.loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
-from .protocolize import LogicProtocolizer, protocolize
+from .protocolizer import (
+    CostProtocolizer,
+    LogicProtocolizer,
+    optimize_protocols,
+    protocolize,
+)
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
+from .workspacer import DefaultLogicWorkspacer, LogicWorkspacer
 
 __all__ = [
     "COMPILE_JULIA",
@@ -60,8 +68,10 @@ __all__ = [
     "Alias",
     "BufferizedNDArrayFormatter",
     "CompilerFormLowerer",
+    "CostProtocolizer",
     "DefaultLogicFactorizer",
     "DefaultLogicFormatter",
+    "DefaultLogicWorkspacer",
     "DefaultLoopOrderer",
     "FDFormatter",
     "Field",
@@ -70,10 +80,13 @@ __all__ = [
     "LogicCompiler",
     "LogicEinsumLowerer",
     "LogicExecutor",
+    "LogicFillDropper",
     "LogicFormatter",
+    "LogicFuseMerger",
     "LogicNormalizer",
     "LogicNotationLowerer",
     "LogicProtocolizer",
+    "LogicWorkspacer",
     "MapJoin",
     "NotationGenerator",
     "Plan",
@@ -88,8 +101,10 @@ __all__ = [
     "SmartFormatter",
     "Table",
     "Value",
+    "drop_fills",
     "get_default_scheduler",
     "normalize_names",
+    "optimize_protocols",
     "protocolize",
     "set_default_scheduler",
     "with_default_scheduler",

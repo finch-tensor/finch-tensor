@@ -7,15 +7,16 @@ import numpy as np
 
 import finch as fl
 from finch import ffuncs
+from finch.algebra import ftype
 from finch.autoschedule.cost_models import (
+    LOOP_COST_MODEL,
     Concat,
-    LinearPredictor,
-    LoopCostModel,
-    PigeonCostModel,
+    CostModel,
+    LoopBasis,
+    PigeonBasis,
     Prefix,
-    QuadraticPredictor,
-    Sum,
-    TransposeCostModel,
+    Quadratic,
+    WriteBasis,
 )
 from finch.autoschedule.loop_orderer import loop_order_bnb, loop_order_greedy
 from finch.autoschedule.loop_orderer.loop_order_bnb import (
@@ -39,6 +40,7 @@ from finch.finch_logic import (
     Alias,
     Field,
     Fuse,
+    Gallop,
     HardAlias,
     Literal,
     MapJoin,
@@ -49,6 +51,10 @@ from finch.finch_logic import (
     Table,
     TensorStats,
 )
+from finch.symbolic import PostOrderDFS
+from finch.tensor import dense, element, fiber_tensor, sparse_list
+
+from .utils import TransposeBasis
 
 
 def test_bfs_and_dfs_are_no_worse_than_greedy():
@@ -159,15 +165,12 @@ def test_loop_search_minimizes_nonlinear_component_cost(search):
     }
     arg = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), arg, (j,))
-    model = Concat(
-        PigeonCostModel(),
-        TransposeCostModel(),
-        predictor=QuadraticPredictor(np.ones(25)),
-    )
+    basis = Concat(PigeonBasis(), TransposeBasis())
+    model = CostModel(Quadratic(basis), np.ones(49))
 
     def cost(order):
         query = fuse_loop_order(Query(Table(out, (i, k)), expr), order)
-        features = model.get_features(query, {}, stats, sf)
+        features = basis.get_features(query, {}, stats, sf)
         return sum(row.sum() ** 2 for row in features)
 
     chosen = search(expr, sf, stats, (i, k), cost_model=model)
@@ -179,13 +182,12 @@ def test_loop_search_minimizes_nonlinear_component_cost(search):
     assert cost(chosen) == expected
 
 
-class PreferFieldCostModel(LoopCostModel, LoopOrderedForm):
+class PreferFieldBasis(LoopBasis, LoopOrderedForm):
     @property
     def n_features(self) -> int:
         return 1
 
     def __init__(self, field):
-        super().__init__(LinearPredictor(np.array([1.0])))
         self.field = field
 
     def get_component_features(self, component, machine):
@@ -213,7 +215,7 @@ def test_loop_orderers_use_selected_model(search, orderer, inplace):
     a, out = HardAlias("a"), HardAlias("out")
     expr = Table(a, (i, j))
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((16, 16))), (i, j))}
-    model = PreferFieldCostModel(j)
+    model = CostModel(PreferFieldBasis(j), [1.0])
     assert search(expr, sf, stats, cost_model=model) == (j, i)
     if inplace:
         stats[out] = sf(fl.asarray(np.ones(())), ())
@@ -232,21 +234,39 @@ def test_loop_orderers_use_selected_model(search, orderer, inplace):
             assert (outer, inner) == (j, i)
         case _:
             pytest.fail("Expected an ordered query")
-    assert isinstance(orderer().cost_model, Sum)
+    assert orderer().cost_model is LOOP_COST_MODEL
 
 
 @pytest.mark.parametrize(
     "search",
     [greedy_loop_order, loop_order_bfs, loop_order_dfs, loop_order_brute_force],
 )
-def test_loop_orderers_respect_output_order(search):
+def test_loop_orderers_may_visit_outputs_out_of_order(search):
     sf = UniformStatsFactory()
     i, j, unit = Field("i"), Field("j"), Field("unit")
     a = HardAlias("a")
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), Table(a, (i, j)), (j,))
-    order = search(expr, sf, stats, (unit, i), cost_model=PreferFieldCostModel(j))
-    assert order == (j, unit, i)
+    # Without a cost for writes, the output's fields may come in any order.
+    prefer_i = CostModel(PreferFieldBasis(i), [1.0])
+    assert search(expr, sf, stats, (unit, i), cost_model=prefer_i) == (i, j, unit)
+
+
+# A greedy search only sees the writes to a level once it reaches the level,
+# after it has chosen the loops before it.
+@pytest.mark.parametrize(
+    "search", [loop_order_bfs, loop_order_dfs, loop_order_brute_force]
+)
+def test_loop_orderers_write_outputs_in_order_when_it_pays(search):
+    sf = UniformStatsFactory()
+    i, j, unit = Field("i"), Field("j"), Field("unit")
+    a = HardAlias("a")
+    stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
+    expr = Aggregate(Literal(ffuncs.add), Literal(0.0), Table(a, (i, j)), (j,))
+    # Scattering into the output costs more than looping over i first saves.
+    basis = Concat(PreferFieldBasis(i), WriteBasis())
+    writes = CostModel(basis, [1.0, 0.0, 100.0, 0.0, 0.0])
+    assert search(expr, sf, stats, (unit, i), cost_model=writes) == (unit, i, j)
 
 
 @pytest.mark.parametrize(
@@ -313,3 +333,50 @@ def test_loop_orderers_refresh_stats_of_redefined_aliases(
         plan, {a: factory(sparse, (i,)), b: factory(dense, (i,))}, factory
     )
     assert seen == [5]
+
+
+@pytest.mark.parametrize(
+    "orderer,module,search",
+    [
+        (GreedyLoopOrderer, loop_order_greedy, "greedy_loop_order"),
+        (BFSLoopOrderer, loop_order_bnb, "loop_order_bfs"),
+        (DFSLoopOrderer, loop_order_bnb, "loop_order_dfs"),
+        (BruteForceLoopOrderer, loop_order_bnb, "loop_order_brute_force"),
+    ],
+)
+def test_loop_orderers_price_reads_whatever_their_formats(
+    monkeypatch, orderer, module, search
+):
+    i = Field("i")
+    x, y, z, out = map(HardAlias, ("x", "y", "z", "out"))
+    product = MapJoin(
+        Literal(ffuncs.mul), (Table(x, (i,)), Table(y, (i,)), Table(z, (i,)))
+    )
+    query = Query(
+        Table(out, ()), Aggregate(Literal(ffuncs.add), Literal(0.0), product, (i,))
+    )
+    seen = []
+
+    def choose(expr, stats_factory, stats, output_vars, **kwargs):
+        seen.append(expr)
+        return expr.fields()
+
+    monkeypatch.setattr(module, search, choose)
+    sf = DCStatsFactory()
+    stats = {tns: sf(fl.asarray(np.ones(4)), (i,)) for tns in (x, y, z)}
+    lists = fiber_tensor(sparse_list(element(0.0), ftype(np.intp)))
+    full = fiber_tensor(dense(element(0.0), ftype(np.intp)))
+
+    def protocols(expr):
+        return [
+            node.protocols
+            for node in PostOrderDFS(expr)
+            if isinstance(node, Table) and node.tns != out
+        ]
+
+    # The workspacer may copy an input into any format, so the loops are priced
+    # from the stats of the tensors alone, and every read gallops, whatever the
+    # format bound to it.
+    copy = Query(Table(z, (i,)), Table(x, (i,)))
+    orderer()(Plan((copy, query, Produces((out,)))), {x: lists, y: full}, stats, sf)
+    assert protocols(seen[-1]) == [(Gallop(),), (Gallop(),), (Gallop(),)]

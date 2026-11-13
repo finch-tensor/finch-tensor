@@ -16,7 +16,7 @@ from finch.algebra import (
     is_dynamic,
 )
 from finch.compile import looplets as lplt
-from finch.finch_assembly import BufferFType, parse_assembly
+from finch.finch_assembly import parse_assembly
 
 from .level import (
     Level,
@@ -335,11 +335,31 @@ class _SparseHashLowering:
 class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
     _lvl_t: LevelFType
     dimension_type: ftypes.FDTypeInteger = ftypes.intp
+    # None only as constructor input, __post_init__ defaults these to buffers
+    # of the child level's buffer factory.
+    ptr_type: Any = None
+    tbl_ctrl_type: Any = None
+    tbl_type: Any = None
+    key_type: Any = None
+    perm_type: Any = None
+    tbl_count_type: Any = None
 
     def __post_init__(self) -> None:
         if not isinstance(self._lvl_t, LevelFType):
             raise TypeError("SparseHashLevelFType lvl_t must be a level type")
         self.dimension_type = ftype(self.dimension_type)
+        if self.ptr_type is None:
+            self.ptr_type = self.buffer_factory(self.position_type)
+        if self.tbl_ctrl_type is None:
+            self.tbl_ctrl_type = self.buffer_factory(ftypes.uint8)
+        if self.tbl_type is None:
+            self.tbl_type = self.buffer_factory(self.position_type)
+        if self.key_type is None:
+            self.key_type = self.buffer_factory(self.key_entry_type)
+        if self.perm_type is None:
+            self.perm_type = self.buffer_factory(self.position_type)
+        if self.tbl_count_type is None:
+            self.tbl_count_type = self.buffer_factory(ftypes.intp)
 
     @property
     def struct_name(self) -> str:
@@ -395,34 +415,10 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
         return self.lvl_t.buffer_factory
 
     @property
-    def ptr_type(self) -> BufferFType:
-        return self.buffer_factory(self.position_type)
-
-    @property
-    def tbl_ctrl_type(self) -> FType:
-        return self.buffer_factory(ftypes.uint8)
-
-    @property
     def key_entry_type(self) -> TupleFType:
         return TupleFType.from_tuple(
             (self.position_type, self.dimension_type, ftypes.uint8)
         )
-
-    @property
-    def tbl_type(self) -> FType:
-        return self.buffer_factory(self.position_type)
-
-    @property
-    def key_type(self) -> FType:
-        return self.buffer_factory(self.key_entry_type)
-
-    @property
-    def perm_type(self) -> FType:
-        return self.buffer_factory(self.position_type)
-
-    @property
-    def tbl_count_type(self) -> FType:
-        return self.buffer_factory(ftypes.intp)
 
     @property
     def lvl_t(self) -> LevelFType:
@@ -1373,10 +1369,16 @@ class SparseHashLevel(SingleDimensionLevel):
 
     @property
     def ftype(self) -> SparseHashLevelFType:
-        return SparseHashLevelFType(
+        return SparseHashLevelFType(  # type: ignore[abstract]
             self.lvl.ftype,
             ftype(self.dimension),
-        )  # type: ignore[abstract]
+            ftype(self.ptr),
+            ftype(self.tbl_ctrl),
+            ftype(self.tbl),
+            ftype(self.key),
+            ftype(self.perm),
+            ftype(self.tbl_count),
+        )
 
     @property
     def val(self) -> Any:

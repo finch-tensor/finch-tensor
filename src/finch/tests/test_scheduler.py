@@ -700,10 +700,11 @@ def test_heuristic_loop_order():
         )
     )
 
-    # The contracted index i1 is shared by both inputs, so it is outermost.
+    # The output stores i0 before i2, and A and B read i0 before i1 before i2,
+    # so the loops agree with all of them.
     expected = Plan(
         (
-            fuse_loop_order(plan.bodies[0], (Field("i1"), Field("i0"), Field("i2"))),
+            fuse_loop_order(plan.bodies[0], (Field("i0"), Field("i1"), Field("i2"))),
             Produces((HardAlias("C"),)),
         )
     )

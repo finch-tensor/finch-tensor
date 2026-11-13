@@ -4,7 +4,7 @@ import ctypes
 import json
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import lru_cache, reduce
 from typing import Any
 
@@ -328,17 +328,15 @@ def mlir_function_name(op, arg: FType) -> str:
                 return "arith.divui"
             return "arith.divsi"
         case ffuncs._FloorDivFType():
-            if MLIROperator.is_float(arg):
-                raise NotImplementedError(
-                    f"MLIR backend does not yet support floordiv on {arg}"
-                )
             if MLIROperator.is_unsigned(arg):
                 return "arith.divui"
             return "arith.floordivsi"
         case ffuncs._ModFType():
+            if MLIROperator.is_float(arg):
+                return "arith.remf"
             if MLIROperator.is_unsigned(arg):
                 return "arith.remui"
-            raise NotImplementedError(f"MLIR backend does not yet support mod on {arg}")
+            return "arith.remsi"
         case ffuncs._MinFType():
             if MLIROperator.is_float(arg):
                 return "arith.minimumf"
@@ -717,6 +715,8 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
                 f" : {mlir_type(result_type)}"
             )
             return res
+        case ffuncs._TrueDivFType() | ffuncs._FloorDivFType() | ffuncs._ModFType():
+            return mlir_division(ctx, op_type, *args)
         case ffuncs._MakeTupleFType():
             t = TupleFType.from_tuple(tuple(a.result_type for a in args))
             st = mlir_type(t)
@@ -746,9 +746,6 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             )
         case (
             ffuncs._SubFType()
-            | ffuncs._TrueDivFType()
-            | ffuncs._FloorDivFType()
-            | ffuncs._ModFType()
             | ffuncs._LShiftFType()
             | ffuncs._RShiftFType()
             | ffuncs._EqFType()
@@ -767,6 +764,74 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             )
         case _:
             raise NotImplementedError(f"{op} has no MLIR representation.")
+
+
+def mlir_division(
+    ctx: MLIRContext, op_type: ffuncs.BinaryFinchOperatorFType, a: Any, b: Any
+) -> str:
+    """
+    truediv, floordiv and mod like numpy: true division gives a float, float
+    floor division floors the quotient and the remainder takes the sign of the
+    divisor, which `arith.remsi` and `arith.remf` don't do.
+    """
+    result_type = op_type.return_type(a.result_type, b.result_type)
+    t = mlir_type(result_type)
+    x, y = (
+        mlir_cast_value(
+            ctx,
+            ctx(arg),
+            getattr(arg.result_type, "element_type", arg.result_type),
+            result_type,
+        )
+        for arg in (a, b)
+    )
+
+    def emit(code: str) -> str:
+        res = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{res} = {code}")
+        return res
+
+    is_float = MLIROperator.is_float(result_type)
+    match op_type:
+        case ffuncs._TrueDivFType() if is_float:
+            return emit(f"arith.divf {x}, {y} : {t}")
+        case ffuncs._FloorDivFType() if is_float:
+            quotient = emit(f"arith.divf {x}, {y} : {t}")
+            return emit(f"llvm.intr.floor({quotient}) : ({t}) -> {t}")
+        case ffuncs._ModFType() if is_float:
+            return mlir_float_mod(ctx, emit, x, y, t)
+        case ffuncs._TrueDivFType() | ffuncs._FloorDivFType():
+            return emit(f"{mlir_function_name(op_type, result_type)} {x}, {y} : {t}")
+    rem = emit(f"{mlir_function_name(op_type, result_type)} {x}, {y} : {t}")
+    if MLIROperator.is_unsigned(result_type):
+        return rem
+    zero = ctx.constant(0, t)
+    nonzero = emit(f"arith.cmpi ne, {rem}, {zero} : {t}")
+    rem_neg = emit(f"arith.cmpi slt, {rem}, {zero} : {t}")
+    y_neg = emit(f"arith.cmpi slt, {y}, {zero} : {t}")
+    # a nonzero remainder with the wrong sign moves by one divisor
+    differ = emit(f"arith.xori {rem_neg}, {y_neg} : i1")
+    shift = emit(f"arith.andi {nonzero}, {differ} : i1")
+    shifted = emit(f"arith.addi {rem}, {y} : {t}")
+    return emit(f"arith.select {shift}, {shifted}, {rem} : {t}")
+
+
+def mlir_float_mod(
+    ctx: MLIRContext, emit: Callable[[str], str], x: str, y: str, t: str
+) -> str:
+    """The remainder half of numpy's `npy_divmod`, with selects for its branches."""
+    zero = ctx.constant("0.0", t)
+    fmod = emit(f"arith.remf {x}, {y} : {t}")
+    # move a wrong-signed remainder by one divisor; a zero takes the divisor's sign
+    nonzero = emit(f"arith.cmpf une, {fmod}, {zero} : {t}")
+    mod_neg = emit(f"arith.cmpf olt, {fmod}, {zero} : {t}")
+    y_neg = emit(f"arith.cmpf olt, {y}, {zero} : {t}")
+    differ = emit(f"arith.xori {mod_neg}, {y_neg} : i1")
+    shift = emit(f"arith.andi {nonzero}, {differ} : i1")
+    moved = emit(f"arith.addf {fmod}, {y} : {t}")
+    mod = emit(f"arith.select {shift}, {moved}, {fmod} : {t}")
+    zero_mod = emit(f"llvm.intr.copysign({zero}, {y}) : ({t}, {t}) -> {t}")
+    return emit(f"arith.select {nonzero}, {mod}, {zero_mod} : {t}")
 
 
 def mlir_getattr(fmt: FType, ctx, obj, attrs):
