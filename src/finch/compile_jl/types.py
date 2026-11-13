@@ -17,7 +17,7 @@ from finch.algebra.ftypes import FDTypeNumpy, FType, TupleFType
 from finch.finch_assembly import BufferFType
 from finch.tensor import DenseLevelFType, ElementLevelFType, LevelFType
 from finch.tensor.bufferized_ndarray import BufferizedNDArrayFType
-from finch.tensor.fiber_tensor import FiberTensorFType
+from finch.tensor.fiber_tensor import FiberTensorFType, Temp0DFType
 from finch.tensor.level.sparse_bytemap_level import SparseByteMapLevelFType
 from finch.tensor.level.sparse_coo_level import SparseCOOLevelFType
 from finch.tensor.level.sparse_hash_level import SparseHashLevelFType
@@ -367,6 +367,14 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
         elem_t = _leaf_type_str(ftype.element_type)
         fill = _julia_literal(ftype.fill_type)
         return f"Finch.Tensor(Finch.ElementLevel({fill}, {_buffer_ctor_str(elem_t)}))"
+    if isinstance(ftype, Temp0DFType):
+        # A kernel keeps a Temp0D to itself, so it may be a Finch scalar,
+        # whose value Finch.jl keeps in a variable. Finch.jl loads and
+        # stores the element of a zero dimensional tensor at every update,
+        # which LLVM can't keep in a register when the kernel writes other
+        # arrays which might alias it.
+        fill = _julia_literal(ftype.fill_type)
+        return f"{scalar_type_str(ftype.fill_type, ftype.element_type)}({fill})"
     if isinstance(ftype, FiberTensorFType):
         return f"Finch.Tensor({_level_constructor_str(ftype.lvl_t)})"
     if isinstance(ftype, BufferizedNDArrayFType):

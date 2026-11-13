@@ -99,7 +99,9 @@ def drop_fills(prgm: Plan, bindings: Mapping[Alias, TensorFType]) -> Plan:
     innermost loop is dense, so that it is written only where it isn't its
     static fill, as dropping_fill does, where drops lets the query skip those
     writes. The dense loop computes the fills of the argument, which the query
-    then drops within the loop, rather than storing them in the output.
+    then drops within the loop, rather than storing them in the output. A copy
+    into such an output from a workspace fused over every field it stores is
+    marked likewise.
     """
     fills = {alias: fmt.fill_type for alias, fmt in bindings.items()}
 
@@ -124,6 +126,30 @@ def drop_fills(prgm: Plan, bindings: Mapping[Alias, TensorFType]) -> Plan:
                 ):
                     arg = dropping_fill(arg, fill.value)
                     return Query(lhs, Aggregate(agg_op, init, arg, idxs))
+            case Query(
+                Table(Alias() as tns, _) as lhs,
+                Table(Alias() as src, src_idxs) as arg,
+            ) if (
+                loop_order
+                and len(src_idxs) == src.nfused
+                and tns.unfused in bindings
+                and src.unfused in bindings
+                and stores_sparsely(bindings[tns.unfused])
+            ):
+                # A copy out of a workspace which stores nothing, an
+                # accumulator, writes one entry in each fused iteration, which
+                # is a fill where nothing was accumulated.
+                fill = bindings[src.unfused].fill_type
+                if is_static(fill) and drops(
+                    ffuncs.overwrite, fill.value, (), bindings[tns.unfused]
+                ):
+                    arg = dropping_fill(arg, fill.value)
+                    return Query(
+                        lhs,
+                        Aggregate(
+                            Literal(ffuncs.overwrite), Literal(fill.value), arg, ()
+                        ),
+                    )
         return stmt
 
     return Plan(tuple(rewrite(body, ()) for body in prgm.bodies))

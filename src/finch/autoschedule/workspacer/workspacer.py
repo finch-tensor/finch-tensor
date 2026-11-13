@@ -4,7 +4,7 @@ import math
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
 
-from finch.algebra import ftype, ftypes
+from finch.algebra import ftype, ftypes, is_static
 from finch.algebra.tensor import TensorFType
 from finch.autoschedule.cost_models import (
     PROTOCOL_COST_MODEL,
@@ -40,15 +40,13 @@ from finch.finch_logic import (
     TensorStats,
 )
 from finch.symbolic import Namespace, PostOrderDFS, PostWalk, Rewrite
+from finch.tensor import element, temp_0d
 
 
-def workspace_depth(prgm: LogicStatement, alias: Alias) -> int | None:
-    """
-    Return the number of leading fields that the query defining alias writes in
-    loop order, when it scatters into a later field. A workspace fused over
-    those fields can then take the scattered writes. Only an alias which one
-    Query defines, and nothing updates, has a workspace.
-    """
+def definitions(
+    prgm: LogicStatement, alias: Alias
+) -> list[tuple[LogicStatement, tuple[Field, ...]]]:
+    """The statements which define or update alias, with their enclosing loops."""
     writes: list[tuple[LogicStatement, tuple[Field, ...]]] = []
 
     def visit(node: LogicStatement, loops: tuple[Field, ...]):
@@ -64,7 +62,17 @@ def workspace_depth(prgm: LogicStatement, alias: Alias) -> int | None:
                 writes.append((node, loops))
 
     visit(prgm, ())
-    match writes:
+    return writes
+
+
+def workspace_depth(prgm: LogicStatement, alias: Alias) -> int | None:
+    """
+    Return the number of leading fields that the query defining alias writes in
+    loop order, when it scatters into a later field. A workspace fused over
+    those fields can then take the scattered writes. Only an alias which one
+    Query defines, and nothing updates, has a workspace.
+    """
+    match definitions(prgm, alias):
         case [(Query(Table(HardAlias(), idxs), _), loops)]:
             depth = 0
             while loops[depth : depth + 1] == idxs[depth : depth + 1] != ():
@@ -78,45 +86,109 @@ def add_workspace(
     prgm: LogicStatement, alias: HardAlias, depth: int, ws: HardAlias
 ) -> LogicStatement:
     """
-    Redirect the query which defines alias into ws, fused over its first depth
-    fields. Right after the statement within depth Fuse nodes which holds the
-    query, ws is copied into alias in order.
+    Redirect the query which defines alias into ws, fused over the first depth
+    loops enclosing the query, which are fields of alias in any order. ws lists
+    those fields in loop order, and then the others in the order of alias.
+    Right after the statement within depth Fuse nodes which holds the query,
+    ws is copied into alias in order.
     """
     fused = FusedAlias(ws, depth)
 
     # Each rewrite returns the copy until the depth where it is inserted.
     def rewrite(
-        node: LogicStatement, nloops: int
+        node: LogicStatement, loops: tuple[Field, ...]
     ) -> tuple[LogicStatement, LogicStatement | None]:
         match node:
             case Plan(bodies):
                 stmts: list[LogicStatement] = []
                 pending = None
                 for body in bodies:
-                    body, copy = rewrite(body, nloops)
+                    body, copy = rewrite(body, loops)
                     stmts.append(body)
-                    if copy is not None and nloops == depth:
+                    if copy is not None and len(loops) == depth:
                         stmts.append(copy)
                     elif copy is not None:
                         pending = copy
                 return Plan(tuple(stmts)), pending
             case Fuse(idx, body):
-                body, copy = rewrite(body, nloops + 1)
-                if copy is not None and nloops + 1 == depth:
+                body, copy = rewrite(body, (*loops, idx))
+                if copy is not None and len(loops) + 1 == depth:
                     return Fuse(idx, Plan((body, copy))), None
                 return Fuse(idx, body), copy
             case Query(Table(lhs, idxs), rhs) if lhs == alias:
-                copy = fuse_loop_order(
-                    Query(Table(alias, idxs), Table(fused, idxs)), idxs[depth:]
+                ws_idxs = (
+                    *loops[:depth],
+                    *(idx for idx in idxs if idx not in loops[:depth]),
                 )
-                return Query(Table(fused, idxs), rhs), copy
+                copy = fuse_loop_order(
+                    Query(Table(alias, idxs), Table(fused, ws_idxs)), ws_idxs[depth:]
+                )
+                return Query(Table(fused, ws_idxs), rhs), copy
             case _:
                 return node, None
 
-    prgm, copy = rewrite(prgm, 0)
+    prgm, copy = rewrite(prgm, ())
     if copy is not None:
         prgm = Plan((prgm, copy))
     return prgm
+
+
+def accumulator_depth(prgm: LogicStatement, alias: Alias) -> int | None:
+    """
+    Return the number of fields of the query defining alias, when they are
+    its outermost loops, in any order, and it reduces over further loops, so
+    that each element it writes stays fixed across those loops, even where it
+    scatters into alias. A workspace fused over every field then stores
+    nothing, and holds the running value of one element. Only an alias which
+    one Query defines, and nothing updates, has an accumulator.
+    """
+    match definitions(prgm, alias):
+        case [(Query(Table(HardAlias(), idxs), _), loops)] if set(
+            loops[: len(idxs)]
+        ) == set(idxs) and len(loops) > len(idxs):
+            return len(idxs)
+    return None
+
+
+def add_accumulators(
+    prgm: Plan,
+    bindings: Mapping[Alias, TensorFType],
+) -> tuple[Plan, dict[Alias, TensorFType]]:
+    """
+    Redirect each query of prgm which reduces into an output whose fields are
+    its outermost loops, as accumulator_depth finds, into a workspace fused
+    over all of them, as add_workspace does. The workspace stores no fields,
+    so it is declared before the loops it reduces over, accumulates the value
+    of one element of the output, and is copied into it once those loops end.
+    Return the program and the format of each workspace, a Temp0D, which a
+    backend may keep in a register, where it would load and store the output
+    in every iteration, and could not keep it there when another output might
+    alias it. Where a sparse input leaves nothing to accumulate, the reset and
+    the copy of the fill write nothing, so a backend which reads a declared
+    tensor as its fill until it is written skips them, as the loops would
+    without the workspace. Only an output with a static fill, which isn't an
+    input of bindings, has one.
+    """
+    prgm = flatten_plans(prgm)
+    spc = Namespace(prgm)
+    fills = prgm.infer_fill_type({var: fmt.fill_type for var, fmt in bindings.items()})
+    outputs: dict[HardAlias, None] = {}
+    for node in PostOrderDFS(prgm):
+        match node:
+            case Query(Table(HardAlias() as lhs, _), _) if lhs not in bindings:
+                outputs[lhs] = None
+    formats: dict[Alias, TensorFType] = {}
+    for alias in outputs:
+        fill = fills[alias]
+        depth = accumulator_depth(prgm, alias)
+        if depth is None or not is_static(fill):
+            continue
+        acc = HardAlias(spc.freshen(alias.name, "acc"))
+        staged = add_workspace(prgm, alias, depth, acc)
+        assert isinstance(staged, Plan)
+        prgm = staged
+        formats[acc] = temp_0d(element(fill, fill.element_type))
+    return prgm, formats
 
 
 def stage_workspaces(
@@ -362,7 +434,10 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
     formatter it wraps should price programs with the same model. format_cost
     prices a program with the formats its formatter would choose: format_cost
     searches them as a CostFormatter does, and galley_format_cost takes those
-    of a GalleyFormatter, far more cheaply.
+    of a GalleyFormatter, far more cheaply. Last, unless accumulators is
+    False, each query which reduces into fixed elements of its output across
+    its inner loops accumulates each element in a workspace which stores
+    nothing, as add_accumulators does.
     """
 
     def __init__(
@@ -371,8 +446,10 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
         cost_model: CostModel[ProtocolChoice] | None = None,
         options: Sequence[LevelOption] = LEVEL_OPTIONS,
         format_cost: FormatCost = format_cost,
+        accumulators: bool = True,
     ):
         self.ctx = ctx
+        self.accumulators = accumulators
         if cost_model is None:
             cost_model = PROTOCOL_COST_MODEL
         self.cost_model = cost_model
@@ -405,6 +482,9 @@ class LogicWorkspacer(LoopOrderedForm, LogicLoader):
             self.options,
             self.format_cost,
         )
+        if self.accumulators:
+            prgm, formats = add_accumulators(prgm, bindings)
+            bindings = {**bindings, **formats}
         return self.ctx(prgm, bindings, stats, stats_factory)
 
 

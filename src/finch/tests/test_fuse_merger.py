@@ -36,6 +36,7 @@ from finch.finch_logic import (
     Alias,
     Field,
     Fuse,
+    FusedAlias,
     HardAlias,
     Literal,
     LogicSimplify,
@@ -140,6 +141,55 @@ def test_loops_over_other_tensors_or_positions_stay_apart():
     }
     plan = Plan((*queries, Produces((s, t, u, v))))
     assert _merged(queries, (s, t, u, v), tensors) == plan
+
+
+def test_loops_which_copy_their_accumulators_merge():
+    # Each row sum of a accumulates in a workspace fused over the rows, which
+    # isn't read with the row field, so the loops over the rows of a merge, as
+    # do the loops over each row.
+    a, s, t = HardAlias("a"), HardAlias("s"), HardAlias("t")
+    i1, i2, j1, j2 = Field("i1"), Field("i2"), Field("j1"), Field("j2")
+    s_acc, t_acc = FusedAlias(HardAlias("s_acc"), 1), FusedAlias(HardAlias("t_acc"), 1)
+
+    def row_sum(out, acc, i, j):
+        total = _total(ffuncs.add, 0.0, Table(a, (i, j)), j)
+        return Fuse(
+            i,
+            Plan(
+                (
+                    Fuse(j, Query(Table(acc, (i,)), total)),
+                    Query(Table(out, (i,)), Table(acc, (i,))),
+                )
+            ),
+        )
+
+    queries = (row_sum(s, s_acc, i1, j1), row_sum(t, t_acc, i2, j2))
+    tensors = {a: (fl.asarray(np.ones((4, 4))), (Field("i"), Field("j")))}
+    prgm = _merged(queries, (s, t), tensors)
+    total = _total(ffuncs.add, 0.0, Table(a, (i1, j1)), j1)
+    assert prgm == Plan(
+        (
+            Fuse(
+                i1,
+                Plan(
+                    (
+                        Fuse(
+                            j1,
+                            Plan(
+                                (
+                                    Query(Table(s_acc, (i1,)), total),
+                                    Query(Table(t_acc, (i1,)), total),
+                                )
+                            ),
+                        ),
+                        Query(Table(s, (i1,)), Table(s_acc, (i1,))),
+                        Query(Table(t, (i1,)), Table(t_acc, (i1,))),
+                    )
+                ),
+            ),
+            Produces((s, t)),
+        )
+    )
 
 
 def test_loops_which_depend_on_each_other_stay_apart():
