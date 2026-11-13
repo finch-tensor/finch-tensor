@@ -148,7 +148,7 @@ class NumpyBufferFType(
         return np_dtype(self._element_type)
 
     def __eq__(self, other):
-        if not isinstance(other, NumpyBufferFType):
+        if type(other) is not type(self):
             return False
         return self._element_type == other._element_type
 
