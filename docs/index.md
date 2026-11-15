@@ -7,20 +7,19 @@
     to users unfamiliar with theory of sparse array optimizations.
 
 
-## Sparse Array Definition.
+## Sparse Array Definition
 
-A sparse array is an ordered sequence of values, where it is advantageous to reason about the sequence as being primarily composed of a singular value at most positions, which is called the fill value, and other values elsewhere. A very common matrix that fits this definition is an identity matrix.
+A sparse array is an array where most entries are blank. Usually, these blanks are represented by 0 or some other, selected value. Sparse arrays provide asymptotic time and space complexity benefits compared to dense arrays for some classes of problems.
 
+## Finch Advances the Ecosystem
 
-## Finch is special.
-There have been many sparse array projects prior to this project, but this project is special for a couple of reasons:
-
-| Solution      | Maximum Dimensions        | Optimizing | Extensible with custom sparse format |
-| :---          | :---                      | :---:      | ---:                                 |
-| Finch         | word size  (usually 2^64) | YES        | YES                                  |
-| Scipy Sparse  | 2                         | NO         | NO                                   |
-| Pydata Sparse | 2                         | NO         | NO                                   |
-
+| Feature / Tool                      | Finch     | Scipy Sparse | PyData Sparse |
+| :---                                | ---:      | ---:         | ---:          |
+| Sparse Array Operations and Formats | &check;   | &check;      | &check;       |
+| Tensor Support                      | &check;   | &cross;      | &cross;       |
+| Optimizing Compiler / Scheduler     | &check;   | &cross;      | &cross;       |
+| Custom Sparse Array Formats         | &check;   | &cross;      | &cross;       |
+| Binary operations supported on tensors of different formats | &check;   | &cross;      | &cross;       |
 
 
 
@@ -51,12 +50,3 @@ Finch can:
  - Generate, compile, and execute sparse programs in C code.
  - Generate and run MLIR, an intermediate code representation, which can take advantage of hardware specifics to optimize problem runtime.
  - Execute the calculation in Python, for debugging and when speed is not a priority.
-
-
-
-
-
-
-
-### Background
-Finch is a pure-Python rewrite of [`Finch.jl`](https://github.com/finch-tensor/Finch.jl).

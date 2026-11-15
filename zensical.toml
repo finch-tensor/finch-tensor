@@ -9,6 +9,8 @@ repo_url = "https://github.com/finch-tensor/finch-tensor"
 edit_uri = "blob/main/docs/"
 nav = [
   { "Introduction" = "index.md" },
+  { "A Graph Analog" = "graph.md" },
+  { "Under The Hood" = "under-the-hood.md" },
   { "Issue Tracker" = "https://github.com/finch-tensor/finch-tensor/issues" },
 ]
 
