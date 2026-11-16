@@ -788,6 +788,10 @@ class NumbaContext(Context):
                             self,
                             *(asm.Literal(v) for v in value),
                         )
+                    case float() | np.floating() if not np.isfinite(value):
+                        if np.isnan(value):
+                            return "numpy.nan"
+                        return "numpy.inf" if value > 0 else "-numpy.inf"
                     case _:
                         return str(value)
             case asm.Variable(name, _) | asm.Slot(name, _):
