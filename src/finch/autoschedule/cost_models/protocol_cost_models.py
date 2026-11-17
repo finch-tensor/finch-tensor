@@ -10,7 +10,7 @@ import json
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -604,6 +604,17 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
         spaces = loop_spaces(prefix, machine)
         visited = spaces.visited()
         visits = spaces.count(visited)
+        iterations = spaces.iterations()
+        if component.write and component.alias.nfused:
+            # There is some minimal work done every time a workspace is
+            # declared or copied out, regardless of actual writes. We model
+            # this as at least 1 write per declare.
+            fused = table.idxs[: component.alias.nfused]
+            last = max(prefix.prefix.index(idx) for idx in fused)
+            outer = replace(prefix, prefix=prefix.prefix[: last + 1])
+            declares = loop_spaces(outer, machine).iterations()
+            iterations = max(iterations, declares)
+            visits = max(visits, declares)
         if component.write:
             distinct = spaces.located(visited, component.fields)
         else:
@@ -647,7 +658,7 @@ class AccessBasis(Basis[ProtocolChoice], LoopOrderedForm):
             [
                 [
                     spaces.executions(),
-                    spaces.iterations(),
+                    iterations,
                     visits,
                     parents(component, spaces),
                     distinct,

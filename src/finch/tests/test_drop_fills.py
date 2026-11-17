@@ -18,6 +18,8 @@ from finch.compile import NotationCompiler
 from finch.finch_logic import (
     Aggregate,
     Field,
+    Fuse,
+    FusedAlias,
     HardAlias,
     Literal,
     MapJoin,
@@ -89,6 +91,35 @@ def test_an_output_with_any_sparse_level_drops_fills():
     all_dense = fiber_tensor(dense(dense(element(0.0))))
     assert drop_fills(plan, {A: all_dense, B: all_dense, C: DENSE_ROWS}) != plan
     assert drop_fills(plan, {A: all_dense, B: all_dense, C: all_dense}) == plan
+
+
+def test_a_copy_out_of_an_accumulator_drops_fills():
+    # C[i] = sum_j A[i, j], accumulated for each i in a workspace which stores
+    # nothing, holds a fill wherever row i is empty, which a sparse C drops.
+    acc = FusedAlias(HardAlias("acc"), 1)
+    total = Aggregate(Literal(ffuncs.add), Literal(0.0), Table(A, (i, j)), (j,))
+
+    def plan(copy):
+        loop = Plan((Fuse(j, Query(Table(acc, (i,)), total)), copy))
+        return Plan((fuse_loop_order(loop, (i,)), Produces((C,))))
+
+    copy = Query(Table(C, (i,)), Table(acc, (i,)))
+    scalar = fiber_tensor(element(0.0))
+    dropped = drop_fills(plan(copy), {A: DENSE_ROWS, acc.unfused: scalar, C: LIST})
+    drop = Query(
+        Table(C, (i,)),
+        Aggregate(
+            Literal(ffuncs.overwrite),
+            Literal(FILL),
+            dropping_fill(Table(acc, (i,)), FILL),
+            (),
+        ),
+    )
+    assert dropped == plan(drop)
+    # A dense C stores every entry, fills or not.
+    assert drop_fills(plan(copy), {A: DENSE_ROWS, acc.unfused: scalar, C: DENSE}) == (
+        plan(copy)
+    )
 
 
 def test_a_reduction_drops_fills_within_its_loop():
