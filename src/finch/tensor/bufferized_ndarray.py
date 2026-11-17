@@ -491,14 +491,14 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
     def protocols(self):
         return self.lvl_t.level_protocols()
 
-    def lower_dim(self, ctx, obj, r):
-        return self.lvl_t.level_lower_dim(ctx, ctx(obj.lvl), r)
+    def lower_dim(self, ctx, lvl, r):
+        return self.lvl_t.level_lower_dim(ctx, ctx(lvl.lvl), r)
 
-    def lower_fill(self, ctx, obj):
-        return self.lvl_t.lower_fill(ctx(obj.lvl))
+    def lower_fill(self, ctx, lvl):
+        return self.lvl_t.lower_fill(ctx(lvl.lvl))
 
-    def lower_declare(self, ctx, tns: ntn.Fiber, init, op, shape):
-        root = ctx(tns.lvl.root)
+    def lower_declare(self, ctx, lvl: ntn.Fiber, init, op, shape):
+        root = ctx(lvl.lvl.root)
         shape = tuple(
             dim
             if dim.result_type == dim_t
@@ -577,11 +577,11 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
             device=arr.device,
         )
 
-    def lower_unwrap(self, ctx, obj):
-        return self.lvl_t.level_lower_unwrap(ctx, obj, ctx(obj.pos))
+    def lower_unwrap(self, ctx, lvl):
+        return self.lvl_t.level_lower_unwrap(ctx, lvl, ctx(lvl.pos))
 
-    def lower_increment(self, ctx, obj, op, val):
-        return self.lvl_t.level_lower_increment(ctx, obj, op, val, ctx(obj.pos))
+    def lower_increment(self, ctx, lvl, op, val):
+        return self.lvl_t.level_lower_increment(ctx, lvl, op, val, ctx(lvl.pos))
 
 
 class BufferizedNDArrayAccessor(Tensor):
@@ -802,20 +802,20 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
     def __call__(self, val):
         raise NotImplementedError("An ndarray level is a view of existing storage")
 
-    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
         raise NotImplementedError(
             "Declare the owning ndarray before accessing its levels"
         )
 
-    def level_lower_freeze(self, ctx, tns, op, pos):
-        return tns
+    def level_lower_freeze(self, ctx, lvl, op, pos):
+        return lvl
 
-    def level_lower_thaw(self, ctx, tns, op, pos):
-        return tns
+    def level_lower_thaw(self, ctx, lvl, op, pos):
+        return lvl
 
-    def level_lower_dim(self, ctx, obj, r):
+    def level_lower_dim(self, ctx, lvl, r):
         return asm.GetAttr(
-            asm.GetAttr(obj, asm.Literal("shape")),
+            asm.GetAttr(lvl, asm.Literal("shape")),
             asm.Literal(f"element_{self.nind + r}"),
         )
 
@@ -824,21 +824,21 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
             return asm.GetAttr(lvl_expr, asm.Literal("fill"))
         return asm.Literal(self.fill_type.value)
 
-    def level_lower_unwrap(self, ctx, tns, pos):
+    def level_lower_unwrap(self, ctx, lvl, pos):
         return asm.Load(
-            asm.GetAttr(ctx(tns.lvl), asm.Literal("val")),
+            asm.GetAttr(ctx(lvl.lvl), asm.Literal("val")),
             pos,
         )
 
     def level_lower_increment(
         self,
         ctx: AssemblyContext,
-        obj: ntn.Fiber,
+        lvl: ntn.Fiber,
         op: ntn.NotationExpression,
         val: ntn.NotationExpression,
         pos: asm.AssemblyExpression,
     ):
-        buf = asm.GetAttr(ctx(obj.lvl), asm.Literal("val"))
+        buf = asm.GetAttr(ctx(lvl.lvl), asm.Literal("val"))
         op_e, pos_e, val_e = ctx(op), pos, ctx(val)
         increment_call = asm.Call(
             op_e,
@@ -846,8 +846,8 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
         )
         ctx.exec(asm.Store(buf, pos_e, increment_call))
 
-    def level_unfurl(self, ctx: AssemblyContext, tns, ext, mode, proto, pos):
-        level = tns.lvl
+    def level_unfurl(self, ctx: AssemblyContext, lvl, ext, mode, proto, pos):
+        level = lvl.lvl
         root = ctx(level)
 
         def child_accessor(ctx, idx):
@@ -879,7 +879,7 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
                 ntn.Fiber(
                     ntn.Child(level),
                     ntn.Value(pos_2, self.position_type),
-                    (*tns.idxs, idx),
+                    (*lvl.idxs, idx),
                 )
             )
 

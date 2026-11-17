@@ -274,7 +274,7 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpression:
             assert all(isinstance(idx, Token) for idx in idxs)
             return ein.Access(
                 ein.Alias(tns.value),
-                tuple(ein.Index(idx.value) for idx in idxs),  # ty: ignore[unresolved-attribute]
+                tuple(ein.Index(idx.value) for idx in idxs),  # ty: ignore[missing-union-attribute]
             )
         case Tree("bool_literal", (val,)):
             assert isinstance(val, Token)
@@ -306,7 +306,7 @@ def parse_einop(expr: str) -> ein.EinsumNode:
             assert isinstance(expr_node, Tree)
             arg = _parse_einop_expr(expr_node)
             assert all(isinstance(idx, Token) for idx in idxs)
-            idxs_exprs = tuple(ein.Index(idx.value) for idx in idxs)  # ty: ignore[unresolved-attribute]
+            idxs_exprs = tuple(ein.Index(idx.value) for idx in idxs)  # ty: ignore[missing-union-attribute]
             assert isinstance(op_token, Token)
             op = ein.Literal(reduction_ops[op_token.value])
             assert isinstance(tns, Token)
@@ -326,7 +326,7 @@ def parse_einop(expr: str) -> ein.EinsumNode:
             return ein.Einsum(
                 op,
                 ein.Alias(tns.value),
-                tuple(ein.Index(idx.value) for idx in idxs),  # ty: ignore[unresolved-attribute]
+                tuple(ein.Index(idx.value) for idx in idxs),  # ty: ignore[missing-union-attribute]
                 arg,
             )
 

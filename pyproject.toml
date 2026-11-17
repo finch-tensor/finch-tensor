@@ -106,6 +106,7 @@ pre-commit = { features = ["pre-commit"], no-default-feature = true }
 # default feature definition
 
 [tool.pixi.dependencies]
+python = "<3.15"  # See https://github.com/yaml/pyyaml/issues/951
 finch-tensor.path = "."
 h5py = ">=3.16.0,<4"
 
@@ -293,8 +294,8 @@ include = ["src"]
 exclude = ["**/reference"]
 
 [tool.ty.rules]
-invalid-method-override = "ignore"
-unresolved-import = "ignore"
+incompatible-method-override = "ignore"
+import-not-found = "ignore"
 blanket-ignore-comment = "error"
 unused-type-ignore-comment = "error"
 unused-ignore-comment = "error"

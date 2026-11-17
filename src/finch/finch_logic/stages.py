@@ -13,7 +13,7 @@ from .tensor_stats import StatsFactory, TensorStats
 class LogicEvaluator(Stage):
     @abstractmethod
     def lower(
-        self, term: lgc.LogicNode, bindings: dict[lgc.Alias, Tensor] | None = None
+        self, prgm: lgc.LogicNode, bindings: dict[lgc.Alias, Tensor] | None = None
     ):
         """
         Evaluate the given logic.

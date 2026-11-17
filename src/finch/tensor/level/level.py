@@ -156,21 +156,21 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def level_lower_unwrap(self, ctx, obj, pos):
+    def level_lower_unwrap(self, ctx, lvl, pos):
         """
         Emit code to return the unwrapped scalar at position `pos` in the level.
         """
         ...
 
     @abstractmethod
-    def level_lower_increment(self, ctx, obj, op, val, pos):
+    def level_lower_increment(self, ctx, lvl, op, val, pos):
         """
         Emit code to increment position `pos` in the level.
         """
         ...
 
     @abstractmethod
-    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
         """
         Emit code to lower a declare of `pos` previously assembled positions in
         the level.
@@ -178,7 +178,7 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def level_lower_dim(self, ctx, obj, r):
+    def level_lower_dim(self, ctx, lvl, r):
         """
         Emit code to return the size of dimension `r` of the subtensors in the level.
         """

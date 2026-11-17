@@ -1148,28 +1148,28 @@ class MLIRBufferFType(BufferFType, MLIRArgumentFType, ABC):
     """
 
     @abstractmethod
-    def mlir_length(self, ctx: MLIRContext, buffer):
+    def mlir_length(self, ctx: MLIRContext, buf):
+        """
+        Return MLIR code which gets the length of a named buffer.
+        """
+        ...
+
+    @abstractmethod
+    def mlir_load(self, ctx: MLIRContext, buf, idx):
         """
         Return MLIR code which loads a named buffer at the given index.
         """
         ...
 
     @abstractmethod
-    def mlir_load(self, ctx: MLIRContext, buffer, index):
-        """
-        Return MLIR code which loads a named buffer at the given index.
-        """
-        ...
-
-    @abstractmethod
-    def mlir_store(self, ctx: MLIRContext, buffer, index, value=None):
+    def mlir_store(self, ctx: MLIRContext, buf, idx, value=None):
         """
         Return MLIR code which stores a named buffer to the given index.
         """
         ...
 
     @abstractmethod
-    def mlir_resize(self, ctx: MLIRContext, buffer, new_length):
+    def mlir_resize(self, ctx: MLIRContext, buf, new_len):
         """Resize a buffer and store its updated descriptor in the slot box."""
         ...
 
