@@ -1,6 +1,9 @@
+from typing import Any
+
 import pytest
 
 import numpy as np
+import scipy.sparse as sps
 
 import finch as ft
 import finch.finch_notation as ntn
@@ -34,6 +37,7 @@ from finch.compile.lower import make_extent
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.compile_jl.interop import jl_tensor_to_python, tensor_to_jl
 from finch.compile_jl.julia import jl, julia_available
+from finch.compile_jl.runtime import DefaultFinchJLRuntime
 from finch.finch_assembly import AssemblyKernelFType
 from finch.tensor import BufferizedNDArray
 from finch.tensor.patterns import (
@@ -1262,3 +1266,30 @@ def test_register_julia_op_maps_and_defines_once():
     assert compiler._JULIA_OPS[op.ftype] == "finch_test_twice"
     assert int(jl.finch_test_twice(3)) == 6
     del compiler._JULIA_OPS[op.ftype]
+
+
+def test_julia_kernels_keep_their_own_scalars_in_finch_scalars():
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA_GALLEY
+
+    # Two row sums of a CSR matrix run in one loop over its rows, each summing
+    # into a Temp0D accumulator, which Finch.jl keeps in a variable.
+    rng = np.random.default_rng(0)
+    data = rng.random((20, 30)) * (rng.random((20, 30)) < 0.3)
+    data[3] = 0.0
+    x = ft.defer(ft.asarray(sps.csr_array(data)))
+    with with_default_scheduler(COMPILE_JULIA_GALLEY):
+        sums, squares = ft.compute((ft.sum(x, axis=1), ft.sum(x * x, axis=1)))
+    np.testing.assert_allclose(np.asarray(sums), data.sum(axis=1))
+    np.testing.assert_allclose(np.asarray(squares), (data * data).sum(axis=1))
+
+    stage: Any = COMPILE_JULIA_GALLEY
+    while not isinstance(stage, LogicCompiler):
+        stage = stage.ctx
+    loader = stage.ctx_load
+    assert isinstance(loader, FinchJLCompiler)
+    runtime = loader.runtime
+    assert isinstance(runtime, DefaultFinchJLRuntime)
+    codes = [kernel.jl_code for kernel in runtime._kernels.values()]
+    # Each accumulator is a Temp0D, which the Finch kernel keeps in a scalar.
+    assert any(code.count("Finch.Scalar{0.0, Float64}(0.0)") == 2 for code in codes)

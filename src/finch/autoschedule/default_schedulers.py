@@ -27,12 +27,13 @@ from .executor import LogicExecutor
 from .factor_cache import FactorCacheEvaluator
 from .factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
 from .factorizer.optimize import DefaultLogicFactorizer
-from .formatter import DefaultLogicFormatter, FDFormatter, GalleyFormatter
+from .formatter import DefaultLogicFormatter, FDFormatter
+from .formatter.smart_formatter import CostFormatter
 from .fuse_merger import LogicFuseMerger
 from .loop_orderer import BFSLoopOrderer, DefaultLoopOrderer
 from .normalize import LogicNormalizer
 from .protocolizer import CostProtocolizer
-from .workspacer import DefaultLogicWorkspacer, LogicWorkspacer, galley_format_cost
+from .workspacer import DefaultLogicWorkspacer, LogicWorkspacer
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
@@ -220,7 +221,7 @@ COMPILE_JULIA_GALLEY = LogicNormalizer(
                 BFSLoopOrderer(
                     LogicWorkspacer(
                         LogicFuseMerger(
-                            GalleyFormatter(
+                            CostFormatter(
                                 LogicFillDropper(
                                     CostProtocolizer(
                                         CompilerFormLowerer(
@@ -230,7 +231,6 @@ COMPILE_JULIA_GALLEY = LogicNormalizer(
                                 )
                             )
                         ),
-                        format_cost=galley_format_cost,
                     )
                 )
             )
