@@ -79,7 +79,6 @@ requires-pixi = ">=0.72.0"
 
 [tool.pixi.package.build.backend]
 name = "pixi-build-python"
-version = "*"
 
 [tool.pixi.package.build.config]
 ignore-pypi-mapping = false
@@ -106,7 +105,7 @@ pre-commit = { features = ["pre-commit"], no-default-feature = true }
 # default feature definition
 
 [tool.pixi.dependencies]
-finch-tensor.path = "."
+finch-tensor = { path = "." }
 h5py = ">=3.16.0,<4"
 
 [tool.pixi.target.macos-arm64.dependencies]

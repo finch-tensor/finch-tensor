@@ -371,8 +371,8 @@ class NotationCompiler(UnvalidatedForm, NotationLoader):
         self.ctx_lower: NotationLowerer = ctx_lower
         self.mode = ctx_lower.mode
 
-    def lower(self, term: ntn.Module) -> AssemblyLibrary:
-        asm_code = self.ctx_lower(term)
+    def lower(self, prgm: ntn.Module) -> AssemblyLibrary:
+        asm_code = self.ctx_lower(prgm)
         for transform in self.ctx_transforms:
             asm_code = transform(asm_code)
         logger.debug(asm_code)
