@@ -106,7 +106,6 @@ pre-commit = { features = ["pre-commit"], no-default-feature = true }
 # default feature definition
 
 [tool.pixi.dependencies]
-python = "<3.15"  # See https://github.com/yaml/pyyaml/issues/951
 finch-tensor.path = "."
 h5py = ">=3.16.0,<4"
 
@@ -247,17 +246,17 @@ find-links = [{ url = "https://llvm.github.io/eudsl" }]
 mlir-python-bindings = "*"
 
 [tool.pixi.feature.pre-commit.dependencies]
-pre-commit = "*"
+prek = "*"
 
 [tool.pixi.feature.pre-commit.tasks]
-pre-commit-install = "pre-commit install"
+pre-commit-install = "prek install -f"
 
 [tool.pixi.feature.pre-commit.tasks.pre-commit]
 args = [
     { arg = "skip", default = "" },
 ]
 env = { "SKIP" = "{{ skip }}" }
-cmd = "pre-commit run -a"
+cmd = "prek run -a"
 
 
 [tool.ruff]

@@ -1,0 +1,68 @@
+# Configuration file for `prek`, a git hook framework written in Rust.
+# See https://prek.j178.dev for more information.
+#:schema https://www.schemastore.org/prek.json
+
+exclude = "^src/finch/tests/data/"
+ci = { autofix_prs = false }
+
+[[repos]]
+repo = "https://github.com/pre-commit/pre-commit-hooks"
+rev = "v6.0.0"
+[[repos.hooks]]
+id = "end-of-file-fixer"
+exclude = """
+(?x)(
+    ^src/finch/tests/reference/|
+    ^src/finch/codegen/stc/
+)
+"""
+
+[[repos.hooks]]
+id = "trailing-whitespace"
+exclude = """
+(?x)(
+    ^src/finch/tests/reference/|
+    ^src/finch/codegen/stc/
+)"""
+
+
+
+[[repos.hooks]]
+id = "mixed-line-ending"
+exclude = """
+(?x)(
+    ^src/finch/tests/reference/|
+    ^src/finch/codegen/stc/
+)
+"""
+
+[[repos.hooks]]
+id = "name-tests-test"
+args = ["--pytest-test-first"]
+exclude = """
+(?x)(
+    ^src/finch/tests/reference/|
+    ^src/finch/tests/scripts/|
+    ^src/finch/tests/utils.py|
+    ^src/finch/tests/stats_cases.py|
+    ^src/finch/codegen/src/
+)
+"""
+
+[[repos.hooks]]
+id = "no-commit-to-branch"
+
+[[repos]]
+repo = "https://github.com/astral-sh/ruff-pre-commit"
+rev = "v0.17.5"
+
+[[repos.hooks]]
+id = "ruff-check"
+args = ["--fix", "--config=pyproject.toml"]
+types_or = ["python", "pyi", "jupyter"]
+
+
+[[repos.hooks]]
+id = "ruff-format"
+args = ["--config=pyproject.toml"]
+types_or = ["python", "pyi", "jupyter"]
