@@ -45,7 +45,7 @@ def custom_callable_program():
         struct_fields = [("offset", dtype)]
         c_symbol = "+"
 
-        def from_fields(self, offset):
+        def from_fields(self, offset, /):
             return Shift(offset)
 
         def return_type(self, *args):
@@ -58,8 +58,8 @@ def custom_callable_program():
         def numba_name(self):
             return "+"
 
-        def numba_function_call(self, op, ctx, *args):
-            offset = ctx(asm.GetAttr(op, asm.Literal("offset")))
+        def numba_function_call(self, val, ctx, *args):
+            offset = ctx(asm.GetAttr(val, asm.Literal("offset")))
             return f"({ctx(args[0])} + {offset})"
 
         def mlir_name(self):
@@ -473,8 +473,8 @@ def test_callable_without_algebraic_properties(ir):
         def __hash__(self):
             return hash(type(self))
 
-        def __call__(self, value):
-            return value
+        def __call__(self, val):
+            return val
 
         def return_type(self, *args):
             return args[0]

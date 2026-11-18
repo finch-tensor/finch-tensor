@@ -145,14 +145,14 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
     def _var(self, ctx, name, type_=None):
         return asm.Variable(ctx.freshen(name), type_ or self.ptr_type.length_type)
 
-    def level_lower_dim(self, ctx, obj, r):
+    def level_lower_dim(self, ctx, lvl, r):
         if r == 0:
-            return asm.GetAttr(obj, asm.Literal("dimension"))
+            return asm.GetAttr(lvl, asm.Literal("dimension"))
         return self.lvl_t.level_lower_dim(
-            ctx, asm.GetAttr(obj, asm.Literal("lvl")), r - 1
+            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), r - 1
         )
 
-    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
         l_t = self.ptr_type.length_type
         dimension = shape[0]
         if dimension.result_type != self.dimension_type:
@@ -178,8 +178,8 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
         # positions are found with the old dimension, before it is resized.
         expr = """finch
         pos_stop = to_len(pos)
-        dim = to_len(tns.dimension)
-        n_dirty = to_len(tns.qos_fill)
+        dim = to_len(lvl.dimension)
+        n_dirty = to_len(lvl.qos_fill)
         if (mul(n_dirty, 16) > n_tbl)
             for (p in 0:n_ptr)
                 ptr[p] = unset
@@ -198,13 +198,13 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
         end
         """
         exec_block(
-            ctx, parse_assembly(expr, locals() | self._bindings(tns), position_type=l_t)
+            ctx, parse_assembly(expr, locals() | self._bindings(lvl), position_type=l_t)
         )
-        child = asm.GetAttr(tns, asm.Literal("lvl"))
+        child = asm.GetAttr(lvl, asm.Literal("lvl"))
         if self.lvl_t.supports_reassembly:
             # The child holds the fill wherever this level wasn't written, so
             # only the cleared positions are reset, instead of declaring it.
-            bindings = self._bindings(tns)
+            bindings = self._bindings(lvl)
             n_tbl = bindings["n_tbl"]
             one = ctx.block()
             one.exec(
@@ -237,9 +237,9 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
                 )
             )
         expr = """finch
-        tns.qos_fill = zero
-        tns.dimension = dimension
-        dim = to_len(tns.dimension)
+        lvl.qos_fill = zero
+        lvl.dimension = dimension
+        dim = to_len(lvl.dimension)
         q_stop = mul(pos_stop, dim)
         ptr_len = n_ptr
         if (ptr_len < add(pos_stop, 1))
@@ -258,7 +258,7 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
         ptr[0] = zero
         """
         exec_block(
-            ctx, parse_assembly(expr, locals() | self._bindings(tns), position_type=l_t)
+            ctx, parse_assembly(expr, locals() | self._bindings(lvl), position_type=l_t)
         )
         if not self.lvl_t.supports_reassembly:
             child_pos = asm.Call(asm.Literal(ffuncs.mul), (pos, dim))
@@ -385,24 +385,22 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
             asm.Call(asm.Literal(ffuncs.mul), (pos, dim)),
         )
 
-    def level_lower_increment(self, ctx, obj, op, val, pos):
+    def level_lower_increment(self, ctx, lvl, op, val, pos):
         raise NotImplementedError(
             "SparseByteMapLevelFType does not support level_lower_increment."
         )
 
-    def level_lower_unwrap(self, ctx, obj, pos):
+    def level_lower_unwrap(self, ctx, lvl, pos):
         raise NotImplementedError(
             "SparseByteMapLevelFType does not support level_lower_unwrap."
         )
 
-    def level_unfurl(
-        self, ctx, fiber: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos
-    ):
+    def level_unfurl(self, ctx, lvl: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos):
         match mode:
             case ntn.Update():
-                return self.level_unfurl_update(ctx, fiber, ext, mode, proto, pos)
-        level = fiber.lvl
-        lvl = ctx(level)
+                return self.level_unfurl_update(ctx, lvl, ext, mode, proto, pos)
+        level = lvl.lvl
+        lvl_o = ctx(level)
         p_t = self.position_type
         r, r_stop, q_offset, i_stop, i_last = (
             asm.Variable(ctx.freshen(name), p_t)
@@ -410,14 +408,14 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
         )
         seeking = asm.Variable(ctx.freshen("seeking"), ftypes.bool_)
         fill = (
-            ntn.Value(self.lower_fill(lvl), self.element_type)
+            ntn.Value(self.lower_fill(lvl_o), self.element_type)
             if is_dynamic(self.fill_type)
             else ntn.Literal(self.fill_type.value)
         )
         full = ntn.Full(
             fill,
             tuple(
-                ntn.Value(self.level_lower_dim(ctx, lvl, r), self.shape_type[r])
+                ntn.Value(self.level_lower_dim(ctx, lvl_o, r), self.shape_type[r])
                 for r in range(1, self.ndim)
             ),
         )
@@ -427,17 +425,17 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
             case ntn.Gallop():
                 step = lplt.Jumper
             case ntn.Follow():
-                return self._level_unfurl_follow(ctx, fiber, pos, full)
+                return self._level_unfurl_follow(ctx, lvl, pos, full)
             case _:
                 raise NotImplementedError(
                     f"SparseByteMapLevelFType does not support the {proto} protocol."
                 )
-        bindings = locals() | self._bindings(lvl)
+        bindings = locals() | self._bindings(lvl_o)
         bindings |= {
             "one": asm.Literal(p_t(1)),
             "dimension": asm.Call(
                 asm.Literal(ffuncs.astype(p_t)),
-                (asm.GetAttr(lvl, asm.Literal("dimension")),),
+                (asm.GetAttr(lvl_o, asm.Literal("dimension")),),
             ),
         }
 
@@ -495,7 +493,7 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
             pos_2 = asm.Variable(ctx.freshen(idx, f"_pos_{self.ndim - 1}"), p_t)
             exec_block(ctx, parse("finch\npos_2 = srt[to_len(r)]", pos_2=pos_2))
             return lplt.Run(
-                ntn.Fiber(ntn.Child(level), ntn.Value(pos_2, p_t), (*fiber.idxs, idx))
+                ntn.Fiber(ntn.Child(level), ntn.Value(pos_2, p_t), (*lvl.idxs, idx))
             )
 
         return lplt.Thunk(

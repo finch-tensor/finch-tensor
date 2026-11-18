@@ -563,22 +563,22 @@ class EyeTensorFType(PatternTensorFType, FinchTensorFType, MutableStructFType):
         self.get_child_type(attr)
         return obj
 
-    def lower_dim(self, ctx, obj, r):
-        return self.lvl_t.level_lower_dim(ctx, ctx(obj.lvl), r)
+    def lower_dim(self, ctx, lvl, r):
+        return self.lvl_t.level_lower_dim(ctx, ctx(lvl.lvl), r)
 
-    def lower_fill(self, ctx, obj):
+    def lower_fill(self, ctx, lvl):
         match self.fill_type:
             case StaticFillFType() as fill_type:
                 return asm.Literal(fill_type.value)
         raise NotImplementedError(f"Cannot lower the dynamic fill of a {self}")
 
-    def lower_unwrap(self, ctx, obj):
+    def lower_unwrap(self, ctx, lvl):
         raise NotImplementedError(f"Unfurl a {self} before reading it")
 
-    def lower_increment(self, ctx, obj, op, val):
+    def lower_increment(self, ctx, lvl, op, val):
         raise NotImplementedError(f"Cannot update a {self}")
 
-    def lower_declare(self, ctx, tns, init, op, shape):
+    def lower_declare(self, ctx, lvl, init, op, shape):
         shape = tuple(
             dim
             if dim.result_type == dim_t
@@ -587,7 +587,7 @@ class EyeTensorFType(PatternTensorFType, FinchTensorFType, MutableStructFType):
         )
         ctx.exec(
             asm.SetAttr(
-                ctx(tns.lvl.root),
+                ctx(lvl.lvl.root),
                 asm.Literal("shape"),
                 asm.Call(asm.Literal(ffuncs.make_tuple), shape),
             )
@@ -672,36 +672,36 @@ class EyeLevelFType(LevelFType, ImmutableStructFType):
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl):
         raise NotImplementedError
 
-    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
         raise NotImplementedError("Declare the owning eye tensor instead")
 
-    def level_lower_freeze(self, ctx, tns, op, pos):
-        return tns
+    def level_lower_freeze(self, ctx, lvl, op, pos):
+        return lvl
 
-    def level_lower_thaw(self, ctx, tns, op, pos):
-        return tns
+    def level_lower_thaw(self, ctx, lvl, op, pos):
+        return lvl
 
-    def level_lower_dim(self, ctx, obj, r):
+    def level_lower_dim(self, ctx, lvl, r):
         return asm.GetAttr(
-            asm.GetAttr(obj, asm.Literal("shape")),
+            asm.GetAttr(lvl, asm.Literal("shape")),
             asm.Literal(f"element_{self.nind + r}"),
         )
 
-    def level_lower_unwrap(self, ctx, tns, pos):
+    def level_lower_unwrap(self, ctx, lvl, pos):
         raise NotImplementedError("Unfurl an eye level before reading it")
 
-    def level_lower_increment(self, ctx, obj, op, val, pos):
+    def level_lower_increment(self, ctx, lvl, op, val, pos):
         raise NotImplementedError("Cannot update an eye level")
 
-    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):
         if self.nind == 0:
             return lplt.Lookup(
                 lambda ctx, idx: lplt.Run(
-                    ntn.Fiber(ntn.Child(tns.lvl), tns.pos, (*tns.idxs, idx))
+                    ntn.Fiber(ntn.Child(lvl.lvl), lvl.pos, (*lvl.idxs, idx))
                 )
             )
         # A column holds the pattern only where it is offset by k from its row.
-        i = tns.idxs[-1]
+        i = lvl.idxs[-1]
         k = dict(self.tns._constructor_kwargs)["k"]
         diag = ntn.Call(ntn.L(ffuncs.add), (i, ntn.L(i.result_type(k)))) if k else i
 

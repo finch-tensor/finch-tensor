@@ -88,14 +88,14 @@ class _AddFType(NAryFinchOperatorFType):
 
     is_commutative = True
 
-    def is_identity(self, arg: Any) -> builtins.bool:
-        return arg == 0
+    def is_identity(self, val: Any) -> builtins.bool:
+        return val == 0
 
-    def is_annihilator(self, arg: Any) -> builtins.bool:
+    def is_annihilator(self, val: Any) -> builtins.bool:
         try:
-            return np.isinf(arg)
+            return np.isinf(val)
         except (TypeError, ValueError):
-            # If arg is not a type that can be checked for infinity, it cannot
+            # If val is not a type that can be checked for infinity, it cannot
             # be an annihilator for addition.
             return False
 
@@ -135,14 +135,14 @@ class _MulFType(NAryFinchOperatorFType):
 
     is_commutative = True
 
-    def is_identity(self, arg: Any) -> builtins.bool:
-        return arg == 1
+    def is_identity(self, val: Any) -> builtins.bool:
+        return val == 1
 
     def repeat_operator(self):
         return pow
 
-    def is_distributive(self, other_op: "FinchOperatorFType") -> builtins.bool:
-        return isinstance(other_op, _AddFType | _SubFType)
+    def is_distributive(self, other: "FinchOperatorFType") -> builtins.bool:
+        return isinstance(other, _AddFType | _SubFType)
 
     def is_annihilator(self, val):
         return val == 0
@@ -197,8 +197,8 @@ class _TrueDivFType(BinaryFinchOperatorFType):
     def operator(self):
         return truediv
 
-    def is_identity(self, arg):
-        return arg == 1
+    def is_identity(self, val):
+        return val == 1
 
 
 class _TrueDiv(FinchOperator):
@@ -294,8 +294,8 @@ class _PowFType(BinaryFinchOperatorFType):
     def c_symbol(self) -> str:
         return "pow"
 
-    def is_identity(self, arg):
-        return arg == 1
+    def is_identity(self, val):
+        return val == 1
 
 
 class _Pow(FinchOperator):
@@ -318,8 +318,8 @@ class _LShiftFType(BinaryFinchOperatorFType):
     def operator(self):
         return lshift
 
-    def is_identity(self, arg):
-        return arg == 0
+    def is_identity(self, val):
+        return val == 0
 
 
 class _LShift(FinchOperator):
@@ -342,8 +342,8 @@ class _RShiftFType(BinaryFinchOperatorFType):
     def operator(self):
         return rshift
 
-    def is_identity(self, arg):
-        return arg == 0
+    def is_identity(self, val):
+        return val == 0
 
 
 class _RShift(FinchOperator):
@@ -372,14 +372,14 @@ class _AndFType(NAryFinchOperatorFType):
 
     is_idempotent = True
 
-    def is_identity(self, arg):
-        return arg == -1
+    def is_identity(self, val):
+        return val == -1
 
-    def is_annihilator(self, arg):
-        return not bool(arg)
+    def is_annihilator(self, val):
+        return not bool(val)
 
-    def is_distributive(self, other_op: "FinchOperatorFType") -> builtins.bool:
-        return isinstance(other_op, _OrFType | _XorFType)
+    def is_distributive(self, other: "FinchOperatorFType") -> builtins.bool:
+        return isinstance(other, _OrFType | _XorFType)
 
     def init_value(self, type_: FType) -> Any:
         assert isinstance(type_, FDType)
@@ -410,8 +410,8 @@ class _XorFType(NAryFinchOperatorFType):
 
     is_commutative = True
 
-    def is_identity(self, arg):
-        return arg == 0
+    def is_identity(self, val):
+        return val == 0
 
     def init_value(self, type_: FType) -> Any:
         assert isinstance(type_, FDType)
@@ -444,14 +444,14 @@ class _OrFType(NAryFinchOperatorFType):
 
     is_idempotent = True
 
-    def is_identity(self, arg):
-        return not bool(arg)
+    def is_identity(self, val):
+        return not bool(val)
 
-    def is_annihilator(self, arg):
-        return arg == -1
+    def is_annihilator(self, val):
+        return val == -1
 
-    def is_distributive(self, other_op: "FinchOperatorFType") -> builtins.bool:
-        return isinstance(other_op, _AndFType)
+    def is_distributive(self, other: "FinchOperatorFType") -> builtins.bool:
+        return isinstance(other, _AndFType)
 
     def init_value(self, type_: FType) -> Any:
         assert isinstance(type_, FDType)
@@ -789,8 +789,8 @@ class _LogicalAndFType(BinaryFinchOperatorFType):
     def is_annihilator(self, val) -> builtins.bool:
         return not builtins.bool(val)
 
-    def is_distributive(self, other_op: FinchOperatorFType) -> builtins.bool:
-        return isinstance(other_op, _LogicalOrFType | _LogicalXorFType)
+    def is_distributive(self, other: FinchOperatorFType) -> builtins.bool:
+        return isinstance(other, _LogicalOrFType | _LogicalXorFType)
 
     def init_value(self, type_: FType) -> Any:
         return True
@@ -829,8 +829,8 @@ class _LogicalOrFType(BinaryFinchOperatorFType):
     def is_annihilator(self, val) -> builtins.bool:
         return builtins.bool(val)
 
-    def is_distributive(self, other_op: FinchOperatorFType) -> builtins.bool:
-        return isinstance(other_op, _LogicalAndFType)
+    def is_distributive(self, other: FinchOperatorFType) -> builtins.bool:
+        return isinstance(other, _LogicalAndFType)
 
     def init_value(self, type_: FType) -> Any:
         return False

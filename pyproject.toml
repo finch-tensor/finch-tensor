@@ -79,7 +79,6 @@ requires-pixi = ">=0.72.0"
 
 [tool.pixi.package.build.backend]
 name = "pixi-build-python"
-version = "*"
 
 [tool.pixi.package.build.config]
 ignore-pypi-mapping = false
@@ -106,7 +105,7 @@ pre-commit = { features = ["pre-commit"], no-default-feature = true }
 # default feature definition
 
 [tool.pixi.dependencies]
-finch-tensor.path = "."
+finch-tensor = { path = "." }
 h5py = ">=3.16.0,<4"
 
 [tool.pixi.target.macos-arm64.dependencies]
@@ -246,17 +245,17 @@ find-links = [{ url = "https://llvm.github.io/eudsl" }]
 mlir-python-bindings = "*"
 
 [tool.pixi.feature.pre-commit.dependencies]
-pre-commit = "*"
+prek = "*"
 
 [tool.pixi.feature.pre-commit.tasks]
-pre-commit-install = "pre-commit install"
+pre-commit-install = "prek install -f"
 
 [tool.pixi.feature.pre-commit.tasks.pre-commit]
 args = [
     { arg = "skip", default = "" },
 ]
 env = { "SKIP" = "{{ skip }}" }
-cmd = "pre-commit run -a"
+cmd = "prek run -a"
 
 
 [tool.ruff]
@@ -293,8 +292,8 @@ include = ["src"]
 exclude = ["**/reference"]
 
 [tool.ty.rules]
-invalid-method-override = "ignore"
-unresolved-import = "ignore"
+incompatible-method-override = "ignore"
+import-not-found = "ignore"
 blanket-ignore-comment = "error"
 unused-type-ignore-comment = "error"
 unused-ignore-comment = "error"

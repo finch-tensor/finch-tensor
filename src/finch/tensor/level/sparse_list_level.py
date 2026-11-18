@@ -164,20 +164,20 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
             *self.lvl_t.level_protocols(),
         )
 
-    def level_lower_dim(self, ctx, obj, r):
+    def level_lower_dim(self, ctx, lvl, r):
         if r == 0:
-            return asm.GetAttr(obj, asm.Literal("dimension"))
+            return asm.GetAttr(lvl, asm.Literal("dimension"))
         return self.lvl_t.level_lower_dim(
-            ctx, asm.GetAttr(obj, asm.Literal("lvl")), r - 1
+            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), r - 1
         )
 
-    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
         dimension = shape[0]
         if dimension.result_type != self.dimension_type:
             dimension = asm.Call(
                 asm.Literal(ffuncs.astype(self.dimension_type)), (dimension,)
             )
-        ctx.exec(asm.SetAttr(tns, asm.Literal("dimension"), dimension))
+        ctx.exec(asm.SetAttr(lvl, asm.Literal("dimension"), dimension))
         p_t = self.ptr_type.length_type
         p = asm.Variable(ctx.freshen("p"), p_t)
         stop = asm.Variable(ctx.freshen("pos_stop"), p_t)
@@ -185,18 +185,18 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         zero = asm.Literal(self.position_type(0))
         expr = """finch
         stop = to_size(pos) + 1
-        resize(tns.ptr, stop)
+        resize(lvl.ptr, stop)
         for (p in 0:stop)
-            tns.ptr[p] = zero
+            lvl.ptr[p] = zero
         end
-        tns.qos_fill = zero
-        tns.qos_stop = zero
-        tns.prev_pos = zero
-        tns.frozen = false
+        lvl.qos_fill = zero
+        lvl.qos_stop = zero
+        lvl.prev_pos = zero
+        lvl.frozen = false
         """
         ctx.exec(parse_assembly(expr, locals(), position_type=p_t))
         return self.lvl_t.level_lower_declare(
-            ctx, asm.GetAttr(tns, asm.Literal("lvl")), init, op, shape[1:], zero
+            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), init, op, shape[1:], zero
         )
 
     def level_lower_thaw(self, ctx, lvl, op, pos):
@@ -263,7 +263,7 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
             asm.GetAttr(lvl, asm.Literal("qos_fill")),
         )
 
-    def level_lower_increment(self, ctx, obj, op, val, pos):
+    def level_lower_increment(self, ctx, lvl, op, val, pos):
         raise NotImplementedError(
             "SparseListLevelFType does not support level_lower_increment."
         )
@@ -288,18 +288,16 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         """
         ctx.exec(parse_assembly(expr, locals(), position_type=p_t))
 
-    def level_lower_unwrap(self, ctx, obj, pos):
+    def level_lower_unwrap(self, ctx, lvl, pos):
         raise NotImplementedError(
             "SparseListLevelFType does not support level_lower_unwrap."
         )
 
-    def level_unfurl(
-        self, ctx, fiber: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos
-    ):
+    def level_unfurl(self, ctx, lvl: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos):
         match mode:
             case ntn.Update():
-                return self.level_unfurl_update(ctx, fiber, ext, mode, proto, pos)
-        tns = fiber
+                return self.level_unfurl_update(ctx, lvl, ext, mode, proto, pos)
+        tns = lvl
         level = tns.lvl
         lvl_asm = ctx(level)
         ptr_s = asm.GetAttr(lvl_asm, asm.Literal("ptr"))
@@ -327,7 +325,7 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
             case ntn.Gallop():
                 step = lplt.Jumper
             case ntn.Follow():
-                return self._level_unfurl_follow(ctx, fiber, pos, full)
+                return self._level_unfurl_follow(ctx, lvl, pos, full)
             case _:
                 raise NotImplementedError(
                     f"SparseListLevelFType does not support the {proto} protocol."

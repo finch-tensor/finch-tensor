@@ -81,12 +81,12 @@ class EinsumInterpreter(UnvalidatedForm, EinsumEvaluator):
     def __init__(self, xp=np):
         self.xp = xp
 
-    def lower(self, node, bindings=None):
+    def lower(self, term, bindings=None):
         if bindings is None:
             bindings = {}
         bindings = {k: self.xp.asarray(v) for k, v in bindings.items()}
         machine = EinsumMachine(xp=self.xp, bindings=bindings.copy())
-        return machine(node)
+        return machine(term)
 
 
 class PointwiseEinsumMachine:
@@ -226,7 +226,7 @@ class MockEinsumLoader(UnvalidatedForm, EinsumLoader):
 
     def lower(
         self,
-        prgm: ein.EinsumStatement,
+        term: ein.EinsumStatement,
         bindings: dict[ein.Alias, TensorFType],
         *,
         defined: set[ein.Alias] | None = None,
@@ -234,4 +234,4 @@ class MockEinsumLoader(UnvalidatedForm, EinsumLoader):
         MockEinsumLibrary,
         dict[ein.Alias, TensorFType],
     ]:
-        return MockEinsumLibrary(prgm, bindings, defined), bindings
+        return MockEinsumLibrary(term, bindings, defined), bindings

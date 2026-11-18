@@ -599,7 +599,7 @@ class LogicFactorizer(ScopedForm, LogicLoader):
     @abstractmethod
     def lower(
         self,
-        term: LogicStatement,
+        prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
@@ -617,7 +617,7 @@ class LogicLoopOrderer(SingleAggregateForm, LogicLoader):
     @abstractmethod
     def lower(
         self,
-        term: LogicStatement,
+        prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
@@ -635,7 +635,7 @@ class LogicFormatter(LoopOrderedForm, LogicLoader):
     @abstractmethod
     def lower(
         self,
-        term: LogicStatement,
+        prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
@@ -667,7 +667,7 @@ class LogicEinsumLowerer(FormattedForm, Stage):
     @abstractmethod
     def lower(
         self,
-        term: LogicStatement,
+        prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Self, TypeVar
 
@@ -511,7 +511,7 @@ class Alias(LogicNode, NamedTerm):
     def dimmap(
         self,
         op: Callable,
-        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        dim_bindings: Mapping[Alias, tuple[T | None, ...]],
     ) -> tuple[T | None, ...]:
         if dim_bindings is None or self.unfused not in dim_bindings:
             raise NotImplementedError(f"Cannot resolve dims of Alias {self.name}")

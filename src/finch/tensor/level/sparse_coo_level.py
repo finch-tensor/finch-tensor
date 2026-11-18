@@ -152,13 +152,13 @@ class SparseCOOLevelFType(ImmutableStructFType, MultiDimensionLevelFType):
         )
 
     def __call__(
-        self, lvl, shape=None, ptr=None, idx=None, tbl=None
+        self, val, shape=None, ptr=None, idx=None, tbl=None
     ) -> "SparseCOOLevel":
         if shape is None:
             raise ValueError("SparseCOOLevel requires a COO shape")
         if tbl is None:
             tbl = idx
-        return SparseCOOLevel(lvl, shape, ptr, tbl)
+        return SparseCOOLevel(val, shape, ptr, tbl)
 
     def from_fields(self, lvl, coo_shape, ptr, idx, tbl=None) -> "SparseCOOLevel":
         if tbl is None:
@@ -171,10 +171,10 @@ class SparseCOOLevelFType(ImmutableStructFType, MultiDimensionLevelFType):
     def level_asm_repack(self, ctx, lvl_fields):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
-    def level_lower_dim(self, ctx, obj, r):
+    def level_lower_dim(self, ctx, lvl, r):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
-    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
     def level_lower_freeze(self, ctx, lvl, op, pos):
@@ -183,10 +183,10 @@ class SparseCOOLevelFType(ImmutableStructFType, MultiDimensionLevelFType):
     def level_lower_thaw(self, ctx, lvl, op, pos):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
-    def level_lower_increment(self, ctx, obj, op, val, pos):
+    def level_lower_increment(self, ctx, lvl, op, val, pos):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
-    def level_lower_unwrap(self, ctx, obj, pos):
+    def level_lower_unwrap(self, ctx, lvl, pos):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
     def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):

@@ -188,7 +188,7 @@ class _FusedFunctionParser:
                 base = self._parse_expr(value)
                 return fzd.Call(fzd.Literal(getattr), (base, fzd.Literal(attr)))
             case ast.Break():
-                return fzd.Break()  # ty: ignore[invalid-return-type]
+                return fzd.Break()  # ty: ignore[invalid-explicit-return]
             case _:
                 raise self._unsupported(
                     expr,
