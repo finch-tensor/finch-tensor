@@ -68,7 +68,8 @@ from finch.finch_logic import (
 )
 from finch.symbolic import gensym
 
-from .lazy import LazyTensor, asarray, defer
+from .constructor import asarray
+from .lazy import LazyTensor, defer
 
 
 def compute(arg, ctx=None):

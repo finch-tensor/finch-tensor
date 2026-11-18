@@ -10,10 +10,7 @@ from itertools import accumulate, zip_longest
 from typing import Any, overload
 
 import numpy as np
-import scipy.sparse as sps
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
-
-import sparse as pydata_sparse
 
 from finch import finch_einsum as ein
 from finch.algebra import (
@@ -24,7 +21,6 @@ from finch.algebra import (
     FinchOperatorFType,
     FType,
     StaticFillFType,
-    Tensor,
     TensorFType,
     apply_fill,
     as_fill,
@@ -62,18 +58,10 @@ from finch.finch_logic import (
     Table,
     TensorStats,
 )
-from finch.interface.constructor import (
-    from_numpy,
-    from_pydata,
-    from_scipy,
-)
+from finch.interface.constructor import asarray
 from finch.symbolic import gensym
 from finch.tensor import (
-    BufferizedNDArray,
-    BufferizedNDArrayFType,
     EyeTensor,
-    FiberTensor,
-    FiberTensorFType,
     FillTensor,
     IndexTensor,
     LowerTriangleTensor,
@@ -95,58 +83,6 @@ from finch.tensor.scalar import ConstantScalar, Scalar
 
 def _shape_size(shape: tuple) -> int:
     return int(np.prod(shape, dtype=np.intp)) if shape else 1
-
-
-def reformat(tensor, format, *, device=None):
-    if tensor.ftype == format:
-        return tensor
-
-    if isinstance(format, BufferizedNDArrayFType):
-        return from_numpy(tensor.to_numpy(), device=device)
-
-    if isinstance(format, FiberTensorFType):
-        if isinstance(tensor, BufferizedNDArray):
-            try:
-                return format.from_numpy(tensor.to_numpy())
-            except NotImplementedError:
-                pass
-
-        if isinstance(tensor, FiberTensor):
-            try:
-                scipy_mat = tensor.to_scipy()
-            except NotImplementedError as exc:
-                raise NotImplementedError(
-                    f"Cannot extract sparse intermediate from {tensor.ftype}"
-                ) from exc
-        else:
-            arr = tensor.to_numpy()
-            if arr.ndim == 2:
-                scipy_mat = sps.csr_matrix(arr)
-            elif arr.ndim >= 1:
-                coo = pydata_sparse.COO.from_numpy(arr)
-                result = from_pydata(coo, device=device)
-                if result.ftype != format:
-                    raise NotImplementedError(
-                        f"Cannot build {format} from pydata COO; "
-                        f"got {result.ftype}. A Reformat node is required."
-                    )
-                return result
-            else:
-                raise NotImplementedError("Cannot build sparse from 0-D input")
-
-        if isinstance(scipy_mat, sps.csr_matrix):
-            result = from_scipy(scipy_mat, device=device)
-        else:
-            result = from_scipy(scipy_mat.tocoo(), device=device)
-
-        if result.ftype != format:
-            raise NotImplementedError(
-                f"Cannot build {format} from SciPy; got {result.ftype}. "
-                f"A Reformat node is required for arbitrary format conversion."
-            )
-        return result
-
-    raise NotImplementedError(f"Cannot reformat to {type(format).__name__}")
 
 
 class LazyTensorFType(TensorFType):
@@ -432,138 +368,6 @@ class LazyTensor(OverrideTensor):
 
     def reshape(self, shape, /, *, copy=None):
         return reshape(self, shape, copy=copy)
-
-
-@overload
-def asarray(
-    obj: np.ndarray,
-    /,
-    *,
-    dtype=None,
-    device=None,
-    copy=None,
-    format: None = None,
-) -> BufferizedNDArray: ...
-
-
-@overload
-def asarray(
-    obj: sps.spmatrix | sps.sparray,
-    /,
-    *,
-    dtype=None,
-    device=None,
-    copy=None,
-    format: None = None,
-) -> FiberTensor: ...
-
-
-@overload
-def asarray(
-    obj: Any,
-    /,
-    *,
-    dtype=None,
-    device=None,
-    copy=None,
-    format: FiberTensorFType,
-) -> FiberTensor: ...
-
-
-@overload
-def asarray(
-    obj: np.generic | complex,
-    /,
-    *,
-    dtype=None,
-    device=None,
-    copy=None,
-    format: None = None,
-) -> Scalar: ...
-
-
-@overload
-def asarray(
-    obj: Any,
-    /,
-    *,
-    dtype=None,
-    device=None,
-    copy=None,
-    format: TensorFType | None = None,
-) -> Tensor: ...
-
-
-def asarray(
-    obj: Any,
-    /,
-    *,
-    dtype=None,
-    device=None,
-    copy=None,
-    format: TensorFType | None = None,
-) -> Tensor:
-    """
-    Convert given argument and return wrapper type instance.
-    If input argument is already array type, return unchanged.
-    https://data-apis.org/array-api/latest/API_specification/generated/array_api.asarray.html
-    """
-    explicit_device = device is not None
-    device = normalize_device(device)
-
-    if isinstance(obj, Scalar):
-        if copy is True or (explicit_device and obj.device != device):
-            tensor = Scalar(obj.val, fill_value=obj.fill_value, device=device)
-        else:
-            tensor = obj
-    elif isinstance(obj, BufferizedNDArray):
-        if copy is True:
-            tensor = BufferizedNDArray.from_numpy(
-                obj.to_numpy().copy(), fill_value=obj.fill_value, device=device
-            )
-        elif explicit_device and obj.device != device:
-            tensor = obj.to_device(device)
-        else:
-            tensor = obj
-    elif isinstance(obj, Tensor) and copy is not True:
-        if explicit_device and obj.device != device:
-            tensor = obj.to_device(device)
-        else:
-            tensor = obj
-    elif isinstance(obj, np.ndarray):
-        tensor = from_numpy(obj, device=device, copy=copy)
-    elif sps.issparse(obj):
-        tensor = from_scipy(obj, device=device, dtype=dtype, copy=copy)
-    elif isinstance(obj, pydata_sparse.COO):
-        tensor = from_pydata(obj, device=device, dtype=dtype, copy=copy)
-
-    elif np.isscalar(obj) or obj is None:
-        if dtype is not None:
-            obj = ftype(dtype)(obj)
-        elif isinstance(obj, bool | int | float | complex):
-            obj = np.asarray(obj)[()]
-        tensor = Scalar(obj, device=device)
-    else:
-        try:
-            np_arr = np.asarray(obj)
-            if np_arr.dtype != object:
-                if dtype is not None:
-                    np_arr = np_arr.astype(np_dtype(ftype(dtype)))
-                elif copy is True:
-                    np_arr = np_arr.copy()
-                tensor = BufferizedNDArray.from_numpy(np_arr, device=device)
-            else:
-                raise TypeError(
-                    f"Cannot convert {type(obj).__name__} to a Finch tensor"
-                )
-        except (TypeError, ValueError) as exc:
-            raise TypeError(
-                f"Cannot convert {type(obj).__name__} to a Finch tensor"
-            ) from exc
-
-    if format is not None:
-        tensor = reformat(tensor, format, device=device)
-    return tensor.to_device(device) if explicit_device else tensor
 
 
 @overload

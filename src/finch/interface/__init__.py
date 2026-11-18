@@ -4,6 +4,7 @@ from finch.tensor.scalar import Scalar, ScalarFType
 
 from . import fft, linalg
 from .constructor import (
+    asarray,
     from_numpy,
     from_pydata,
     from_scipy,
@@ -153,7 +154,6 @@ from .fuse import (
 )
 from .lazy import (
     LazyTensor,
-    asarray,
     defer,
 )
 

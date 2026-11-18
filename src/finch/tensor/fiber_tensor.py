@@ -20,6 +20,11 @@ from finch.algebra import (
     resolve_fill,
 )
 from finch.compile.lower import FinchTensorFType
+from finch.tensor.level import (
+    DenseLevel,
+    ElementLevel,
+)
+from finch.tensor.scalar import Scalar
 
 from . import level as levels
 from .override_tensor import OverrideTensor
@@ -57,6 +62,78 @@ class FiberTensor(OverrideTensor):
 
     def with_fill(self, fill_value: AbstractFill) -> FiberTensor:
         return replace(self, lvl=self.lvl.with_fill(fill_value))
+
+    def declare(self, init, op, shape):
+        """Declare this FiberTensor: resize to `shape` and initialize with `init`.
+
+        Rebuilds the level hierarchy for `shape` with `init` as the fill value,
+        so subsequent writes accumulate over a background of `init`.
+        """
+
+        shape = tuple(int(dim) for dim in shape)
+        fill = as_fill(init)
+
+        # Rebuild the format with the new fill.
+        fmt = self.ftype.with_fill(fill.ftype)
+
+        # Build the level hierarchy for the new shape.
+        new_lvl = fmt.lvl_t.construct(shape, pos=1)
+
+        return FiberTensor(new_lvl, fmt.position_type(0), _device=self.device)
+
+    def _flat_position(self, idxs):
+        """Walk the level tree and return (leaf_buffer, flat_position).
+        Only DenseLevel chains are supported.
+        """
+        if not isinstance(idxs, tuple):
+            idxs = (idxs,)
+
+        lvl = self.lvl
+        pos = self.pos
+        remaining = list(idxs)
+
+        while True:
+            match lvl:
+                case DenseLevel(lvl=inner, dimension=dim):
+                    if not remaining:
+                        raise IndexError(
+                            f"too few indices: got {len(idxs)}, expected one per "
+                            f"dense level"
+                        )
+                    i = remaining.pop(0)
+                    if not isinstance(i, (int, np.integer)):
+                        raise IndexError(f"index {i!r} is not an integer")
+                    if not (0 <= int(i) < int(dim)):
+                        raise IndexError(
+                            f"index {int(i)} out of bounds for axis "
+                            f"with dimension {int(dim)}"
+                        )
+                    pos = pos * dim + int(i)
+                    lvl = inner
+                case ElementLevel(_val=buf):
+                    if remaining:
+                        raise IndexError(
+                            f"too many indices: got {len(idxs)}, tensor has "
+                            f"{len(idxs) - len(remaining)} dimensions"
+                        )
+                    if buf is None:
+                        raise ValueError("ElementLevel has no buffer")
+                    return buf, pos
+                case _:
+                    raise NotImplementedError(
+                        f"Cannot index into {type(lvl).__name__} "
+                        f"(only DenseLevel chains are supported)"
+                    )
+
+    def __getitem__(self, idxs):
+        buf, pos = self._flat_position(idxs)
+        return Scalar(buf.load(pos), device=self.device)
+
+    def __setitem__(self, idxs, val):
+        buf, pos = self._flat_position(idxs)
+        if isinstance(val, Scalar):
+            val = val.val
+        buf.store(pos, val)
 
     @property
     def shape(self):
