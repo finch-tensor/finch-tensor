@@ -9,7 +9,7 @@ from .bound_stats import (
     LPStats,
     LPStatsFactory,
 )
-from .dense_stat import DenseStats, DenseStatsFactory
+from .dense_stats import DenseStats, DenseStatsFactory
 from .dummy_stats import DummyStats, DummyStatsFactory
 from .fd_stats import FDStats, FDStatsFactory
 from .sampling_stats import SamplingStats, SamplingStatsFactory

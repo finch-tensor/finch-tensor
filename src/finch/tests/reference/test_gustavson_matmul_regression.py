@@ -140,8 +140,7 @@ def main(_a_0: builtins.tuple, _b_4: builtins.tuple, _w_8: Numba_BufferizedNDArr
             _j_16__pos: int32 = q
             for _j_16 in range(i_start, min(i_end, i_stop)):
                 for _k_17 in range(0, _b_dim_1_7):
-                    _k_17__pos: int64 = (0 + (__w_9_strides_element_0 * _k_17))
-                    __w_9_val_slot_arr[_k_17__pos] = (__w_9_val_slot_arr[_k_17__pos] + 0)
+                    pass
             for _j_16 in range(max(i_start, i_stop), i_end):
                 _j_16__pos_2: int32 = ((0 * __b_5_lvl_dimension) + _j_16)
                 q_2: int32 = __b_5_lvl_lvl_ptr_slot_arr[_j_16__pos_2]
@@ -186,13 +185,12 @@ def main(_a_0: builtins.tuple, _b_4: builtins.tuple, _w_8: Numba_BufferizedNDArr
                 i_start_2: int32 = 0
                 while (i_start_2 < min(_b_dim_1_7, (i_last_2 + 1))):
                     i_end_2: int32 = min((min(i_stop_2) + 1), min(_b_dim_1_7, (i_last_2 + 1)))
-                    _k_17__pos_3: int32 = q_2
+                    _k_17__pos: int32 = q_2
                     for _k_17 in range(i_start_2, min(i_end_2, i_stop_2)):
-                        _k_17__pos_2: int64 = (0 + (__w_9_strides_element_0 * _k_17))
-                        __w_9_val_slot_arr[_k_17__pos_2] = (__w_9_val_slot_arr[_k_17__pos_2] + 0)
+                        pass
                     for _k_17 in range(max(i_start_2, i_stop_2), i_end_2):
-                        _k_17__pos_4: int64 = (0 + (__w_9_strides_element_0 * _k_17))
-                        __w_9_val_slot_arr[_k_17__pos_4] = (__w_9_val_slot_arr[_k_17__pos_4] + (__a_1_lvl_lvl_lvl_val_slot_arr[numpy.int64(_j_16__pos)] * __b_5_lvl_lvl_lvl_val_slot_arr[numpy.int64(_k_17__pos_3)]))
+                        _k_17__pos_2: int64 = (0 + (__w_9_strides_element_0 * _k_17))
+                        __w_9_val_slot_arr[_k_17__pos_2] = (__w_9_val_slot_arr[_k_17__pos_2] + (__a_1_lvl_lvl_lvl_val_slot_arr[numpy.int64(_j_16__pos)] * __b_5_lvl_lvl_lvl_val_slot_arr[numpy.int64(_k_17__pos)]))
                     if ((i_stop_2 + 1) == i_end_2):
                         q_2 = (q_2 + 1)
                         if (q_2 < q_stop_2):
@@ -201,8 +199,7 @@ def main(_a_0: builtins.tuple, _b_4: builtins.tuple, _w_8: Numba_BufferizedNDArr
                             i_stop_2 = __b_5_lvl_lvl_dimension
                     i_start_2 = i_end_2
                 for _k_17 in range(max(0, (i_last_2 + 1)), _b_dim_1_7):
-                    _k_17__pos_5: int64 = (0 + (__w_9_strides_element_0 * _k_17))
-                    __w_9_val_slot_arr[_k_17__pos_5] = (__w_9_val_slot_arr[_k_17__pos_5] + 0)
+                    pass
             if ((i_stop + 1) == i_end):
                 q = (q + 1)
                 if (q < q_stop):
@@ -212,8 +209,7 @@ def main(_a_0: builtins.tuple, _b_4: builtins.tuple, _w_8: Numba_BufferizedNDArr
             i_start = i_end
         for _j_16 in range(max(0, (i_last + 1)), _a_dim_1_3):
             for _k_17 in range(0, _b_dim_1_7):
-                _k_17__pos_6: int64 = (0 + (__w_9_strides_element_0 * _k_17))
-                __w_9_val_slot_arr[_k_17__pos_6] = (__w_9_val_slot_arr[_k_17__pos_6] + 0)
+                pass
         qos: int32 = __c_12_lvl_lvl_qos_fill
         for _k_20 in range(0, _w_dim_1_19):
             _k_20__pos: int64 = (0 + (__w_9_strides_element_0 * _k_20))

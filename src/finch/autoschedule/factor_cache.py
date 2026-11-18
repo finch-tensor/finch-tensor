@@ -3,6 +3,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import cast
 
+import numpy as np
+
 from finch.algebra import (
     FinchOperator,
     ffuncs,
@@ -12,13 +14,14 @@ from finch.algebra import (
 )
 from finch.algebra.tensor import Tensor
 from finch.autoschedule.capture import LogicCapture
-from finch.autoschedule.cost_models import LoopDepthCostModel
+from finch.autoschedule.cost_models import LOOP_DEPTH_COST_MODEL
 from finch.autoschedule.executor import extract_tensors
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.util import push_relabels
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    DimensionTable,
     Field,
     FillTable,
     HardAlias,
@@ -177,7 +180,7 @@ class FactorCacheEvaluator(UnvalidatedForm, LogicEvaluator):
         self.capture = LogicCapture()
         if factorizer is None:
             self.factorizer: LogicLoader = GalleyLogicFactorizer(
-                self.capture, optimizer="greedy", cost_model=LoopDepthCostModel()
+                self.capture, optimizer="greedy", cost_model=LOOP_DEPTH_COST_MODEL
             )
         else:
             self.factorizer = factorizer(self.capture)
@@ -231,6 +234,8 @@ class FactorCacheEvaluator(UnvalidatedForm, LogicEvaluator):
                     return Table(Literal(self._ref(results[alias])), idxs)
                 case FillTable(Alias() as alias):
                     return Literal(results[alias].fill_value)
+                case DimensionTable(Alias() as alias, Literal(r)):
+                    return Literal(np.intp(results[alias].shape[r]))
             return None
 
         factored = self.capture.last_prgm

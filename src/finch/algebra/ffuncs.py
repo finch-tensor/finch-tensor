@@ -797,8 +797,9 @@ class _LogicalAndFType(BinaryFinchOperatorFType):
 
 
 class _LogicalAnd(FinchOperator):
-    def __call__(self, a, b):
-        return np.logical_and(a, b)
+    def __call__(self, *args):
+        # Associative, so calls may carry more than two operands, like add's.
+        return reduce(np.logical_and, args)
 
     def __repr__(self) -> str:
         return "logical_and"
@@ -836,8 +837,9 @@ class _LogicalOrFType(BinaryFinchOperatorFType):
 
 
 class _LogicalOr(FinchOperator):
-    def __call__(self, a, b):
-        return np.logical_or(a, b)
+    def __call__(self, *args):
+        # Associative, so calls may carry more than two operands, like add's.
+        return reduce(np.logical_or, args)
 
     def __repr__(self) -> str:
         return "logical_or"
@@ -1477,9 +1479,18 @@ class _Same(FinchOperator):
             return len(a) == len(b) and all(
                 builtins.bool(self(x, y)) for x, y in zip(a, b, strict=True)
             )
+        # Like Julia's isequal, which Finch.jl compares fills with: NaNs are the
+        # same as each other, but -0.0 is not the same as 0.0. Equal values
+        # differ in sign only when they are zeros, so the signs (of both parts
+        # of a complex value) are compared alongside equality.
         try:
+            same_signs = np.logical_and(
+                np.equal(np.signbit(np.real(a)), np.signbit(np.real(b))),
+                np.equal(np.signbit(np.imag(a)), np.signbit(np.imag(b))),
+            )
             return np.logical_or(
-                np.equal(a, b), np.logical_and(np.isnan(a), np.isnan(b))
+                np.logical_and(np.equal(a, b), same_signs),
+                np.logical_and(np.isnan(a), np.isnan(b)),
             )
         except TypeError:
             return np.equal(a, b)
@@ -1516,8 +1527,9 @@ class _Canonical(FinchOperator):
     `hash(canonical(x))` is a hash consistent with `same`. NaNs hash by identity,
     so each kind of NaN is one object: one complex NaN for NumPy complex values,
     `cmath.nanj` for Python complex values, `np.nan` for NumPy floats and
-    `math.nan` for Python floats. -0.0 is 0.0, and other values keep their type.
-    Tuples are scalars, whose fields are made canonical. Override with
+    `math.nan` for Python floats. Other values are their own canonical value
+    (-0.0 is not `same` as 0.0, so it stays -0.0). Tuples are scalars, whose
+    fields are made canonical. Override with
     `__canonical__`, alongside `__same__`.
     """
 
@@ -1539,9 +1551,6 @@ class _Canonical(FinchOperator):
                 return np.nan
             case float() if math.isnan(a):
                 return math.nan
-            case float() | complex() | np.floating() | np.complexfloating():
-                # Adding zero turns -0.0 into 0.0 and leaves other values alone.
-                return a + type(a)(0)
             case _:
                 return a
 
@@ -2380,6 +2389,78 @@ def init_write(value):
     return _InitWrite(as_fill(value))
 
 
+@dataclass(unsafe_hash=True)
+class _DropFillFType(ImmutableStructFType, FinchOperatorFType):
+    fill_type: AbstractFillFType
+    arity = 1
+
+    @property
+    def struct_name(self):
+        return "DropFill"
+
+    @property
+    def struct_fields(self):
+        return [("value", self.fill_type.element_type)]
+
+    def __call__(self, value):
+        if isinstance(value, _DropFill) and value.ftype == self:
+            return value
+        raise TypeError(f"Expected a drop_fill of type {self}")
+
+    def from_fields(self, value):
+        fill = (
+            StaticFill(self.fill_type.value)
+            if is_static(self.fill_type)
+            else DynamicFill(value, self.fill_type.element_type)
+        )
+        return _DropFill(fill)
+
+    def return_type(self, *args: FType) -> FType:
+        if len(args) != 1:
+            raise TypeError("drop_fill expects one argument")
+        return args[0]
+
+
+class _DropFill(FinchOperator):
+    """
+    drop_fill(z)(x) returns x. It marks the value a query writes, so that the
+    query is compiled to write it only where it isn't z, the value which an
+    entry left unwritten has, or which leaves the entry as it was.
+    """
+
+    def __init__(self, fill: AbstractFill):
+        self.fill = fill
+
+    @property
+    def value(self):
+        return self.fill.value
+
+    @property
+    def ftype(self):
+        return _DropFillFType(self.fill.ftype)
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, _DropFill)
+            and self.fill == other.fill
+            and StaticFill(self.value) == StaticFill(other.value)
+        )
+
+    def __hash__(self):
+        return hash((type(self), self.fill, StaticFill(self.value)))
+
+    def __call__(self, x: Any):
+        return x
+
+    def __repr__(self) -> str:
+        return f"drop_fill({self.value!r})"
+
+
+def drop_fill(value):
+    # The value may be raw, which is a static fill.
+    return _DropFill(as_fill(value))
+
+
 class _OverwriteFType(SingletonOperatorFType):
     @property
     def operator(self):
@@ -2463,6 +2544,11 @@ class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
     arity = math.inf
 
     is_associative = True
+    # Choose may return any of its non-fill arguments, so reordering them is
+    # allowed, even though the Python implementation returns the first one.
+    is_commutative = True
+
+    is_idempotent = True
 
     def return_type(self, *args: FType) -> FType:
         if not args:

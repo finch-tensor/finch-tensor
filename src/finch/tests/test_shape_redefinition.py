@@ -19,8 +19,8 @@ from finch.autoschedule import (
 )
 from finch.autoschedule.formatter.galley_formatter import GalleyFormatter
 from finch.autoschedule.formatter.smart_formatter import (
+    CostFormatter,
     FDFormatter,
-    StorageCostFormatter,
 )
 from finch.autoschedule.loop_orderer import loop_order_bnb, loop_order_greedy
 from finch.autoschedule.loop_orderer.loop_order_bnb import (
@@ -204,7 +204,7 @@ def test_cost_formatter_rejects_rank_changes():
     )
     factory = DenseStatsFactory()
     with pytest.raises(ValueError, match="Cannot change the rank"):
-        StorageCostFormatter(LogicCapture()).lower(
+        CostFormatter(LogicCapture()).lower(
             plan,
             {a: a_tensor.ftype, b: b_tensor.ftype},
             {a: factory(a_tensor, (i,)), b: factory(b_tensor, (i, j))},

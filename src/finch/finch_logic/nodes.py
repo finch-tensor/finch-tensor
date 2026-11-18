@@ -5,9 +5,12 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Self, TypeVar
 
+import numpy as np
+
 from finch.algebra import (
     AbstractFill,
     AbstractFillFType,
+    DynamicFill,
     DynamicFillFType,
     FinchOperator,
     FType,
@@ -18,6 +21,7 @@ from finch.algebra import (
     ffuncs,
     fixpoint_type,
     ftype,
+    ftypes,
     is_dynamic,
     promote_type,
     return_type,
@@ -901,6 +905,50 @@ class FillTable(LogicTree, LogicExpression):
         return cls(tns)
 
 
+@dataclass(eq=True, frozen=True)
+class DimensionTable(LogicTree, LogicExpression):
+    """
+    Represents a logical AST expression for the size of dimension `r` of the
+    tensor `tns`, as a zero-dimensional tensor. Like `FillTable`, its value is
+    only known once `tns` is bound, so a kernel may be reused across sizes.
+
+    Attributes:
+        tns: The alias of the tensor whose dimension is taken.
+        r: The literal position of the dimension.
+    """
+
+    tns: Alias
+    r: Literal
+
+    def fields(self) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return ()
+
+    def dimmap(
+        self, op: Callable, dim_bindings: dict[Alias, tuple[T | None, ...]]
+    ) -> tuple[T | None, ...]:
+        return ()
+
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        h: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        # A size is a runtime value which kernels must not specialize on.
+        return h(DynamicFill(None, ftypes.intp))
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.tns, self.r]
+
+    @classmethod
+    def from_children(cls, tns, r):
+        return cls(tns, r)
+
+
 def fill_expression(ex: LogicExpression) -> LogicExpression:
     """
     A zero-dimensional expression for the fill value of `ex`, made of the fill
@@ -912,7 +960,7 @@ def fill_expression(ex: LogicExpression) -> LogicExpression:
         case Table(Literal(tns), _):
             # The fill value of a literal tensor is compile-time data too.
             return Literal(tns.fill_value)
-        case Literal() | FillTable():
+        case Literal() | FillTable() | DimensionTable():
             return ex
         case MapJoin(op, args):
             return MapJoin(op, tuple(fill_expression(arg) for arg in args))
@@ -925,7 +973,7 @@ def fill_expression(ex: LogicExpression) -> LogicExpression:
 def is_fill_expression(ex: LogicNode) -> bool:
     """Whether `ex` is made of literals and fill values, as `fill_expression`."""
     match ex:
-        case Literal() | FillTable():
+        case Literal() | FillTable() | DimensionTable():
             return True
         case MapJoin(Literal(), args):
             return all(is_fill_expression(arg) for arg in args)
@@ -1175,6 +1223,39 @@ class Plan(LogicTree, LogicStatement):
         return cls(bodies)
 
 
+def format_literal(val: Any) -> str:
+    """
+    The text of a literal value. parse_logic reads it back as an equal value
+    when the value is a scalar, a fill, a dtype, an operator, or a tuple of
+    them. Other values print as their qual_str, which may not parse.
+    """
+    match val:
+        case tuple():
+            items = [format_literal(item) for item in val]
+            return f"({items[0]},)" if len(items) == 1 else f"({', '.join(items)})"
+        # The reprs of these operators leave out their parameters.
+        case ffuncs._Cast(dtype=dtype):
+            return f"astype({format_literal(dtype)})"
+        case ffuncs._InitWrite(fill=fill):
+            return f"init_write({format_literal(fill)})"
+        case ffuncs._Choose(fill=DynamicFill() as fill):
+            return f"choose({format_literal(fill)})"
+        case (
+            None
+            | bool()
+            | int()
+            | float()
+            | complex()
+            | str()
+            | np.generic()
+            | AbstractFill()
+            | FType()
+        ):
+            return repr(val)
+        case _:
+            return qual_str(val).replace("\n", "")
+
+
 class LogicPrinterContext(Context):
     def __init__(self, tab="    ", indent=0):
         super().__init__()
@@ -1199,11 +1280,26 @@ class LogicPrinterContext(Context):
         blk.indent = self.indent + 1
         return blk
 
+    def exec_bodies(self, bodies: tuple[LogicStatement, ...]):
+        # The statements of a block are those of a plan, so a plan in a plan
+        # is printed explicitly, or it would be flattened into its parent.
+        for body in bodies:
+            match body:
+                case Plan():
+                    self.exec_plan(body)
+                case _:
+                    self(body)
+
+    def exec_plan(self, prgm: Plan):
+        ctx_2 = self.subblock()
+        ctx_2.exec_bodies(prgm.bodies)
+        self.exec(f"{self.feed}plan:\n{ctx_2.emit()}".rstrip("\n"))
+
     def __call__(self, prgm: LogicNode):
         feed = self.feed
         match prgm:
             case Literal(value):
-                return qual_str(value).replace("\n", "")
+                return format_literal(value)
             case Value(ex):
                 return self(ex)
             case Field(name):
@@ -1249,6 +1345,8 @@ class LogicPrinterContext(Context):
                 return f"Relabel({arg}, {idxs_e})"
             case FillTable(tns):
                 return f"FillTable({self(tns)})"
+            case DimensionTable(tns, r):
+                return f"DimensionTable({self(tns)}, {self(r)})"
             case Reorder(arg, idxs):
                 idxs_e = ", ".join([self(idx) for idx in idxs])
                 arg = self(arg)
@@ -1264,10 +1362,13 @@ class LogicPrinterContext(Context):
                 ctx_2(body)
                 self.exec(f"{feed}fuse({self(idx)}):\n{ctx_2.emit()}")
                 return None
+            case Plan((_,)):
+                # A block of one statement is that statement, not a plan.
+                self.exec_plan(prgm)
+                return None
             case Plan(bodies):
                 ctx_2 = self.block()
-                for body in bodies:
-                    ctx_2(body)
+                ctx_2.exec_bodies(bodies)
                 self.exec(ctx_2.emit())
                 return None
             case Produces(args):

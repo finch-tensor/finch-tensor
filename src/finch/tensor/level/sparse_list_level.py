@@ -23,9 +23,17 @@ from .level import Level, LevelFType, SingleDimensionLevel, SingleDimensionLevel
 class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
     _lvl_t: LevelFType
     dimension_type: ftypes.FDTypeInteger = ftypes.intp
+    # None only as constructor input, __post_init__ defaults these to buffers
+    # of the child level's buffer factory.
+    ptr_type: Any = None
+    idx_type: Any = None
 
     def __post_init__(self):
         self.dimension_type = ftype(self.dimension_type)
+        if self.ptr_type is None:
+            self.ptr_type = self.buffer_factory(self.position_type)
+        if self.idx_type is None:
+            self.idx_type = self.buffer_factory(self.dimension_type)
 
     @property
     def struct_name(self):
@@ -90,14 +98,6 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         Returns the ftype of the buffer used for the fibers.
         """
         return self.lvl_t.buffer_factory
-
-    @property
-    def ptr_type(self):
-        return self.buffer_factory(self.position_type)
-
-    @property
-    def idx_type(self):
-        return self.buffer_factory(self.dimension_type)
 
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
         pos_size = np_dtype(self.position_type).itemsize
@@ -715,7 +715,9 @@ class SparseListLevel(SingleDimensionLevel):
 
     @property
     def ftype(self) -> SparseListLevelFType:
-        return SparseListLevelFType(self.lvl.ftype, ftype(self.dimension))
+        return SparseListLevelFType(
+            self.lvl.ftype, ftype(self.dimension), ftype(self.ptr), ftype(self.idx)
+        )
 
     @property
     def val(self) -> Any:

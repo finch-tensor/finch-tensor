@@ -6,7 +6,7 @@ import numpy as np
 
 import finch as ft
 from finch import ffuncs
-from finch.autoschedule.cost_models import FlopsCostModel
+from finch.autoschedule.cost_models import FLOPS_COST_MODEL
 from finch.autoschedule.factorizer.galley_factorizer import (
     AnnotatedQuery,
     greedy_query,
@@ -1016,7 +1016,7 @@ def test_greedy_query_multi_component():
     aq.connected_idxs = OrderedDict({fi: set(), fj: set()})
     aq.output_order = []
     aq.bindings = OrderedDict()
-    aq.cost_model = FlopsCostModel()
+    aq.cost_model = FLOPS_COST_MODEL
 
     # Two independent components: {i} and {j}
     assert len(aq.connected_components) == 2

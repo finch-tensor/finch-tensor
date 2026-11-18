@@ -1,0 +1,35 @@
+{
+  "feature_names": [
+    "iterations",
+    "operations",
+    "outputs",
+    "lookups",
+    "dense_iterations",
+    "class0.sequential_writes",
+    "class0.scatter_writes",
+    "class0.scattered_region",
+    "class0.distinct_outputs",
+    "class1.sequential_writes",
+    "class1.scatter_writes",
+    "class1.scattered_region",
+    "class1.distinct_outputs",
+    "constant"
+  ],
+  "coefficients": [
+    0.0,
+    4.202491029086936e-09,
+    7.050886428263416e-09,
+    1.2651774482716532e-10,
+    2.046275170879228e-12,
+    3.8011354020304444e-09,
+    1.8089801893496752e-10,
+    2.394575642245087e-10,
+    0.0,
+    0.0,
+    5.261264491044383e-10,
+    0.0,
+    1.3655985560052673e-08,
+    0.00015289191115297484
+  ],
+  "region_cutoff": 185363.80004736633
+}

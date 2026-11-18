@@ -1,5 +1,6 @@
 import gc
 import math
+import weakref
 from collections import OrderedDict
 
 import pytest
@@ -1042,6 +1043,45 @@ def test_memo_leaf_cache_is_weak():
     del tensor, stats, relabeled
     gc.collect()
     assert not factory.leaves
+
+
+def test_memo_keeps_expressions_while_their_inputs_live():
+    class CountingFactory(ExactStatsFactory):
+        def __init__(self):
+            super().__init__()
+            self.aggregates = 0
+
+        def aggregate(self, *args):
+            self.aggregates += 1
+            return super().aggregate(*args)
+
+    i, j, k = Field("i"), Field("j"), Field("k")
+    inner = CountingFactory()
+    factory = MemoStatsFactory(inner)
+    a = factory(ft.asarray(np.ones((2, 10))), (i, j))
+    b = factory(ft.asarray(np.ones((10, 3))), (j, k))
+
+    def matmul():
+        product = factory.mapjoin(ffuncs.mul, a, b)
+        return factory.aggregate(ffuncs.add, None, (j,), product)
+
+    # A search builds an expression, drops it, and builds it again.
+    assert matmul().estimate_non_fill_values() == 6
+    gc.collect()
+    assert matmul().estimate_non_fill_values() == 6
+    assert inner.aggregates == 1
+
+
+def test_memo_frees_expressions_with_their_inputs():
+    i, j = Field("i"), Field("j")
+    factory = MemoStatsFactory()
+    a = factory(ft.asarray(np.eye(3)), (i, j))
+    built = weakref.ref(factory.aggregate(ffuncs.add, None, (j,), a).node)
+    assert built() is not None
+
+    del a
+    gc.collect()
+    assert built() is None
 
 
 # ─────────────────────────────── DummyStats tests ────────────────────────────────

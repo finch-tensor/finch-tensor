@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import weakref
-from collections.abc import Iterable
-from typing import Any
-from weakref import WeakKeyDictionary
+from collections.abc import Callable, Iterable, Sequence
+from typing import Any, Self
 
 import numpy as np
 
@@ -17,19 +16,35 @@ from finch.algebra import (
 from finch.finch_logic import (
     Aggregate,
     Field,
-    Literal,
-    LogicExpression,
-    LogicNode,
     MapJoin,
     Relabel,
     Reorder,
     StatsFactory,
-    Table,
 )
 
 from .bound_stats import DCStatsFactory
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
+
+
+class MemoNode:
+    """
+    The inner statistic of an expression, with its estimates, and the nodes of
+    the expressions built from it with it as their first argument, under their
+    operation and their other arguments. Every MemoStats of the expression
+    shares its node, so a copy of one shares it too.
+    """
+
+    def __init__(self, inner: Any):
+        self.inner = inner
+        self.estimates: dict[frozenset[Field], float] = {}
+        self.derived: dict[tuple, MemoNode] = {}
+
+    def __copy__(self) -> Self:
+        return self
+
+    def __deepcopy__(self, memo: dict) -> Self:
+        return self
 
 
 class MemoStatsFactory(
@@ -40,54 +55,67 @@ class MemoStatsFactory(
     Wraps an eager statistic `inner`, such as DC, so that the statistics of an
     expression are computed once however many times it is built. Each tensor is
     converted to its support, and the statistics of an expression are built from
-    those with and, or, exists and forall.
+    those with and, or, exists and forall. The statistics of an expression are
+    kept by those of its first argument, so they last as long as the stats of
+    the inputs they are built from, however often the expression is dropped and
+    built again.
     """
 
     def __init__(self, inner: StatsFactory[Any] | None = None):
         super().__init__(MemoStats)
         self.inner = DCStatsFactory() if inner is None else inner
-        # Tensors are unhashable, so a leaf is cached by id until its tensor dies.
-        self.leaves: dict[int, Any] = {}
-        self.memo: WeakKeyDictionary[LogicNode, Any] = WeakKeyDictionary()
-        self.estimates: WeakKeyDictionary[LogicNode, dict[frozenset[Field], float]] = (
-            WeakKeyDictionary()
-        )
+        # Tensors are unhashable, so the inner statistic of a tensor is cached
+        # by id until it dies, and the inner factory reads each tensor once.
+        self.leaves: dict[int, tuple[BaseTensorStats, Any]] = {}
 
-    def _memo(
-        self, base: BaseTensorStats, expr: LogicExpression, method, *args
+    def _derive(
+        self,
+        base: BaseTensorStats,
+        args: Sequence[MemoStats],
+        key: tuple,
+        compute: Callable[[], Any],
     ) -> MemoStats:
-        # The inner statistic of expr is `method(*args)`, computed only once,
-        # and so are its estimates.
-        if expr not in self.memo:
-            self.memo[expr] = method(*args)
-            self.estimates[expr] = {}
-        return MemoStats(base, expr, self.memo[expr], self.estimates[expr])
+        # Nodes are shared, so an expression is found by the identity of the
+        # nodes of its arguments, without hashing it.
+        first, *rest = (s.node for s in args)
+        key = (*key, *rest)
+        if key not in first.derived:
+            first.derived[key] = MemoNode(compute())
+        return MemoStats(base, first.derived[key])
 
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> MemoStats:
-        base = super().__call__(tensor, fields)
+        # The inner statistic describes the tensor, which needn't have an ftype,
+        # so its base is kept with its support.
         if id(tensor) not in self.leaves:
-            self.leaves[id(tensor)] = self.inner.support(self.inner(tensor, fields))
+            stats = self.inner(tensor, fields)
+            self.leaves[id(tensor)] = (
+                BaseTensorStats(stats),
+                self.inner.support(stats),
+            )
             weakref.finalize(tensor, self.leaves.pop, id(tensor), None)
-        return self._memo(
-            base,
-            Table(Literal(tensor), fields),
-            self.inner.relabel,
-            self.leaves[id(tensor)],
-            fields,
+        base, support = self.leaves[id(tensor)]
+        # Each call makes new stats, which keep what is built from them.
+        return MemoStats(
+            self.relabel_def(base, fields),
+            MemoNode(self.inner.relabel(support, fields)),
         )
 
     def _mapjoin_join(self, op: FinchOperator, *join_args: MemoStats) -> MemoStats:
         base = super()._mapjoin_defs(op, *join_args)
-        expr = MapJoin(Literal(ffuncs.and_), tuple(s.expr for s in join_args))
-        return self._memo(
-            base, expr, self.inner.mapjoin, ffuncs.and_, *(s.inner for s in join_args)
+        return self._derive(
+            base,
+            join_args,
+            (MapJoin, ffuncs.and_),
+            lambda: self.inner.mapjoin(ffuncs.and_, *(s.inner for s in join_args)),
         )
 
     def _mapjoin_union(self, op: FinchOperator, *union_args: MemoStats) -> MemoStats:
         base = super()._mapjoin_defs(op, *union_args)
-        expr = MapJoin(Literal(ffuncs.or_), tuple(s.expr for s in union_args))
-        return self._memo(
-            base, expr, self.inner.mapjoin, ffuncs.or_, *(s.inner for s in union_args)
+        return self._derive(
+            base,
+            union_args,
+            (MapJoin, ffuncs.or_),
+            lambda: self.inner.mapjoin(ffuncs.or_, *(s.inner for s in union_args)),
         )
 
     def aggregate(
@@ -112,54 +140,55 @@ class MemoStatsFactory(
             )
 
         base = self.aggregate_def(op, init, reduce_indices, stats)
-        expr = Aggregate(
-            Literal(bool_op), Literal(bool_init), stats.expr, reduce_indices
-        )
         # TODO: an or from True is every entry, but `False` is the identity of
         # or, so the inner statistics count it as an exists.
-        return self._memo(
+        return self._derive(
             base,
-            expr,
-            self.inner.aggregate,
-            bool_op,
-            bool_init,
-            reduce_indices,
-            stats.inner,
+            (stats,),
+            (Aggregate, bool_op, bool_init, reduce_indices),
+            lambda: self.inner.aggregate(
+                bool_op, bool_init, reduce_indices, stats.inner
+            ),
         )
 
     def relabel(
         self, stats: MemoStats, relabel_indices: tuple[Field, ...]
     ) -> MemoStats:
         base = self.relabel_def(stats, relabel_indices)
-        expr = Relabel(stats.expr, relabel_indices)
-        return self._memo(base, expr, self.inner.relabel, stats.inner, relabel_indices)
+        return self._derive(
+            base,
+            (stats,),
+            (Relabel, relabel_indices),
+            lambda: self.inner.relabel(stats.inner, relabel_indices),
+        )
 
     def reorder(
         self, stats: MemoStats, reorder_indices: tuple[Field, ...]
     ) -> MemoStats:
         base = self.reorder_def(stats, reorder_indices)
-        expr = Reorder(stats.expr, reorder_indices)
-        return self._memo(base, expr, self.inner.reorder, stats.inner, reorder_indices)
+        return self._derive(
+            base,
+            (stats,),
+            (Reorder, reorder_indices),
+            lambda: self.inner.reorder(stats.inner, reorder_indices),
+        )
 
 
 class MemoStats(NumericStats):
-    def __init__(
-        self,
-        base: BaseTensorStats,
-        expr: LogicExpression,
-        inner: Any,
-        estimates: dict[frozenset[Field], float],
-    ):
+    def __init__(self, base: BaseTensorStats, node: MemoNode):
         super().__init__(base)
-        self.expr = expr
-        self.inner = inner
-        self.estimates = estimates
+        self.node = node
+
+    @property
+    def inner(self) -> Any:
+        return self.node.inner
 
     def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
         over = frozenset(over)
-        if over not in self.estimates:
-            self.estimates[over] = self.inner.estimate_non_fill_values(over)
-        return self.estimates[over]
+        estimates = self.node.estimates
+        if over not in estimates:
+            estimates[over] = self.inner.estimate_non_fill_values(over)
+        return estimates[over]
 
     def get_embedding(self) -> np.ndarray:
         return self.inner.get_embedding()

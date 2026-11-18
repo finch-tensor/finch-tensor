@@ -1,5 +1,5 @@
-fuse(i_1):
-    fuse(i_0):
+fuse(i_0):
+    fuse(i_1):
         S_2[i_1, i_0] = S[i_0, i_1]
 fuse(i):
     fuse(j):

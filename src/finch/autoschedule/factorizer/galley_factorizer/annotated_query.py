@@ -3,20 +3,24 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar, cast
 
+import numpy as np
+
 from finch.algebra import (
     cansplitpush,
     ffuncs,
     is_associative,
     is_commutative,
     is_distributive,
+    is_idempotent,
     repeat_operator,
 )
 from finch.algebra.algebra import FinchOperator
-from finch.autoschedule.cost_models import CostModel, FlopsCostModel
+from finch.autoschedule.cost_models import FLOPS_COST_MODEL, CostModel
 from finch.autoschedule.tensor_stats import StatsInterpreter
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    DimensionTable,
     Field,
     HardAlias,
     Literal,
@@ -80,14 +84,14 @@ class AnnotatedQuery(Generic[TS]):
             Existing alias→stats environment to seed the analysis.
         cost_model : CostModel, optional
             Cost model used to estimate the cost of each reduction. Defaults
-            to `FlopsCostModel`.
+            to `FLOPS_COST_MODEL`.
         """
         assert isinstance(q, Query), (
             "Annotated Queries can only be built from queries of the form: "
             "Query(Table(lhs, idxs), rhs)"
         )
         self.stats_factory = stats_factory
-        self.cost_model = cost_model if cost_model is not None else FlopsCostModel()
+        self.cost_model = cost_model if cost_model is not None else FLOPS_COST_MODEL
         if bindings is None:
             bindings = OrderedDict()
         self.bindings = bindings
@@ -149,14 +153,13 @@ class AnnotatedQuery(Generic[TS]):
             (idx, idx) for idx in q.rhs.fields()
         )
         idx_lowest_path: OrderedDict[Field, Path] = OrderedDict()
-        # The size of each field, from the statistics of a table it indexes.
-        self.idx_dim_size: dict[Field, Any] = {
-            idx: bindings[node.tns].dim_sizes[field]
+        # The size of each field, read from a table it indexes when the kernel
+        # runs, since a kernel planned for one size may be reused for another.
+        self.idx_dim: dict[Field, DimensionTable] = {
+            idx: DimensionTable(node.tns, Literal(r))
             for node in PostOrderDFS(point_expr)
             if isinstance(node, Table) and isinstance(node.tns, Alias)
-            for idx, field in zip(
-                node.idxs, bindings[node.tns].index_order, strict=True
-            )
+            for r, idx in enumerate(node.idxs)
         }
         for idx in starting_reduce_idxs:
             agg_op = idx_op[idx]
@@ -175,10 +178,9 @@ class AnnotatedQuery(Generic[TS]):
                 idx_lowest_path[idx] = lowest_paths[0]
                 reduce_idxs.append(idx)
             else:
-                new_idxs = [
-                    Field(f"{idx.name}_{i}")
-                    for i, _ in enumerate(lowest_paths, start=1)
-                ]
+                # The normalizer names fields `i`, `i_2`, ..., so the names of
+                # the split copies must be fresh.
+                new_idxs = [Field(gensym(idx.name)) for _ in lowest_paths]
                 for i, path in enumerate(lowest_paths):
                     new_idx = new_idxs[i]
                     idx_op[new_idx] = agg_op
@@ -259,7 +261,7 @@ class AnnotatedQuery(Generic[TS]):
         )
         new.output_order = list(self.output_order)
         new.bindings = OrderedDict(self.bindings.items())
-        new.idx_dim_size = dict(self.idx_dim_size)
+        new.idx_dim = dict(self.idx_dim)
 
         return new
 
@@ -548,7 +550,7 @@ class AnnotatedQuery(Generic[TS]):
                     return roots_without + roots_with
 
                 return [base]
-            case Alias(_) | Table(_, _) | Reorder(_, _) | Literal(_):
+            case Alias(_) | Table(_, _) | Reorder(_, _) | Literal(_) | DimensionTable():
                 return [base]
             case _:
                 raise ValueError(
@@ -667,11 +669,13 @@ class AnnotatedQuery(Generic[TS]):
         # applying the operator over |Dom(idx)| identical values is the repeat
         # operator, i.e. sum_i B = B * |Dom(i)|.
         kernel_order = query_expr.fields()
+        # Without a repeat operator or idempotence (e.g. a norm's reduction),
+        # the absent indices are aggregated by iterating.
         repeat_op = repeat_operator(agg_op.ftype)
         repeated = (
-            []
-            if repeat_op is None
-            else [i for i in final_idxs_to_be_reduced if i not in kernel_order]
+            [i for i in final_idxs_to_be_reduced if i not in kernel_order]
+            if repeat_op is not None or is_idempotent(agg_op.ftype)
+            else []
         )
         aggregated = [i for i in final_idxs_to_be_reduced if i not in repeated]
 
@@ -679,8 +683,20 @@ class AnnotatedQuery(Generic[TS]):
         # these power-like operators (sum_j(K*n) == (sum_j K)*n) and keeps an
         # Aggregate at the root, as the rest of the optimizer expects.
         for idx in repeated:
-            factor = Literal(self.idx_dim_size[idx])
-            query_expr = MapJoin(Literal(repeat_op), (query_expr, factor))
+            n = self.idx_dim[idx]
+            if repeat_op is not None:
+                query_expr = MapJoin(Literal(repeat_op), (query_expr, n))
+            else:
+                # An idempotent reduction of n copies of K is K, or its init
+                # when n is 0, and op(init, init) is init.
+                query_expr = MapJoin(
+                    Literal(ffuncs.where),
+                    (
+                        MapJoin(Literal(ffuncs.greater), (n, Literal(np.intp(0)))),
+                        query_expr,
+                        Literal(agg_init),
+                    ),
+                )
 
         query_expr = Aggregate(
             Literal(agg_op),

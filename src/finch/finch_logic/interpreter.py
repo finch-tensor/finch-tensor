@@ -4,6 +4,7 @@ from itertools import product
 import numpy as np
 
 from finch.algebra import (
+    DynamicFill,
     DynamicFillFType,
     TupleFType,
     as_fill,
@@ -27,6 +28,7 @@ from . import nodes as lgc
 from .nodes import (
     Aggregate,
     Alias,
+    DimensionTable,
     Field,
     FillTable,
     Fuse,
@@ -220,6 +222,9 @@ class LogicMachine:
             case FillTable(tns):
                 fill = self(tns).fill
                 return TableValue(Scalar(fill.value, fill), ())
+            case DimensionTable(tns, Literal(r)):
+                size = np.intp(self(tns).shape[r])
+                return TableValue(Scalar(size, DynamicFill(size)), ())
             case Relabel(arg, idxs):
                 arg = self(arg)
                 if len(arg.idxs) != len(idxs):

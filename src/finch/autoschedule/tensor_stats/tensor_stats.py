@@ -255,22 +255,21 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
             old_fill = fill_type.value
             if is_identity(op.ftype, old_fill) or is_idempotent(op.ftype):
                 new_fill = StaticFillFType(op(old_fill, old_fill))
+            elif (repeat_op := repeat_operator(op.ftype)) is not None:
+                new_fill = StaticFillFType(repeat_op(old_fill, n))
             else:
-                try:
-                    new_fill = StaticFillFType(repeat_operator(op.ftype)(old_fill, n))
-                except AttributeError:
-                    # This is going to be VERY SLOW. Should raise a warning about
-                    #  reductions over non-identity fill values. Depending on the
-                    # semantics of reductions, we might be able to do this faster.
-                    print(
-                        "Warning: A reduction can take place over a tensor whose fill"
-                        "value is not the reduction operator's identity. This can"
-                        "result in a large slowdown as the new fill is calculated."
-                    )
-                    acc = old_fill
-                    for _ in range(max(n - 1, 0)):
-                        acc = op(acc, old_fill)
-                    new_fill = StaticFillFType(acc)
+                # This is going to be VERY SLOW. Should raise a warning about
+                #  reductions over non-identity fill values. Depending on the
+                # semantics of reductions, we might be able to do this faster.
+                print(
+                    "Warning: A reduction can take place over a tensor whose fill"
+                    "value is not the reduction operator's identity. This can"
+                    "result in a large slowdown as the new fill is calculated."
+                )
+                acc = old_fill
+                for _ in range(max(n - 1, 0)):
+                    acc = op(acc, old_fill)
+                new_fill = StaticFillFType(acc)
         else:
             # A dynamic fill must stay dynamic through the reduction.
             new_fill = apply_fill_type(op, fill_type, fill_type)

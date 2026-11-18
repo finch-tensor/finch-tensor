@@ -11,6 +11,7 @@ from finch.algebra.tensor import TensorFType
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    DimensionTable,
     FillTable,
     Fuse,
     Literal,
@@ -75,15 +76,24 @@ class StatsInterpreter(Generic[TS]):
 
 
 class StatsMachine(Generic[TS]):
+    """
+    Evaluates the stats of a program, binding each alias it defines. cache
+    holds what the cost models compute from the stats, for as long as the
+    search which prices with the machine, and the machines of one search may
+    share it.
+    """
+
     def __init__(
         self,
         stats_factory: StatsFactory[TS],
         bindings=None,
+        cache: dict | None = None,
     ):
         self.stats_factory = stats_factory
         if bindings is None:
             bindings = OrderedDict()
         self.bindings = bindings
+        self.cache = {} if cache is None else cache
 
     @overload
     def __call__(self, node: LogicExpression) -> TS: ...
@@ -140,6 +150,9 @@ class StatsMachine(Generic[TS]):
 
             case FillTable(tns):
                 return fill_statistics(self.stats_factory, self(tns).fill_type)
+
+            case DimensionTable():
+                return fill_statistics(self.stats_factory, node.fill_type({}))
 
             case MapJoin():
                 if not isinstance(node.op, Literal):

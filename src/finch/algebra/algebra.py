@@ -52,9 +52,7 @@ class FinchOperatorFType(CallableFType, ABC):
         raise AttributeError(f"{self} has no init_value")
 
     def repeat_operator(self) -> Any:
-        if self.is_idempotent:
-            return None
-        raise AttributeError(f"{self} has no repeat_operator")
+        return None
 
 
 class SingletonOperatorFType(ImmutableStructFType, FinchOperatorFType):
@@ -118,13 +116,14 @@ def is_annihilator(op: FinchOperatorFType, val: Any) -> bool:
     return ok and op.is_annihilator(value)
 
 
-SPECIALIZABLE_VALUES = (0, 1, -1, math.inf, -math.inf)
+SPECIALIZABLE_VALUES = (0, 1, -1, 2, -2, math.inf, -math.inf)
 
 
 def is_specializable_value(val: Any) -> bool:
     """
-    A constant is only worth specializing on if some operator's identity or
-    annihilator rule can fire against it; see `SPECIALIZABLE_VALUES`.
+    A constant is only worth specializing on if the compiler can exploit its
+    value, e.g. when an operator's identity or annihilator rule can fire
+    against it; see `SPECIALIZABLE_VALUES`.
     """
     try:
         return any(bool(val == candidate) for candidate in SPECIALIZABLE_VALUES)
@@ -200,11 +199,16 @@ def repeat_operator(op: FinchOperatorFType):
     """
     If there exists an operator g such that
     f(x, x, ..., x)  (n times)  is equal to g(x, n),
-    then return g.
+    then return g, and otherwise None. Idempotent operators (where g(x, n) is
+    x) have no repeat operator, so callers query `is_idempotent` separately.
     """
     return op.repeat_operator()
 
 
 def cansplitpush(op: FinchOperatorFType) -> bool:
     """Whether a reduction can split-push through the same operator expression."""
-    return repeat_operator(op) is not None and is_commutative(op) and is_associative(op)
+    return (
+        (repeat_operator(op) is not None or is_idempotent(op))
+        and is_commutative(op)
+        and is_associative(op)
+    )

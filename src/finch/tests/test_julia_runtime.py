@@ -11,7 +11,7 @@ import finch as ft
 from finch.algebra import TupleFType, np_dtype
 from finch.autoschedule import COMPILE_JULIA, with_default_scheduler
 from finch.codegen import NumpyBuffer
-from finch.compile_jl.buffer import MinusOneBuffer, PlusOneBuffer
+from finch.compile_jl.buffer import MinusOneBuffer, MinusOneBufferFType, PlusOneBuffer
 from finch.compile_jl.interop import (
     _buffer_to_jl,
     _jl_array_to_python_no_copy,
@@ -122,9 +122,12 @@ def test_offset_buffer_ftype_preserves_index_fields(buffer_type):
     assert type_.index_fields == (0,)
     rebuilt = type_(2)
     assert rebuilt.index_fields == (0,)
+    assert rebuilt.load(1) == (0, 0)
     assert rebuilt.ftype == type_
     assert hash(rebuilt.ftype) == hash(type_)
     assert len({type_, buffer_type(data, index_fields=(1,)).ftype}) == 2
+    # The Julia runtime pools storage by the repr of its format.
+    assert repr(rebuilt.ftype) == repr(type_)
 
 
 @pytest.mark.parametrize("new_length", [0, 2, 8])
@@ -391,6 +394,34 @@ def test_julia_sparse_level_round_trip(kind, copy_buffers):
                 )
 
 
+@pytest.mark.parametrize(
+    "format_",
+    [
+        "SparseList{Int32}(Element(0))",
+        "SparseByteMap{Int32}(Element(0))",
+        "SparseHash{Int32}(Element(0))",
+        "SparseCOO{1}(Element(0))",
+    ],
+)
+def test_julia_built_level_passes_its_buffers_to_kernels(format_):
+    # Finch.jl builds 1-based index buffers, which the level format records so
+    # that kernels take them as they are.
+    _requires_julia_backend()
+    tensor = jl_tensor_to_python(jl.seval(f"Tensor(Dense({format_}), [1 0; 0 3; 2 4])"))
+    level = tensor.lvl.lvl
+    assert isinstance(level.ftype.ptr_type, MinusOneBufferFType)
+    prototype = jl.seval(_level_constructor_str(level.ftype))
+    assert jl.typeof(level_to_jl(level)) == jl.typeof(prototype)
+
+    with with_default_scheduler(COMPILE_JULIA):
+        result = tensor @ ft.asarray(np.array([1, 2, 3]))
+    np.testing.assert_array_equal(ft.to_numpy(result), [7, 18])
+
+    # A tensor of the format starts out empty.
+    empty = tensor_to_jl(tensor.ftype.construct((2, 3)))
+    assert jl.seval("A -> iszero(Array(A))")(empty)
+
+
 def _runtime(metadata):
     _requires_julia_backend()
     for name, info in metadata.items():
@@ -453,6 +484,24 @@ def test_default_runtime_uses_a_free_buffer():
     )[0]
 
     assert result.raw_julia_obj is lease.raw
+
+
+def test_cleared_runtime_allocates_a_new_buffer():
+    runtime = _runtime(
+        {"test_runtime_cleared_buffer": _KernalMetadata(frozenset({0}), (0,))}
+    )
+    tensor = ft.asarray(np.arange(4, dtype=np.float64))
+    lease = runtime.free_pool.acquire(tensor.ftype, tensor.shape, False)
+    runtime.free_pool.release_lease(lease)
+    runtime.free_pool.clear()
+
+    result = runtime.kernel_call(
+        "test_runtime_cleared_buffer",
+        runtime._kernels["test_runtime_cleared_buffer"],
+        (tensor,),
+    )[0]
+
+    assert result.raw_julia_obj is not lease.raw
 
 
 def test_default_runtime_reuses_a_sparse_free_buffer():

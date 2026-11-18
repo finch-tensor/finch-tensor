@@ -1,5 +1,6 @@
 """Tests: branch-and-bound (exact) cost vs greedy."""
 
+import sys
 from collections import OrderedDict
 
 import pytest
@@ -202,3 +203,19 @@ def test_pruned_query_to_plan_passthrough_body_references_input_alias():
     # Body should be Table(Alias("A_in"), ...) — the input alias
     assert isinstance(last_rhs, Table)
     assert last_rhs.tns == HardAlias("A_in")
+
+
+@pytest.mark.parametrize("greedy_component_size, exact", [(4, False), (5, True)])
+def test_pruned_query_to_plan_orders_large_components_greedily(
+    monkeypatch, greedy_component_size, exact
+):
+    """A component of at least GREEDY_COMPONENT_SIZE indices takes the greedy
+    order, as Galley.jl's pruned optimizer does, since the exact search grows
+    exponentially with it; the four-index chain is cheaper searched exactly."""
+    module = sys.modules[pruned_query_to_plan.__module__]
+    monkeypatch.setattr(module, "GREEDY_COMPONENT_SIZE", greedy_component_size)
+    _, greedy_cost = pruned_query_to_plan(
+        _make_aq_four_index_chain(), optimizer="greedy"
+    )
+    _, cost = pruned_query_to_plan(_make_aq_four_index_chain(), optimizer="bfs")
+    assert (cost < greedy_cost) == exact

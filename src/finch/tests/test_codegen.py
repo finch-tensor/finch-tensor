@@ -1128,7 +1128,7 @@ def mlir_kernel_under_test(caplog) -> str:
         and record.message.startswith("Compiling MLIR code:\n")
     ]
     assert kernels, "no MLIR kernel was compiled"
-    return re.sub(r"%(_A_\d+|__A|_eye|__eye)(?:_\d+)+", r"%\1", kernels[-1])
+    return re.sub(r"%(_A_\d+_ws|_A_\d+|__A|_eye|__eye)(?:_\d+)+", r"%\1", kernels[-1])
 
 
 @mlir_backend
@@ -1495,6 +1495,80 @@ def test_c_min_max(operator, values):
     expected = operator(*values)
     assert type(result) is type(expected)
     np.testing.assert_equal(result, expected)
+
+
+DIVISION_OPERATORS = [ffuncs.truediv, ffuncs.floordiv, ffuncs.mod]
+DIVISION_COMPILERS = [
+    pytest.param(CCompiler(), marks=pytest.mark.c_backend),
+    pytest.param(MLIRCompiler(), marks=pytest.mark.mlir_backend),
+]
+
+
+def division_kernel(operator, values):
+    args = tuple(asm.Variable(f"x{i}", ftype(value)) for i, value in enumerate(values))
+    call = asm.Call(asm.Literal(operator), args)
+    return asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "divide",
+                    asm.AssemblyKernelFType(
+                        "divide",
+                        tuple(arg.result_type for arg in args),
+                        call.result_type,
+                    ),
+                ),
+                args,
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+
+def check_division(compiler, operator, values):
+    if isinstance(compiler, MLIRCompiler):
+        pytest.importorskip("mlir", reason="MLIR Python bindings not installed.")
+    result = compiler(division_kernel(operator, values)).divide(*values)
+    expected = operator(*values)
+    # on windows numpy returns `intc` where the backends return `int32`
+    assert result.dtype == expected.dtype
+    np.testing.assert_equal(result, expected)
+
+
+@pytest.mark.parametrize("operator", DIVISION_OPERATORS)
+@pytest.mark.parametrize("dtype", [np.int8, np.int32, np.int64, np.float32, np.float64])
+@pytest.mark.parametrize("a, b", [(7, 2), (-7, 2), (7, -2), (-7, -2), (-6, 3), (0, -3)])
+@pytest.mark.parametrize("compiler", DIVISION_COMPILERS)
+def test_division(compiler, operator, dtype, a, b):
+    """backends round and sign division and mod like numpy"""
+    check_division(compiler, operator, (dtype(a), dtype(b)))
+
+
+@pytest.mark.parametrize("operator", DIVISION_OPERATORS)
+@pytest.mark.parametrize("dtype", [np.uint8, np.uint64])
+@pytest.mark.parametrize("a, b", [(7, 2), (6, 3), (0, 3)])
+@pytest.mark.parametrize("compiler", DIVISION_COMPILERS)
+def test_division_unsigned(compiler, operator, dtype, a, b):
+    check_division(compiler, operator, (dtype(a), dtype(b)))
+
+
+@pytest.mark.parametrize("operator", DIVISION_OPERATORS)
+@pytest.mark.parametrize(
+    "values",
+    [
+        (np.int8(-7), np.int32(2)),
+        (np.uint8(7), np.int64(-2)),
+        (np.float64(-7.5), np.float64(2.0)),
+        (np.float32(7.5), np.float32(-2.0)),
+        # ffuncs.floordiv gives 10 here, where numpy's 1.0 // 0.1 gives 9
+        (np.float64(1.0), np.float64(0.1)),
+        (np.float32(1.0), np.float32(0.1)),
+    ],
+)
+@pytest.mark.parametrize("compiler", DIVISION_COMPILERS)
+def test_division_mixed(compiler, operator, values):
+    """mixed dtypes promote like numpy, and fractions round like numpy"""
+    check_division(compiler, operator, values)
 
 
 @mlir_backend

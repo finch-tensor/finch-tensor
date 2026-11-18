@@ -12,6 +12,16 @@ from .julia import jl
 FT = TypeVar("FT", bound=FType)
 
 
+def _shift_index_fields(arr, delta: int, index_fields: tuple[int, ...] | None):
+    # New buffers hold zeros, which an offset buffer stores offset.
+    if arr.dtype.names is None:
+        arr += delta
+        return
+    for i, name in enumerate(arr.dtype.names):
+        if index_fields is None or i in index_fields:
+            arr[name] += delta
+
+
 class PlusOneBufferFType(BufferFType[FT]):
     def __init__(
         self, data_ftype: BufferFType[FT], index_fields: tuple[int, ...] | None = None
@@ -20,7 +30,9 @@ class PlusOneBufferFType(BufferFType[FT]):
         self.index_fields = index_fields
 
     def __call__(self, *args, **kwargs):
-        return PlusOneBuffer(self.data_ftype(*args, **kwargs), self.index_fields)
+        data = self.data_ftype(*args, **kwargs)
+        _shift_index_fields(data.arr, -1, self.index_fields)
+        return PlusOneBuffer(data, self.index_fields)
 
     @property
     def element_type(self):
@@ -39,6 +51,9 @@ class PlusOneBufferFType(BufferFType[FT]):
 
     def __hash__(self):
         return hash((self.data_ftype, self.index_fields))
+
+    def __repr__(self):
+        return f"PlusOneBufferFType({self.data_ftype!r}, {self.index_fields!r})"
 
 
 class PlusOneBuffer(Buffer, ABC):
@@ -124,7 +139,9 @@ class MinusOneBufferFType(BufferFType[FT]):
         self.index_fields = index_fields
 
     def __call__(self, *args, **kwargs):
-        return MinusOneBuffer(self.data_ftype(*args, **kwargs), self.index_fields)
+        data = self.data_ftype(*args, **kwargs)
+        _shift_index_fields(data.arr, 1, self.index_fields)
+        return MinusOneBuffer(data, self.index_fields)
 
     @property
     def element_type(self):
@@ -143,6 +160,9 @@ class MinusOneBufferFType(BufferFType[FT]):
 
     def __hash__(self):
         return hash((self.data_ftype, self.index_fields))
+
+    def __repr__(self):
+        return f"MinusOneBufferFType({self.data_ftype!r}, {self.index_fields!r})"
 
 
 class MinusOneBuffer(Buffer, ABC):

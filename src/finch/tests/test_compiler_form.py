@@ -492,7 +492,9 @@ def test_loop_orderer_includes_output_only_fields(lhs_idxs):
             match stmt:
                 case Query(Table(_, idxs), Aggregate()):
                     assert idxs == lhs_idxs
-                    assert tuple(idx for idx in order if idx in lhs_idxs) == lhs_idxs
+                    # The loops may visit the output out of the order it stores
+                    # its fields in, but loop over each of them.
+                    assert set(lhs_idxs) <= set(order)
                 case _:
                     pytest.fail("Expected a loop-ordered aggregate")
         case _:
