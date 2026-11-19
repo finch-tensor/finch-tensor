@@ -106,11 +106,11 @@ class LogicInterpreter(UnvalidatedForm, LogicEvaluator):
     def __init__(self, *, make_tensor=make_tensor):
         self.make_tensor = make_tensor  # Added make_tensor argument
 
-    def lower(self, term, bindings=None):
+    def lower(self, prgm, bindings=None):
         if bindings is None:
             bindings = {}
         machine = LogicMachine(make_tensor=self.make_tensor, bindings=bindings)
-        return machine(term)
+        return machine(prgm)
 
 
 class LogicMachine:

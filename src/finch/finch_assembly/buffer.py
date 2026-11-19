@@ -97,7 +97,7 @@ class Buffer(FTyped[BufferFType[FT]], ABC):
         return self
 
     @abstractmethod
-    def resize(self, len: int):
+    def resize(self, new_len: int):
         """
         Resize the buffer to the new length.
         """

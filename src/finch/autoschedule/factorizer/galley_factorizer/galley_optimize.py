@@ -123,14 +123,14 @@ class GalleyLogicFactorizer(LogicFactorizer):
 
     def lower(
         self,
-        term: LogicStatement,
+        prgm: LogicStatement,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ):
-        if not isinstance(term, Plan):
-            raise ValueError(f"Unsupported program type: {type(term)}")
-        logger.debug("Optimizing plan: %s", term)
+        if not isinstance(prgm, Plan):
+            raise ValueError(f"Unsupported program type: {type(prgm)}")
+        logger.debug("Optimizing plan: %s", prgm)
 
         def transform(prgm, bindings):
             prgm = optimize_plan(
@@ -148,7 +148,7 @@ class GalleyLogicFactorizer(LogicFactorizer):
         # produced, then copied back to the tensor it updates. Galley only
         # reduces from literals, so aggregates which start from a tensor are
         # split first.
-        term = split_aggregate_inits(desugar_query_into(term), bindings)
-        term, bindings = with_unique_lhs(transform, term, bindings)
-        assert isinstance(term, Plan)
-        return self.ctx(flatten_plans(term), bindings, stats, stats_factory)
+        prgm = split_aggregate_inits(desugar_query_into(prgm), bindings)
+        prgm, bindings = with_unique_lhs(transform, prgm, bindings)
+        assert isinstance(prgm, Plan)
+        return self.ctx(flatten_plans(prgm), bindings, stats, stats_factory)

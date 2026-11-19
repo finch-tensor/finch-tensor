@@ -30,7 +30,7 @@ class FType(ABC):
     def __hash__(self) -> builtins.int: ...
 
     @abstractmethod
-    def __call__(self, val: Any) -> Any:
+    def __call__(self, val: Any, /) -> Any:
         """
         Perform type conversion or construction with the given value.
 
@@ -328,7 +328,7 @@ class _FDTypeBuiltinFloat(FDTypeNumericBuiltin, FDTypeFloat, FDTypeReal):
         """
         The finfo object for this float type.
         """
-        return _finfo(self, np.float64.finfo)  # ty: ignore[unresolved-attribute]
+        return _finfo(self, np.float64.finfo)  # ty: ignore[missing-attribute]
 
     @property
     def type_min(self):
@@ -352,7 +352,7 @@ class _FDTypeBuiltinComplex(FDTypeNumericBuiltin, FDTypeFloat, FDTypeComplex):
 
     @property
     def finfo(self):
-        return _finfo(self, np.float64.finfo)  # ty: ignore[unresolved-attribute]
+        return _finfo(self, np.float64.finfo)  # ty: ignore[missing-attribute]
 
     @property
     def type_min(self):

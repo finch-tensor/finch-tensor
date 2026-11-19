@@ -10,7 +10,7 @@ class NotationLoader(Stage):
     mode = CompilerMode()
 
     @abstractmethod
-    def lower(self, term: ntn.Module) -> asm.AssemblyLibrary:
+    def lower(self, prgm: ntn.Module) -> asm.AssemblyLibrary:
         """
         Load the given notation program into a runnable module.
         """
@@ -18,7 +18,7 @@ class NotationLoader(Stage):
 
 class NotationTransform(Stage):
     @abstractmethod
-    def lower(self, term: ntn.Module) -> ntn.Module:
+    def lower(self, prgm: ntn.Module) -> ntn.Module:
         """
-        Transform the given assembly term into another assembly term.
+        Transform the given notation program into another notation program.
         """

@@ -59,33 +59,33 @@ class FinchTensorFType(TensorFType[FT], ABC):
         """Lower a logical child level to its storage expression."""
 
     @abstractmethod
-    def lower_dim(self, ctx, obj, i):
+    def lower_dim(self, ctx, lvl, r):
         """
-        Get the dimension of the tensor at mode i.
+        Get the dimension of the tensor at mode r.
         """
 
     @abstractmethod
-    def lower_unwrap(self, ctx, obj):
+    def lower_unwrap(self, ctx, lvl):
         """
         Unwrap a tensor view to get the underlying tensor.
         This is used to get the original tensor from a tensor view.
         """
 
     @abstractmethod
-    def lower_increment(self, ctx, obj, op, val):
+    def lower_increment(self, ctx, lvl, op, val):
         """
         Increment a tensor view with an operation and value.
         This updates the tensor at the specified index with the operation and value.
         """
 
     @abstractmethod
-    def lower_declare(self, ctx, tns, init, op, shape):
+    def lower_declare(self, ctx, lvl, init, op, shape):
         """
         Resize a tensor to `shape` and initialize it. A tensor with a dynamic
         fill takes `init` as its fill.
         """
 
-    def lower_fill(self, ctx, obj):
+    def lower_fill(self, ctx, lvl):
         """
         Lower the fill value of a tensor.
         """
