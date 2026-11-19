@@ -22,6 +22,7 @@ from .default_schedulers import (
     COMPILE_JULIA_GALLEY,
     COMPILE_MLIR,
     COMPILE_NUMBA,
+    COMPILE_NUMBA_DISPATCH,
     COMPILE_NUMBA_GALLEY,
     INTERPRET_ASSEMBLY,
     INTERPRET_LOGIC,
@@ -32,6 +33,7 @@ from .default_schedulers import (
     set_default_scheduler,
     with_default_scheduler,
 )
+from .dispatcher import LibraryKernel, LogicKernelDispatcher
 from .drop_fills import LogicFillDropper, drop_fills
 from .executor import LogicExecutor
 from .factorizer.optimize import DefaultLogicFactorizer
@@ -58,6 +60,7 @@ __all__ = [
     "COMPILE_JULIA_GALLEY",
     "COMPILE_MLIR",
     "COMPILE_NUMBA",
+    "COMPILE_NUMBA_DISPATCH",
     "COMPILE_NUMBA_GALLEY",
     "INTERPRET_ASSEMBLY",
     "INTERPRET_LOGIC",
@@ -75,6 +78,7 @@ __all__ = [
     "DefaultLoopOrderer",
     "FDFormatter",
     "Field",
+    "LibraryKernel",
     "Literal",
     "LogicCapture",
     "LogicCompiler",
@@ -83,6 +87,7 @@ __all__ = [
     "LogicFillDropper",
     "LogicFormatter",
     "LogicFuseMerger",
+    "LogicKernelDispatcher",
     "LogicNormalizer",
     "LogicNotationLowerer",
     "LogicProtocolizer",

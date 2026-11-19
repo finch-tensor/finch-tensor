@@ -22,6 +22,7 @@ from finch.finch_logic.stages import LogicEvaluator
 from finch.finch_notation.interpreter import NotationInterpreter
 
 from .compiler import CompilerFormLowerer, LogicCompiler
+from .dispatcher import LogicKernelDispatcher
 from .drop_fills import LogicFillDropper
 from .executor import LogicExecutor
 from .factor_cache import FactorCacheEvaluator
@@ -136,6 +137,38 @@ COMPILE_NUMBA_GALLEY = LogicNormalizer(
                                                 LowerPackedStructSlots(),
                                                 AssemblySimplify(),
                                             ),
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+
+# COMPILE_NUMBA, except that a program which a library kernel computes, such as
+# a dense matrix product, calls that kernel.
+COMPILE_NUMBA_DISPATCH = LogicNormalizer(
+    LogicExecutor(
+        DefaultLogicFactorizer(
+            LogicSimplify(
+                DefaultLoopOrderer(
+                    LogicKernelDispatcher(
+                        DefaultLogicWorkspacer(
+                            LogicFuseMerger(
+                                DefaultLogicFormatter(
+                                    CompilerFormLowerer(
+                                        LogicCompiler(
+                                            NotationCompiler(
+                                                NumbaCompiler(),
+                                                ctx_transforms=(
+                                                    LowerPackedStructSlots(),
+                                                    AssemblySimplify(),
+                                                ),
+                                            )
                                         )
                                     )
                                 )
