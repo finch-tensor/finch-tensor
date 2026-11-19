@@ -83,11 +83,11 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             ctx, asm.GetAttr(lvl, asm.Literal("body")), op, pos
         )
 
-    def level_lower_unwrap(self, ctx, obj, pos):
+    def level_lower_unwrap(self, ctx, lvl, pos):
         body = ntn.Fiber(
-            ntn.Child(obj.lvl, "body"),
-            obj.pos,
-            obj.idxs,
+            ntn.Child(lvl.lvl, "body"),
+            lvl.pos,
+            lvl.idxs,
         )
         return self.body.level_lower_unwrap(
             ctx,
@@ -95,11 +95,11 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             pos,
         )
 
-    def level_lower_increment(self, ctx, obj, op, val, pos):
+    def level_lower_increment(self, ctx, lvl, op, val, pos):
         body = ntn.Fiber(
-            ntn.Child(obj.lvl, "body"),
-            obj.pos,
-            obj.idxs,
+            ntn.Child(lvl.lvl, "body"),
+            lvl.pos,
+            lvl.idxs,
         )
         return self.body.level_lower_increment(
             ctx,
@@ -109,17 +109,17 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             pos,
         )
 
-    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
         return self.body.level_lower_declare(
-            ctx, asm.GetAttr(tns, asm.Literal("body")), init, op, shape, pos
+            ctx, asm.GetAttr(lvl, asm.Literal("body")), init, op, shape, pos
         )
 
-    def level_unfurl(self, ctx, fiber: ntn.Fiber, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, lvl: ntn.Fiber, ext, mode, proto, pos):
         # The mask walks the triangle itself, so its body reads with its default.
         match proto:
             case ntn.Walk():
                 proto = ntn.DefaultProtocol()
-        tns = fiber
+        tns = lvl
         level = tns.lvl
 
         def child_accessor(ctx, idx):
@@ -130,16 +130,16 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             )
             return self.body.level_unfurl(ctx, body_view, ext, mode, proto, pos)
 
-        lvl = asm.GetAttr(ctx(tns.lvl), asm.Literal("body"))
+        lvl_o = asm.GetAttr(ctx(tns.lvl), asm.Literal("body"))
         fill = (
-            ntn.Value(self.body.lower_fill(lvl), self.element_type)
+            ntn.Value(self.body.lower_fill(lvl_o), self.element_type)
             if is_dynamic(self.fill_type)
             else ntn.Literal(self.fill_type.value)
         )
         full = ntn.Full(
             fill,
             tuple(
-                ntn.Value(self.body.level_lower_dim(ctx, lvl, r), self.shape_type[r])
+                ntn.Value(self.body.level_lower_dim(ctx, lvl_o, r), self.shape_type[r])
                 for r in range(1, self.ndim)
             ),
         )
@@ -152,8 +152,8 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             tail=lambda ctx, idx: lplt.Run(full),
         )
 
-    def level_lower_dim(self, ctx, obj, r):
-        return self.body.level_lower_dim(ctx, asm.GetAttr(obj, asm.Literal("body")), r)
+    def level_lower_dim(self, ctx, lvl, r):
+        return self.body.level_lower_dim(ctx, asm.GetAttr(lvl, asm.Literal("body")), r)
 
     def from_fields(self, lvl) -> "LoTriMask":
         return LoTriMask(lvl)

@@ -150,7 +150,7 @@ def test_empty_results_preserve_effects(use):
         def return_type(self, *args):
             return ffuncs.add.ftype
 
-        def c_function_call(self, op, ctx, buffer):
+        def c_function_call(self, op, ctx, buffer, /):
             ctx.add_header("#include <stdint.h>")
             return f"((void)(++((int64_t*)({ctx(buffer)})->data)[0]))"
 
@@ -159,7 +159,7 @@ def test_empty_results_preserve_effects(use):
         def ftype(self):
             return MakeAdderFType()
 
-        def __call__(self, buffer):
+        def __call__(self, buffer, /):
             buffer.arr[0] += 1
             return ffuncs.add
 

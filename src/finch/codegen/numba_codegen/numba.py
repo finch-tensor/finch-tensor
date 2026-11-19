@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
 from textwrap import dedent
@@ -351,7 +353,7 @@ def numba_jitclass_type(t: FType) -> Any:
                 ret(*(numba_jitclass_type(arg) for arg in t.arg_types))
             )
         case _ if hasattr(t, "numba_jitclass_type"):
-            return t.numba_jitclass_type()  # ty: ignore[call-non-callable]
+            return t.numba_jitclass_type()  # ty: ignore[not-callable]
         case algebra.ftypes.FDTypeNumpy():
             return numba.from_dtype(t.dtype)
         case algebra.int_:
@@ -548,21 +550,21 @@ def struct_construct_from_numba(fmt: StructFType, numba_struct):
 
 class NumbaBufferFType(BufferFType, NumbaArgumentFType, ABC):
     @abstractmethod
-    def numba_length(self, ctx: "NumbaContext", buffer):
+    def numba_length(self, ctx: NumbaContext, buf):
         """
         Return a Numba-compatible expression to get the length of the buffer.
         """
         ...
 
     @abstractmethod
-    def numba_resize(self, ctx: "NumbaContext", buffer, size):
+    def numba_resize(self, ctx: NumbaContext, buf, new_len):
         """
         Return a Numba-compatible expression to resize the buffer to the given size.
         """
         ...
 
     @abstractmethod
-    def numba_load(self, ctx: "NumbaContext", buffer, idx):
+    def numba_load(self, ctx: NumbaContext, buf, idx):
         """
         Return a Numba-compatible expression to load an element from the buffer
         at the given index.
@@ -570,7 +572,7 @@ class NumbaBufferFType(BufferFType, NumbaArgumentFType, ABC):
         ...
 
     @abstractmethod
-    def numba_store(self, ctx: "NumbaContext", buffer, idx, value=None):
+    def numba_store(self, ctx: NumbaContext, buf, idx, value=None):
         """
         Return a Numba-compatible expression to store an element in the buffer
         at the given index. If value is None, it should store the length of the
@@ -709,7 +711,7 @@ class NumbaContext(Context):
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
 
-    def block(self) -> "NumbaContext":
+    def block(self) -> NumbaContext:
         blk = super().block()
         blk.indent = self.indent
         blk.tab = self.tab
@@ -1056,7 +1058,7 @@ def struct_numba_getattr(fmt: StructFType, ctx, obj, attr):
 def numba_getattr(fmt: StructFType, ctx, obj, attr):
     match fmt:
         case _ if hasattr(fmt, "numba_getattr"):
-            return fmt.numba_getattr(ctx, obj, attr)  # ty: ignore[call-non-callable]
+            return fmt.numba_getattr(ctx, obj, attr)  # ty: ignore[not-callable]
         case TupleFType() | ImmutableStructFType():
             return immutable_struct_numba_getattr(fmt, ctx, obj, attr)
         case StructFType():
@@ -1078,7 +1080,7 @@ def struct_numba_setattr(fmt: StructFType, ctx, obj, attr, val):
 def numba_setattr(fmt: StructFType, ctx, obj, attr, val):
     match fmt:
         case _ if hasattr(fmt, "numba_setattr"):
-            return fmt.numba_setattr(ctx, obj, attr, val)  # ty: ignore[call-non-callable]
+            return fmt.numba_setattr(ctx, obj, attr, val)  # ty: ignore[not-callable]
         case MutableStructFType():
             return struct_numba_setattr(fmt, ctx, obj, attr, val)
         case _:

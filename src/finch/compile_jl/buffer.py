@@ -127,8 +127,8 @@ class PlusOneBuffer(Buffer, ABC):
 
         self.data.store(idx, val)
 
-    def resize(self, len: int):
-        self.data.resize(len)
+    def resize(self, new_len: int):
+        self.data.resize(new_len)
 
 
 class MinusOneBufferFType(BufferFType[FT]):
@@ -228,8 +228,8 @@ class MinusOneBuffer(Buffer, ABC):
             val = val + 1
         self.data.store(idx, val)
 
-    def resize(self, len: int):
-        self.data.resize(len)
+    def resize(self, new_len: int):
+        self.data.resize(new_len)
 
 
 def buffer_to_jlobj(buffer: Buffer):

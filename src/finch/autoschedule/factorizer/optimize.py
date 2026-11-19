@@ -189,7 +189,7 @@ def get_productions(root: LogicStatement) -> tuple[Alias, ...]:
             return get_productions(bodies[-1])
         case Produces(args):
             assert all(isinstance(arg, Alias) for arg in args)
-            return args  # ty: ignore[invalid-return-type]
+            return args  # ty: ignore[invalid-explicit-return]
         case Query(Table(Alias() as lhs, _), _):
             return (lhs,)
         case _:

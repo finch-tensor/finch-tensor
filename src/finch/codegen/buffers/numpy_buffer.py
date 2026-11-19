@@ -106,19 +106,19 @@ class NumpyBuffer(Buffer):
     def length(self):
         return self.arr.size
 
-    def load(self, index: int):
-        value = self.arr[index]
+    def load(self, idx: int):
+        value = self.arr[idx]
         if isinstance(self.ftype.element_type, TupleFType):
             return tuple(
                 value[name] for name in self.ftype.element_type.struct_fieldnames
             )
         return value
 
-    def store(self, index: int, value):
-        self.arr[index] = value
+    def store(self, idx: int, val):
+        self.arr[idx] = val
 
-    def resize(self, new_length: int):
-        self.arr = np.resize(self.arr, new_length)
+    def resize(self, new_len: int):
+        self.arr = np.resize(self.arr, new_len)
 
     def to_numpy(self, *, copy: bool | None = None):
         return self.arr.copy() if copy is True else self.arr
@@ -237,13 +237,13 @@ class NumpyBufferFType(
         ctx: "CContext",
         buf: CBufferFields,
         idx: "AssemblyExpression",
-        value: "AssemblyExpression",
+        val: "AssemblyExpression",
     ):
         if isinstance(self.element_type, TupleFType):
             _, store = self._c_tuple_accessors(ctx)
-            ctx.exec(f"{ctx.feed}{store}({buf.data}, {ctx(idx)}, {ctx(value)});")
+            ctx.exec(f"{ctx.feed}{store}({buf.data}, {ctx(idx)}, {ctx(val)});")
             return
-        ctx.exec(f"{ctx.feed}({buf.data})[{ctx(idx)}] = {ctx(value)};")
+        ctx.exec(f"{ctx.feed}({buf.data})[{ctx(idx)}] = {ctx(val)};")
 
     def c_resize(self, ctx, buf: CBufferFields, new_len):
         new_len = ctx(ctx.cache("len", new_len))
@@ -257,28 +257,28 @@ class NumpyBufferFType(
         )
         return
 
-    def c_unpack(self, ctx, var_n, val):
+    def c_unpack(self, ctx, lhs, rhs):
         """
         Unpack the buffer into C context.
         """
-        data = ctx.freshen(var_n, "data")
-        length = ctx.freshen(var_n, "length")
+        data = ctx.freshen(lhs, "data")
+        length = ctx.freshen(lhs, "length")
         t = ctx.ctype_name(c_type(self.element_type))
         ctx.add_header("#include <stddef.h>")
         ctx.exec(
-            f"{ctx.feed}{t}* {data} = ({t}*){ctx(val)}->data;\n"
-            f"{ctx.feed}size_t {length} = {ctx(val)}->length;"
+            f"{ctx.feed}{t}* {data} = ({t}*){ctx(rhs)}->data;\n"
+            f"{ctx.feed}size_t {length} = {ctx(rhs)}->length;"
         )
 
-        return CBufferFields(data, length, var_n)
+        return CBufferFields(data, length, lhs)
 
-    def c_repack(self, ctx, lhs, obj):
+    def c_repack(self, ctx, lhs, rhs):
         """
         Repack the buffer from C context.
         """
         ctx.exec(
-            f"{ctx.feed}{lhs}->data = (void*){obj.data};\n"
-            f"{ctx.feed}{lhs}->length = {obj.length};"
+            f"{ctx.feed}{lhs}->data = (void*){rhs.data};\n"
+            f"{ctx.feed}{lhs}->length = {rhs.length};"
         )
         return
 

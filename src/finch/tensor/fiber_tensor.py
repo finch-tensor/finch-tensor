@@ -415,24 +415,24 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             ctx, ctx(tns.lvl), op, asm.Literal(self.position_type(1))
         )
 
-    def lower_unwrap(self, ctx, obj):
-        return self.lvl_t.level_lower_unwrap(ctx, obj, ctx(obj.pos))
+    def lower_unwrap(self, ctx, lvl):
+        return self.lvl_t.level_lower_unwrap(ctx, lvl, ctx(lvl.pos))
 
-    def lower_increment(self, ctx, obj, op, val):
-        return self.lvl_t.level_lower_increment(ctx, obj, op, val, ctx(obj.pos))
+    def lower_increment(self, ctx, lvl, op, val):
+        return self.lvl_t.level_lower_increment(ctx, lvl, op, val, ctx(lvl.pos))
 
-    def lower_declare(self, ctx, tns, init, op, shape):
+    def lower_declare(self, ctx, lvl, init, op, shape):
         return self.lvl_t.level_lower_declare(
-            ctx, ctx(tns.lvl), init, op, shape, asm.Literal(self.position_type(1))
+            ctx, ctx(lvl.lvl), init, op, shape, asm.Literal(self.position_type(1))
         )
 
-    def lower_dim(self, ctx, obj, r):
-        return self.lvl_t.level_lower_dim(ctx, ctx(obj.lvl), r)
+    def lower_dim(self, ctx, lvl, r):
+        return self.lvl_t.level_lower_dim(ctx, ctx(lvl.lvl), r)
 
-    def lower_fill(self, ctx, obj):
+    def lower_fill(self, ctx, lvl):
         if is_static(self.fill_type):
             return asm.Literal(self.fill_type.value)
-        return self.lvl_t.lower_fill(ctx(obj.lvl))
+        return self.lvl_t.lower_fill(ctx(lvl.lvl))
 
     def from_fields(self, *args) -> FiberTensor:
         lvl, shape, pos = args

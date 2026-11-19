@@ -22,9 +22,9 @@ class CountingEvaluator(UnvalidatedForm, LogicEvaluator):
         self.ctx = ctx
         self.calls = 0
 
-    def lower(self, term, bindings=None):
+    def lower(self, prgm, bindings=None):
         self.calls += 1
-        return self.ctx(term, bindings)
+        return self.ctx(prgm, bindings)
 
 
 def _matmul(x, y, idx):

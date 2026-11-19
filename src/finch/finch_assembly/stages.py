@@ -35,9 +35,9 @@ class AssemblyKernelFType(CallableFType):
     def __hash__(self):
         return hash((self.name, self.arg_types, self.result_type, self.definition))
 
-    def __call__(self, value):
-        if isinstance(value, AssemblyKernel) and value.ftype == self:
-            return value
+    def __call__(self, val):
+        if isinstance(val, AssemblyKernel) and val.ftype == self:
+            return val
         raise TypeError(f"Expected a kernel of type {self}")
 
     def return_type(self, *args: FType) -> FType:
@@ -76,7 +76,7 @@ class AssemblyLibrary(ABC):
 class AssemblyLoader(Stage):
     @abstractmethod
     def lower(
-        self, term: asm.Module, *, mode: CompilerMode | None = None
+        self, prgm: asm.Module, *, mode: CompilerMode | None = None
     ) -> AssemblyLibrary:
         """
         Load the given assembly program into a runnable module.
