@@ -473,15 +473,15 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
             f"Level conversion not yet implemented for {type(self).__name__}"
         )
 
-    def level_lower_dim(self, ctx, obj, r):
+    def level_lower_dim(self, ctx, lvl, r):
         if r == 0:
-            return asm.GetAttr(obj, asm.Literal("dimension"))
+            return asm.GetAttr(lvl, asm.Literal("dimension"))
         return self.lvl_t.level_lower_dim(
-            ctx, asm.GetAttr(obj, asm.Literal("lvl")), r - 1
+            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), r - 1
         )
 
-    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
-        hl = _SparseHashLowering(self, ctx, tns)
+    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
+        hl = _SparseHashLowering(self, ctx, lvl)
         r, h, q, k = hl.var("r"), hl.var("h"), hl.var("q"), hl.key_var()
         hashing, x = hl.record_hash(k)
         parts, base, off, mask, _ = hl.slot_parts(x)
@@ -555,10 +555,10 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
             dimension = asm.Call(
                 asm.Literal(ffuncs.astype(self.dimension_type)), (dimension,)
             )
-        ctx.exec(asm.SetAttr(tns, asm.Literal("dimension"), dimension))
+        ctx.exec(asm.SetAttr(lvl, asm.Literal("dimension"), dimension))
         return self.lvl_t.level_lower_declare(
             ctx,
-            asm.GetAttr(tns, asm.Literal("lvl")),
+            asm.GetAttr(lvl, asm.Literal("lvl")),
             init,
             op,
             shape[1:],
@@ -777,35 +777,33 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
             )
         )
 
-    def level_lower_increment(self, ctx, obj, op, val, pos):
+    def level_lower_increment(self, ctx, lvl, op, val, pos):
         raise NotImplementedError(
             "SparseHashLevelFType does not support level_lower_increment."
         )
 
-    def level_lower_unwrap(self, ctx, obj, pos):
+    def level_lower_unwrap(self, ctx, lvl, pos):
         raise NotImplementedError(
             "SparseHashLevelFType does not support level_lower_unwrap."
         )
 
-    def level_unfurl(
-        self, ctx, fiber: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos
-    ):
+    def level_unfurl(self, ctx, lvl: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos):
         match mode:
             case ntn.Update():
-                return self.level_unfurl_update(ctx, fiber, ext, mode, proto, pos)
-        level = fiber.lvl
-        lvl = ctx(level)
-        hl = _SparseHashLowering(self, ctx, lvl)
+                return self.level_unfurl_update(ctx, lvl, ext, mode, proto, pos)
+        level = lvl.lvl
+        lvl_o = ctx(level)
+        hl = _SparseHashLowering(self, ctx, lvl_o)
         p_t, d_t = self.position_type, self.dimension_type
         fill = (
-            ntn.Value(self.lower_fill(lvl), self.element_type)
+            ntn.Value(self.lower_fill(lvl_o), self.element_type)
             if is_dynamic(self.fill_type)
             else ntn.Literal(self.fill_type.value)
         )
         full = ntn.Full(
             fill,
             tuple(
-                ntn.Value(self.level_lower_dim(ctx, lvl, r), self.shape_type[r])
+                ntn.Value(self.level_lower_dim(ctx, lvl_o, r), self.shape_type[r])
                 for r in range(1, self.ndim)
             ),
         )
@@ -815,7 +813,7 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
             case ntn.Gallop():
                 step = lplt.Jumper
             case ntn.Follow():
-                return self._level_unfurl_follow(ctx, fiber, pos, full)
+                return self._level_unfurl_follow(ctx, lvl, pos, full)
             case _:
                 raise NotImplementedError(
                     f"SparseHashLevelFType does not support the {proto} protocol."
@@ -879,7 +877,7 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
             pos_2 = asm.Variable(ctx.freshen(idx, f"_pos_{self.ndim - 1}"), p_t)
             ctx.exec(asm.Assign(pos_2, hl.expr("perm[r]", r=r)))
             return lplt.Run(
-                ntn.Fiber(ntn.Child(level), ntn.Value(pos_2, p_t), (*fiber.idxs, idx))
+                ntn.Fiber(ntn.Child(level), ntn.Value(pos_2, p_t), (*lvl.idxs, idx))
             )
 
         return lplt.Thunk(

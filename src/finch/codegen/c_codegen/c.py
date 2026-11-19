@@ -1209,7 +1209,7 @@ class CUnpackableFType(ABC):
 def c_getattr(fmt: FType, ctx, obj, attr):
     match fmt:
         case _ if hasattr(fmt, "c_getattr"):
-            return fmt.c_getattr(ctx, obj, attr)  # ty: ignore[call-non-callable]
+            return fmt.c_getattr(ctx, obj, attr)  # ty: ignore[not-callable]
         case MutableStructFType():
             return f"{obj}->{attr}"
         case ImmutableStructFType() | TupleFType():
@@ -1221,7 +1221,7 @@ def c_getattr(fmt: FType, ctx, obj, attr):
 def c_setattr(fmt: FType, ctx, obj, attr, val):
     match fmt:
         case _ if hasattr(fmt, "c_setattr"):
-            return fmt.c_setattr(ctx, obj, attr, val)  # ty: ignore[call-non-callable]
+            return fmt.c_setattr(ctx, obj, attr, val)  # ty: ignore[not-callable]
         case MutableStructFType():
             return struct_mutable_setattr(fmt, ctx, obj, attr, val)
         case _:
@@ -1253,15 +1253,15 @@ class CArgumentFType(ABC):
         ...
 
     @abstractmethod
-    def deserialize_from_c(self, obj, res):
+    def deserialize_from_c(self, obj, c_buffer):
         """
-        Update this `obj` based on how the c call modified `res`, the result
+        Update this `obj` based on how the c call modified `c_buffer`, the result
         of `serialize_to_c`.
         """
         ...
 
     @abstractmethod
-    def construct_from_c(self, res):
+    def construct_from_c(self, c_buffer):
         """
         Construct a new object based on the return value from c
         """
@@ -1412,28 +1412,28 @@ class CBufferFType(BufferFType, CArgumentFType, ABC):
     """
 
     @abstractmethod
-    def c_length(self, ctx, buffer):
+    def c_length(self, ctx, buf):
+        """
+        Return C code which gets the length of a named buffer.
+        """
+        ...
+
+    @abstractmethod
+    def c_load(self, ctx, buf, idx):
         """
         Return C code which loads a named buffer at the given index.
         """
         ...
 
     @abstractmethod
-    def c_load(self, ctx, buffer, index):
-        """
-        Return C code which loads a named buffer at the given index.
-        """
-        ...
-
-    @abstractmethod
-    def c_store(self, ctx, buffer, index, value):
+    def c_store(self, ctx, buf, idx, val):
         """
         Return C code which stores a named buffer to the given index.
         """
         ...
 
     @abstractmethod
-    def c_resize(self, ctx, buffer, new_length):
+    def c_resize(self, ctx, buf, new_len):
         """
         Return C code which resizes a named buffer to the given length.
         """

@@ -396,8 +396,8 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
             function_state=function_state,
         )
 
-    def lower(self, term: ntn.Module):
-        return self._dispatch(term)
+    def lower(self, prgm: ntn.Module):
+        return self._dispatch(prgm)
 
     @overload
     def __call__(self, prgm: ntn.Module) -> NotationInterpreterLibrary: ...

@@ -12,9 +12,9 @@ jobs:
           python-version: '3.x'
       - name: Install dependencies
         run: pip install build
-      - uses: prefix-dev/setup-pixi@v0.10.0
+      - uses: prefix-dev/setup-pixi@v0.11.3
         with:
-          pixi-version: v0.83.0
+          pixi-version: v0.84.2
       - name: Get version
         run: |
             VERSION=$(python -c 'import tomllib; print("v" + tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')

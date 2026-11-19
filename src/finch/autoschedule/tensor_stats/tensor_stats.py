@@ -202,6 +202,7 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
         init: Any | None,
         reduce_indices: tuple[Field, ...],
         stats: TS,
+        /,
     ) -> TS: ...
 
     @abstractmethod

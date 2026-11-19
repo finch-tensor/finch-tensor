@@ -57,7 +57,7 @@ def test_fused_alias_node():
 
 def test_alias_is_abstract():
     with pytest.raises(TypeError, match="abstract"):
-        lgc.Alias("scratch")  # ty: ignore[call-non-callable]
+        lgc.Alias("scratch")  # ty: ignore[abstract-class-instantiation]
 
 
 @pytest.mark.parametrize("n", [-1, 1.5, True])

@@ -28,8 +28,8 @@ from .level import Level, LevelFType
 @dataclass(unsafe_hash=True)
 class ElementLevelFType(LevelFType, MutableStructFType):
     # None only as constructor input, __post_init__ always resolves these.
-    fill_type: AbstractFillFType | None = None  # ty: ignore[invalid-property-type-override]
-    element_type: FType | None = None  # ty: ignore[invalid-property-type-override]
+    fill_type: AbstractFillFType | None = None  # ty: ignore[incompatible-property-override]
+    element_type: FType | None = None  # ty: ignore[incompatible-property-override]
     position_type: FType | None = None
     buffer_factory: Any = NumpyBufferFType
     buffer_type: Any = None
@@ -164,15 +164,15 @@ class ElementLevelFType(LevelFType, MutableStructFType):
             val = NumpyBuffer(np.asarray(val).reshape(-1, copy=False))
         return ElementLevel(_format=self, _val=val, _fill=fill)
 
-    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
         if is_dynamic(self.fill_type):
             # The init becomes the fill of the tensor.
             elem_t = self.fill_type.element_type
             if init.result_type != elem_t:
                 init = asm.Call(asm.Literal(ffuncs.astype(elem_t)), (init,))
-            ctx.exec(asm.SetAttr(tns, asm.Literal("fill"), init))
-            init = asm.GetAttr(tns, asm.Literal("fill"))
-        buf = asm.GetAttr(tns, asm.Literal("val"))
+            ctx.exec(asm.SetAttr(lvl, asm.Literal("fill"), init))
+            init = asm.GetAttr(lvl, asm.Literal("fill"))
+        buf = asm.GetAttr(lvl, asm.Literal("val"))
         if pos.result_type != self.buffer_type.length_type:
             pos = asm.Call(
                 asm.Literal(ffuncs.astype(self.buffer_type.length_type)), (pos,)
@@ -182,8 +182,8 @@ class ElementLevelFType(LevelFType, MutableStructFType):
         body = asm.Store(buf, i_var, init)
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))
 
-    def level_lower_unwrap(self, ctx, obj, pos):
-        buf = asm.GetAttr(ctx(obj.lvl), asm.Literal("val"))
+    def level_lower_unwrap(self, ctx, lvl, pos):
+        buf = asm.GetAttr(ctx(lvl.lvl), asm.Literal("val"))
         if pos.result_type != self.buffer_type.length_type:
             pos = asm.Call(
                 asm.Literal(ffuncs.astype(self.buffer_type.length_type)), (pos,)
@@ -193,12 +193,12 @@ class ElementLevelFType(LevelFType, MutableStructFType):
     def level_lower_increment(
         self,
         ctx: AssemblyContext,
-        obj,
+        lvl,
         op: ntn.Literal,
         val: ntn.NotationExpression,
         pos: asm.AssemblyExpression,
     ):
-        buf = asm.GetAttr(ctx(obj.lvl), asm.Literal("val"))
+        buf = asm.GetAttr(ctx(lvl.lvl), asm.Literal("val"))
         if pos.result_type != self.buffer_type.length_type:
             pos = asm.Call(
                 asm.Literal(ffuncs.astype(self.buffer_type.length_type)), (pos,)
@@ -211,12 +211,12 @@ class ElementLevelFType(LevelFType, MutableStructFType):
                 asm.Call(op_e, (asm.Load(buf, pos_e), val_e)),
             )
         )
-        match obj:
+        match lvl:
             case ntn.HollowFiber(dirty=dirty):
                 fill = (
                     asm.Literal(self.fill_type.value)
                     if is_static(self.fill_type)
-                    else self.lower_fill(ctx(obj.lvl))
+                    else self.lower_fill(ctx(lvl.lvl))
                 )
                 ctx.exec(
                     asm.If(
@@ -274,7 +274,7 @@ class ElementLevelFType(LevelFType, MutableStructFType):
     def level_lower_thaw(self, ctx, lvl, op, pos):
         pass
 
-    def level_lower_dim(self, ctx, obj, r):
+    def level_lower_dim(self, ctx, lvl, r):
         raise NotImplementedError("ElementLevelFType does not support level_lower_dim.")
 
     def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):

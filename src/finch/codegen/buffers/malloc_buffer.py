@@ -212,13 +212,13 @@ class MallocBuffer(Buffer):
     def length(self):
         return np.intp(self.buffer.contents.length)
 
-    def load(self, index):
-        value = self.castbuffer[index]
+    def load(self, idx):
+        value = self.castbuffer[idx]
         return construct_from_c(self.ftype.element_type, value)
 
-    def store(self, index, value):
-        value = serialize_to_c(self.ftype.element_type, value)
-        self.castbuffer[index] = value
+    def store(self, idx, val):
+        val = serialize_to_c(self.ftype.element_type, val)
+        self.castbuffer[idx] = val
 
     def to_numpy(self, *, copy: bool | None = None):
         # Native resize/free can invalidate views, so exported arrays own their data.
@@ -232,15 +232,15 @@ class MallocBuffer(Buffer):
             count=self.length(),
         )
 
-    def resize(self, new_length):
+    def resize(self, new_len):
         # we effectively have to run an entire serialization cycle ourselves.
         old_length = serialize_to_c(self.ftype.length_type, self.length())
-        new_length = serialize_to_c(self.ftype.length_type, new_length)
+        new_len = serialize_to_c(self.ftype.length_type, new_len)
         newptr = MallocBufferBackend.library(self.ftype).resize(
-            self.castbuffer, old_length, new_length
+            self.castbuffer, old_length, new_len
         )
         self.buffer.contents.data = ctypes.cast(newptr, ctypes.c_void_p)
-        self.buffer.contents.length = new_length
+        self.buffer.contents.length = new_len
 
     def __str__(self):
         array = self.castbuffer[: self.length()]
@@ -306,9 +306,9 @@ class MallocBufferFType(CBufferFType, CUnpackableFType):
         ctx: CContext,
         buf: CBufferFields,
         idx: AssemblyExpression,
-        value: AssemblyExpression,
+        val: AssemblyExpression,
     ):
-        ctx.exec(f"{ctx.feed}({buf.data})[{ctx(idx)}] = {ctx(value)};")
+        ctx.exec(f"{ctx.feed}({buf.data})[{ctx(idx)}] = {ctx(val)};")
 
     def c_resize(self, ctx: CContext, buf: CBufferFields, new_len: AssemblyExpression):
         if self not in ctx.buffer_methods:
@@ -326,12 +326,12 @@ class MallocBufferFType(CBufferFType, CUnpackableFType):
         )
         return
 
-    def c_unpack(self, ctx: CContext, var_n, val):
+    def c_unpack(self, ctx: CContext, lhs, rhs):
         """
         Unpack the malloc buffer into C context.
         """
-        data = ctx.freshen(var_n, "data")
-        length = ctx.freshen(var_n, "length")
+        data = ctx.freshen(lhs, "data")
+        length = ctx.freshen(lhs, "length")
         t = ctx.ctype_name(c_type(self.element_type))
         ctx.add_header("#include <stddef.h>")
 
@@ -339,19 +339,19 @@ class MallocBufferFType(CBufferFType, CUnpackableFType):
             MallocBufferBackend.gen_code(ctx, self, inline=True)
 
         ctx.exec(
-            f"{ctx.feed}{t}* {data} = ({t}*){ctx(val)}->data;\n"
-            f"{ctx.feed}size_t {length} = {ctx(val)}->length;"
+            f"{ctx.feed}{t}* {data} = ({t}*){ctx(rhs)}->data;\n"
+            f"{ctx.feed}size_t {length} = {ctx(rhs)}->length;"
         )
 
-        return CBufferFields(data, length, var_n)
+        return CBufferFields(data, length, lhs)
 
-    def c_repack(self, ctx, var_n: str, obj: CBufferFields):
+    def c_repack(self, ctx, lhs: str, rhs: CBufferFields):
         """
         Repack the buffer from C context.
         """
         ctx.exec(
-            f"{ctx.feed}{var_n}->data = (void*){obj.data};\n"
-            f"{ctx.feed}{var_n}->length = {obj.length};"
+            f"{ctx.feed}{lhs}->data = (void*){rhs.data};\n"
+            f"{ctx.feed}{lhs}->length = {rhs.length};"
         )
         return
 

@@ -297,7 +297,7 @@ def test_constant_scalar_inlines_to_literal():
         == 0
     )
     assert all(isinstance(q, Query) for q in inlined.bodies)
-    (mapjoin_q,) = [q for q in inlined.bodies if q.lhs.tns == y.data]  # ty: ignore[unresolved-attribute]
+    (mapjoin_q,) = [q for q in inlined.bodies if q.lhs.tns == y.data]  # ty: ignore[missing-attribute]
     assert isinstance(mapjoin_q, Query)
     match mapjoin_q.rhs:
         case Reorder(MapJoin(Literal(_), args), _):

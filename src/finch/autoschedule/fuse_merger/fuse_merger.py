@@ -27,14 +27,17 @@ def statements(body: LogicStatement) -> tuple[LogicStatement, ...]:
 
 def field_reads(fuse: Fuse) -> frozenset[tuple[Alias, int]]:
     """The tensors which the queries of fuse read with its field, each with
-    the position of the field in their tables."""
+    the position of the field in their tables. A workspace fused over the
+    field stores one slice of it in each iteration, so it isn't read with it."""
     reads = set()
     for node in PostOrderDFS(fuse.body):
         match node:
             case Query(_, rhs) | QueryInto(_, _, rhs):
                 for table in PostOrderDFS(rhs):
                     match table:
-                        case Table(Alias() as tns, idxs) if fuse.idx in idxs:
+                        case Table(Alias() as tns, idxs) if (
+                            fuse.idx in idxs[tns.nfused :]
+                        ):
                             reads.add((tns.unfused, idxs.index(fuse.idx)))
     return frozenset(reads)
 

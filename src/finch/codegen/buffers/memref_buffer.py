@@ -199,13 +199,13 @@ class MemrefBuffer(Buffer):
     def length(self):
         return np.intp(self.buffer.shape[0])
 
-    def load(self, index):
-        value = self.castbuffer[index]
+    def load(self, idx):
+        value = self.castbuffer[idx]
         return construct_from_mlir(self.ftype.element_type, value)
 
-    def store(self, index, value):
-        serialized = serialize_to_mlir(self.ftype.element_type, value)
-        self.castbuffer[index] = getattr(serialized, "value", serialized)
+    def store(self, idx, val):
+        serialized = serialize_to_mlir(self.ftype.element_type, val)
+        self.castbuffer[idx] = getattr(serialized, "value", serialized)
 
     def to_numpy(self, *, copy: bool | None = None):
         # Native resize/free can invalidate views, so exported arrays own their data.
@@ -219,10 +219,10 @@ class MemrefBuffer(Buffer):
             count=self.length(),
         )
 
-    def resize(self, new_length):
+    def resize(self, new_len):
         self.buffer = self._library.resize(
             self.buffer,
-            new_length,
+            new_len,
         )
 
 
@@ -358,10 +358,10 @@ class MemrefBufferFType(MLIRBufferFType, MLIRUnpackableFType):
         ctx.exec(f"{ctx.feed}llvm.store {desc}, {buf.box} : {desc_t}, !llvm.ptr")
 
     # Use the pointer as the descriptor box.
-    def mlir_unpack(self, ctx: MLIRContext, _, val):
-        return MLIRMemrefBufferFields(ctx(val))
+    def mlir_unpack(self, ctx: MLIRContext, lhs, rhs):
+        return MLIRMemrefBufferFields(ctx(rhs))
 
-    def mlir_repack(self, ctx, var_n, obj):
+    def mlir_repack(self, ctx, lhs, rhs):
         # Buffer operations already update the incoming descriptor in place.
         pass
 

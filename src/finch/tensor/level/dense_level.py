@@ -131,25 +131,25 @@ class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
             *self.lvl_t.level_protocols(),
         )
 
-    def level_lower_dim(self, ctx, obj, r):
+    def level_lower_dim(self, ctx, lvl, r):
         if r == 0:
-            return asm.GetAttr(obj, asm.Literal("dimension"))
+            return asm.GetAttr(lvl, asm.Literal("dimension"))
         return self.lvl_t.level_lower_dim(
-            ctx, asm.GetAttr(obj, asm.Literal("lvl")), r - 1
+            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), r - 1
         )
 
-    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
         dimension = shape[0]
         if dimension.result_type != self.dimension_type:
             dimension = asm.Call(
                 asm.Literal(ffuncs.astype(self.dimension_type)), (dimension,)
             )
-        ctx.exec(asm.SetAttr(tns, asm.Literal("dimension"), dimension))
+        ctx.exec(asm.SetAttr(lvl, asm.Literal("dimension"), dimension))
         pos = asm.Call(
             asm.Literal(ffuncs.mul),
-            (pos, asm.GetAttr(tns, asm.Literal("dimension"))),
+            (pos, asm.GetAttr(lvl, asm.Literal("dimension"))),
         )
-        child = asm.GetAttr(tns, asm.Literal("lvl"))
+        child = asm.GetAttr(lvl, asm.Literal("lvl"))
         self.lvl_t.level_lower_declare(ctx, child, init, op, shape[1:], pos)
         # Compiled structs store the stride, so refresh it after sizing the child.
         match self.lvl_t:
@@ -167,7 +167,7 @@ class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
             stride = asm.Call(
                 asm.Literal(ffuncs.astype(self.dimension_type)), (stride,)
             )
-        ctx.exec(asm.SetAttr(tns, asm.Literal("stride"), stride))
+        ctx.exec(asm.SetAttr(lvl, asm.Literal("stride"), stride))
 
     def level_lower_freeze(self, ctx, lvl, op, pos):
         pos = asm.Call(
@@ -196,12 +196,12 @@ class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
             asm.Call(asm.Literal(ffuncs.mul), (stop, dimension)),
         )
 
-    def level_lower_increment(self, ctx, obj, op, val, pos):
+    def level_lower_increment(self, ctx, lvl, op, val, pos):
         raise NotImplementedError(
             "DenseLevelFType does not support level_lower_increment."
         )
 
-    def level_lower_unwrap(self, ctx, obj, pos):
+    def level_lower_unwrap(self, ctx, lvl, pos):
         raise NotImplementedError(
             "DenseLevelFType does not support level_lower_unwrap."
         )
@@ -209,7 +209,7 @@ class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
     def level_unfurl(
         self,
         ctx: AssemblyContext,
-        fiber: ntn.Fiber,
+        lvl: ntn.Fiber,
         ext: SymbolicExtent,
         mode,
         proto,
@@ -224,9 +224,9 @@ class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
                 raise NotImplementedError(
                     f"DenseLevelFType does not support the {proto} protocol."
                 )
-        tns = fiber
+        tns = lvl
         level = tns.lvl
-        lvl = ctx(level)
+        lvl_o = ctx(level)
 
         def child_accessor(ctx: LoopletContext, idx: ntn.Variable):
             if idx.type_ is None:
@@ -239,7 +239,7 @@ class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
                 (
                     asm.Call(
                         asm.Literal(ffuncs.mul),
-                        (pos, asm.GetAttr(lvl, asm.Literal("dimension"))),
+                        (pos, asm.GetAttr(lvl_o, asm.Literal("dimension"))),
                     ),
                     ctx.ctx(idx),
                 ),
