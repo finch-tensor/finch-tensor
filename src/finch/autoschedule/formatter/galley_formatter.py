@@ -39,6 +39,8 @@ from finch.tensor import (
 from finch.tensor.fiber_tensor import FiberTensorFType
 from finch.util.logging import LOG_LOGIC_POST_OPT
 
+from .formatter import scalar_ftype, stores_nothing
+
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 NS = TypeVar("NS", bound=NumericStats)
@@ -256,7 +258,11 @@ class GalleyFormatter(LogicFormatter):
                     stats_bindings[lhs] = rhs_stats  # ty: ignore[invalid-assignment]
 
                     alias, nfused = lhs.unfused, lhs.nfused
-                    if alias not in bindings:
+                    if alias not in bindings and stores_nothing(
+                        lhs, shape_types[alias]
+                    ):
+                        bindings[alias] = scalar_ftype(fill_types[alias])
+                    elif alias not in bindings:
                         # A workspace's formats are chosen per slice, from the
                         # stats over every field, not the union of its slices.
                         format_stats = stats_bindings[lhs]

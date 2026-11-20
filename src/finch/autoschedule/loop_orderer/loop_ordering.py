@@ -7,6 +7,7 @@ from itertools import chain as join_chains
 from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
 from finch.autoschedule.factorizer.optimize import with_unique_lhs
+from finch.autoschedule.protocolizer import protocolize
 from finch.autoschedule.stages import LogicLoopOrderer
 from finch.autoschedule.util import (
     flatten_plans,
@@ -279,6 +280,30 @@ def heuristic_loop_order(plan: Plan) -> Plan:
     return Plan(tuple(new_queries + [plan.bodies[-1]]))
 
 
+def with_default_protocols(f, prgm: Plan, bindings: dict[Alias, TensorFType]) -> Plan:
+    """
+    Apply f to prgm with each input read by the protocol its format reads it
+    with by default, so that f prices the reads which compile, and return the
+    result with the tables of prgm, whose protocols are left to later stages.
+    f may only wrap the statements of prgm in Fuse nodes.
+    """
+
+    def tables(root):
+        found = []
+        for node in PostOrderDFS(root):
+            match node:
+                case Table():
+                    found.append(node)
+        return found
+
+    # Protocolizing keeps the shape of prgm, so its tables pair up in order.
+    protocolized = protocolize(prgm, bindings)
+    originals = dict(zip(tables(protocolized), tables(prgm), strict=True))
+    result = Rewrite(PostWalk(lambda node: originals.get(node)))(f(protocolized))
+    assert isinstance(result, Plan)
+    return result
+
+
 class AbstractLoopOrderer(LogicLoopOrderer):
     def __init__(self, ctx: LogicLoader | None = None):
         if ctx is None:
@@ -308,7 +333,11 @@ class AbstractLoopOrderer(LogicLoopOrderer):
         def loop_order_transform(prgm, bindings):
             prgm = drop_internal_reorders(prgm)
             assert isinstance(prgm, Plan)
-            prgm = self.set_loop_orders(prgm, stats, stats_factory)
+            prgm = with_default_protocols(
+                lambda prgm: self.set_loop_orders(prgm, stats, stats_factory),
+                prgm,
+                bindings,
+            )
             prgm = push_relabels(prgm)
             assert isinstance(prgm, Plan)
             prgm = concordize(prgm, bindings)

@@ -128,6 +128,8 @@ class JuliaOwnedTensor(OverrideTensor):
         return self._as_tensor().fill_value
 
     def item(self):
+        if jl.isa(self.raw_julia_obj, jl.Finch.Scalar):
+            return self.raw_julia_obj.val
         if not self._shape:
             return jl.first(self.raw_julia_obj.lvl.val)
         return self._as_tensor().item()

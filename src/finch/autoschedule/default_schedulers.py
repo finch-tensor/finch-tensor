@@ -22,6 +22,7 @@ from finch.finch_logic.stages import LogicEvaluator
 from finch.finch_notation.interpreter import NotationInterpreter
 
 from .compiler import CompilerFormLowerer, LogicCompiler
+from .cse_extractor import CSEExtractor
 from .drop_fills import LogicFillDropper
 from .executor import LogicExecutor
 from .factor_cache import FactorCacheEvaluator
@@ -42,7 +43,9 @@ OPTIMIZE_LOGIC = LogicNormalizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicWorkspacer(
-                        LogicFuseMerger(DefaultLogicFormatter(MockLogicLoader()))
+                        LogicFuseMerger(
+                            CSEExtractor(DefaultLogicFormatter(MockLogicLoader()))
+                        )
                     )
                 )
             )
@@ -56,9 +59,11 @@ INTERPRET_NOTATION = LogicNormalizer(
                 DefaultLoopOrderer(
                     DefaultLogicWorkspacer(
                         LogicFuseMerger(
-                            DefaultLogicFormatter(
-                                CompilerFormLowerer(
-                                    LogicCompiler(NotationInterpreter())
+                            CSEExtractor(
+                                DefaultLogicFormatter(
+                                    CompilerFormLowerer(
+                                        LogicCompiler(NotationInterpreter())
+                                    )
                                 )
                             )
                         )
@@ -75,12 +80,16 @@ INTERPRET_ASSEMBLY = LogicNormalizer(
                 DefaultLoopOrderer(
                     DefaultLogicWorkspacer(
                         LogicFuseMerger(
-                            DefaultLogicFormatter(
-                                CompilerFormLowerer(
-                                    LogicCompiler(
-                                        NotationCompiler(
-                                            AssemblyInterpreter(),
-                                            mode=CompilerMode(safe=True, debug=True),
+                            CSEExtractor(
+                                DefaultLogicFormatter(
+                                    CompilerFormLowerer(
+                                        LogicCompiler(
+                                            NotationCompiler(
+                                                AssemblyInterpreter(),
+                                                mode=CompilerMode(
+                                                    safe=True, debug=True
+                                                ),
+                                            )
                                         )
                                     )
                                 )
@@ -99,15 +108,17 @@ COMPILE_NUMBA = LogicNormalizer(
                 DefaultLoopOrderer(
                     DefaultLogicWorkspacer(
                         LogicFuseMerger(
-                            DefaultLogicFormatter(
-                                CompilerFormLowerer(
-                                    LogicCompiler(
-                                        NotationCompiler(
-                                            NumbaCompiler(),
-                                            ctx_transforms=(
-                                                LowerPackedStructSlots(),
-                                                AssemblySimplify(),
-                                            ),
+                            CSEExtractor(
+                                DefaultLogicFormatter(
+                                    CompilerFormLowerer(
+                                        LogicCompiler(
+                                            NotationCompiler(
+                                                NumbaCompiler(),
+                                                ctx_transforms=(
+                                                    LowerPackedStructSlots(),
+                                                    AssemblySimplify(),
+                                                ),
+                                            )
                                         )
                                     )
                                 )
@@ -127,15 +138,17 @@ COMPILE_NUMBA_GALLEY = LogicNormalizer(
                 DefaultLoopOrderer(
                     DefaultLogicWorkspacer(
                         LogicFuseMerger(
-                            DefaultLogicFormatter(
-                                CompilerFormLowerer(
-                                    LogicCompiler(
-                                        NotationCompiler(
-                                            NumbaCompiler(),
-                                            ctx_transforms=(
-                                                LowerPackedStructSlots(),
-                                                AssemblySimplify(),
-                                            ),
+                            CSEExtractor(
+                                DefaultLogicFormatter(
+                                    CompilerFormLowerer(
+                                        LogicCompiler(
+                                            NotationCompiler(
+                                                NumbaCompiler(),
+                                                ctx_transforms=(
+                                                    LowerPackedStructSlots(),
+                                                    AssemblySimplify(),
+                                                ),
+                                            )
                                         )
                                     )
                                 )
@@ -155,9 +168,11 @@ INTERPRET_NOTATION_GALLEY = LogicNormalizer(
                 DefaultLoopOrderer(
                     DefaultLogicWorkspacer(
                         LogicFuseMerger(
-                            DefaultLogicFormatter(
-                                CompilerFormLowerer(
-                                    LogicCompiler(NotationInterpreter())
+                            CSEExtractor(
+                                DefaultLogicFormatter(
+                                    CompilerFormLowerer(
+                                        LogicCompiler(NotationInterpreter())
+                                    )
                                 )
                             )
                         )
@@ -175,15 +190,17 @@ COMPILE_MLIR = LogicNormalizer(
                 DefaultLoopOrderer(
                     DefaultLogicWorkspacer(
                         LogicFuseMerger(
-                            DefaultLogicFormatter(
-                                CompilerFormLowerer(
-                                    LogicCompiler(
-                                        NotationCompiler(
-                                            MLIRCompiler(),
-                                            ctx_transforms=(
-                                                LowerPackedStructSlots(),
-                                                AssemblySimplify(),
-                                            ),
+                            CSEExtractor(
+                                DefaultLogicFormatter(
+                                    CompilerFormLowerer(
+                                        LogicCompiler(
+                                            NotationCompiler(
+                                                MLIRCompiler(),
+                                                ctx_transforms=(
+                                                    LowerPackedStructSlots(),
+                                                    AssemblySimplify(),
+                                                ),
+                                            )
                                         )
                                     )
                                 )
@@ -202,8 +219,10 @@ COMPILE_JULIA = LogicNormalizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     LogicFuseMerger(
-                        FDFormatter(
-                            CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
+                        CSEExtractor(
+                            FDFormatter(
+                                CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
+                            )
                         )
                     )
                 )
@@ -221,11 +240,13 @@ COMPILE_JULIA_GALLEY = LogicNormalizer(
                 BFSLoopOrderer(
                     LogicWorkspacer(
                         LogicFuseMerger(
-                            CostFormatter(
-                                LogicFillDropper(
-                                    CostProtocolizer(
-                                        CompilerFormLowerer(
-                                            LogicCompiler(FinchJLCompiler())
+                            CSEExtractor(
+                                CostFormatter(
+                                    LogicFillDropper(
+                                        CostProtocolizer(
+                                            CompilerFormLowerer(
+                                                LogicCompiler(FinchJLCompiler())
+                                            )
                                         )
                                     )
                                 )
@@ -254,7 +275,11 @@ _NON_RECURSIVE_BACKEND = (
 NON_RECURSIVE_SCHEDULER = LogicNormalizer(
     LogicExecutor(
         DefaultLogicFactorizer(
-            LogicSimplify(DefaultLoopOrderer(LogicFuseMerger(_NON_RECURSIVE_BACKEND)))
+            LogicSimplify(
+                DefaultLoopOrderer(
+                    LogicFuseMerger(CSEExtractor(_NON_RECURSIVE_BACKEND))
+                )
+            )
         ),
         stats_factory=FDStatsFactory(),
         cache=True,
