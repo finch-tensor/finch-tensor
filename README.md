@@ -1,3 +1,5 @@
+# 🚧⚠️ Under construction, use Finch.jl for comparisons ⚠️🚧
+
 # finch-tensor
 
 Sparse array programming backed by Numba. [Documentation](https://finch-tensor.org/finch-tensor/)
