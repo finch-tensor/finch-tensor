@@ -1,7 +1,7 @@
 from collections import Counter
 
 from finch.algebra.tensor import TensorFType
-from finch.autoschedule.fuse_merger.fuse_merger import statements
+from finch.autoschedule.fuse_merger.fuse_merger import statements, tensor_accesses
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.finch_assembly import AssemblyLibrary
 from finch.finch_logic import (
@@ -26,7 +26,12 @@ def common_reads(
     stmts: tuple[LogicStatement, ...], loops: tuple[Field, ...]
 ) -> list[Table]:
     """The tables which the queries of stmts read more than once, whose fields
-    are those of the enclosing Fuse nodes loops."""
+    are those of the enclosing Fuse nodes loops, and whose tensors no statement
+    of stmts writes. A copy taken before the statements would miss a write
+    between them, so a tensor they write is read in place."""
+    written: set[Alias] = set()
+    for stmt in stmts:
+        written |= tensor_accesses(stmt)[1]
     counts: Counter[Table] = Counter()
     for stmt in stmts:
         for query in PostOrderDFS(stmt):
@@ -34,7 +39,9 @@ def common_reads(
                 case Query(_, rhs) | QueryInto(_, _, rhs):
                     for node in PostOrderDFS(rhs):
                         match node:
-                            case Table(Alias(), idxs) if set(idxs) == set(loops):
+                            case Table(Alias() as tns, idxs) if (
+                                set(idxs) == set(loops) and tns.unfused not in written
+                            ):
                                 counts[node] += 1
     return [table for table, n in counts.items() if n > 1]
 
@@ -42,8 +49,9 @@ def common_reads(
 def extract_common_reads(prgm: LogicStatement) -> LogicStatement:
     """
     Copy each table which the body of a Fuse of prgm reads more than once, over
-    exactly the fields of its enclosing Fuse nodes, into a temporary at the
-    start of the body, and read the temporary instead. The temporary is fused
+    exactly the fields of its enclosing Fuse nodes, and which the body doesn't
+    write, into a temporary at the start of the body, and read the temporary
+    instead. The temporary is fused
     over every enclosing field, so it holds one scalar for each iteration, and
     the tensor is accessed once per iteration however many statements read it.
     """

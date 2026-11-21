@@ -144,24 +144,24 @@ class ScalarFType(FinchTensorFType, MutableStructFType):
             other_t = other_t.with_fill(self._fill_type)
         return other_t == self
 
-    def lower_fill(self, ctx, obj):
+    def lower_fill(self, ctx, lvl):
         if is_static(self._fill_type):
             return asm.Literal(self._fill_type.value)
-        match obj:
+        match lvl:
             case ntn.Fiber():
-                return asm.GetAttr(ctx(obj.lvl.root), asm.Literal("fill"))
+                return asm.GetAttr(ctx(lvl.lvl.root), asm.Literal("fill"))
             case _:
                 # An inline scalar value (e.g. a sparse gap read) is its fill.
-                return ctx(obj)
+                return ctx(lvl)
 
-    def lower_unwrap(self, ctx, obj):
-        match obj:
+    def lower_unwrap(self, ctx, lvl):
+        match lvl:
             case ntn.Fiber():
                 # A slot-bound scalar argument: read the value struct field.
-                return asm.GetAttr(ctx(obj.lvl.root), asm.Literal("val"))
+                return asm.GetAttr(ctx(lvl.lvl.root), asm.Literal("val"))
             case _:
                 # An inline scalar value (e.g. a sparse gap read).
-                return ctx(obj)
+                return ctx(lvl)
 
     def get_child_type(self, attr: str) -> FType:
         return self
@@ -169,7 +169,7 @@ class ScalarFType(FinchTensorFType, MutableStructFType):
     def get_child(self, obj, attr: str):
         return obj
 
-    def lower_dim(self, ctx, obj, r):
+    def lower_dim(self, ctx, lvl, r):
         raise IndexError(f"A scalar has no dimension {r}")
 
     def _set(self, ctx, obj, attr: str, val: asm.AssemblyExpression):
@@ -179,15 +179,15 @@ class ScalarFType(FinchTensorFType, MutableStructFType):
             val = asm.Call(asm.Literal(ffuncs.astype(self._element_type)), (val,))
         ctx.exec(asm.SetAttr(ctx(obj.lvl.root), asm.Literal(attr), val))
 
-    def lower_declare(self, ctx, tns, init, op, shape):
+    def lower_declare(self, ctx, lvl, init, op, shape):
         # As for other tensors, declaring sets a dynamic fill to the init.
         if is_dynamic(self._fill_type):
-            self._set(ctx, tns, "fill", init)
-        self._set(ctx, tns, "val", init)
+            self._set(ctx, lvl, "fill", init)
+        self._set(ctx, lvl, "val", init)
 
-    def lower_increment(self, ctx, obj, op, val):
-        cur = asm.GetAttr(ctx(obj.lvl.root), asm.Literal("val"))
-        self._set(ctx, obj, "val", asm.Call(ctx(op), (cur, ctx(val))))
+    def lower_increment(self, ctx, lvl, op, val):
+        cur = asm.GetAttr(ctx(lvl.lvl.root), asm.Literal("val"))
+        self._set(ctx, lvl, "val", asm.Call(ctx(op), (cur, ctx(val))))
 
     def lower_freeze(self, ctx, tns, op):
         return tns

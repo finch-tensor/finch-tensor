@@ -2,10 +2,7 @@ from .bufferized_ndarray import BufferizedNDArray, BufferizedNDArrayFType
 from .fiber_tensor import (
     FiberTensor,
     FiberTensorFType,
-    Temp0D,
-    Temp0DFType,
     fiber_tensor,
-    temp_0d,
 )
 from .level import (
     DenseLevel,
@@ -94,8 +91,6 @@ __all__ = [
     "SparseListLevel",
     "SparseListLevelFType",
     "SplitMaskTensor",
-    "Temp0D",
-    "Temp0DFType",
     "UpperTriangleTensor",
     "dense",
     "element",
@@ -104,5 +99,4 @@ __all__ = [
     "sparse_coo",
     "sparse_hash",
     "sparse_list",
-    "temp_0d",
 ]

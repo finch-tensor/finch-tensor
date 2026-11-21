@@ -219,10 +219,8 @@ COMPILE_JULIA = LogicNormalizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     LogicFuseMerger(
-                        CSEExtractor(
-                            FDFormatter(
-                                CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
-                            )
+                        FDFormatter(
+                            CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
                         )
                     )
                 )
@@ -240,13 +238,11 @@ COMPILE_JULIA_GALLEY = LogicNormalizer(
                 BFSLoopOrderer(
                     LogicWorkspacer(
                         LogicFuseMerger(
-                            CSEExtractor(
-                                CostFormatter(
-                                    LogicFillDropper(
-                                        CostProtocolizer(
-                                            CompilerFormLowerer(
-                                                LogicCompiler(FinchJLCompiler())
-                                            )
+                            CostFormatter(
+                                LogicFillDropper(
+                                    CostProtocolizer(
+                                        CompilerFormLowerer(
+                                            LogicCompiler(FinchJLCompiler())
                                         )
                                     )
                                 )
@@ -264,22 +260,22 @@ COMPILE_JULIA_GALLEY = LogicNormalizer(
 # This scheduler is used for computing tensor statistics.
 # Crucially, in order to avoid a circular dependency, this scheduler does not
 # cannot rely on a stats factory that itself calls the interface.
+# Finch.jl reads a tensor which a loop reads several times once, but can't see
+# that a temporary read in its place holds its fill where the tensor is empty,
+# so it would visit every coordinate of a sparse scan: there is no CSEExtractor
+# before the Julia backend.
 _NON_RECURSIVE_BACKEND = (
     FDFormatter(CompilerFormLowerer(LogicCompiler(FinchJLCompiler())))
     if julia_available()
-    else DefaultLogicFormatter(
-        CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+    else CSEExtractor(
+        DefaultLogicFormatter(CompilerFormLowerer(LogicCompiler(NotationInterpreter())))
     )
 )
 
 NON_RECURSIVE_SCHEDULER = LogicNormalizer(
     LogicExecutor(
         DefaultLogicFactorizer(
-            LogicSimplify(
-                DefaultLoopOrderer(
-                    LogicFuseMerger(CSEExtractor(_NON_RECURSIVE_BACKEND))
-                )
-            )
+            LogicSimplify(DefaultLoopOrderer(LogicFuseMerger(_NON_RECURSIVE_BACKEND)))
         ),
         stats_factory=FDStatsFactory(),
         cache=True,

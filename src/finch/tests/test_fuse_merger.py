@@ -515,3 +515,26 @@ def test_reads_go_through_a_temporary_in_the_loop_of_their_fields():
             raise AssertionError(f"Expected x to be read once for each i: {prgm}")
     single = Plan((Fuse(i, Fuse(j, query(Literal(2.0)))), Produces((y,))))
     assert extract_common_reads(single) == single
+
+
+def test_reads_of_a_tensor_the_loop_body_writes_stay_in_place():
+    a, t, u = HardAlias("a"), HardAlias("t"), HardAlias("u")
+    i = Field("i")
+    square = MapJoin(Literal(ffuncs.mul), (Table(t, (i,)), Table(t, (i,))))
+    plan = Plan(
+        (
+            Fuse(
+                i,
+                Plan(
+                    (
+                        Query(Table(t, (i,)), Table(a, (i,))),
+                        Query(Table(u, (i,)), square),
+                    )
+                ),
+            ),
+            Produces((u,)),
+        )
+    )
+    # A copy of t taken at the start of the body would read t before the body
+    # writes it, so t is read in place.
+    assert extract_common_reads(plan) == plan

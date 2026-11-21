@@ -18,7 +18,6 @@ from finch.tensor import (
     SparseCOOLevel,
     SparseHashLevel,
     SparseListLevel,
-    Temp0D,
     element,
 )
 from finch.tensor.np_wrapper import NumPyWrapper
@@ -371,10 +370,6 @@ def tensor_to_jl(obj, pin_fill: bool = False):
         jl.isa(obj, jl.Finch.Tensor) or jl.isa(obj, jl.Finch.Scalar)
     ):
         return obj
-    if isinstance(obj, Temp0D):
-        # A kernel resets a Temp0D before reading it, so it is passed the Finch
-        # scalar types.py constructs for its format, whatever its value.
-        return jl.seval(jl_dtypes.ftype_to_jl_constructor_str(obj.ftype))
     if isinstance(obj, FiberTensor):
         if obj.pos != 0:
             raise ValueError("Only root-position FiberTensor objects can use Julia")
