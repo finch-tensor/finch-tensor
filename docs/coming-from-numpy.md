@@ -11,6 +11,7 @@ In efforts not to bore with tediously long definitions, we describe increasingly
 
 !!! info "Definition 1: An Array"
     An array is a contiguous, ordered sequence of values of finite length, which can be indexed and iterated over.
+
 !!! info "Definition 2: Sparse Arrays (introduction)"
     A sparse array is an array where most values are zero. Some notable examples include arrays of the identity transform (I, aka `np.eye`) and triangular matrices.
 
@@ -111,7 +112,7 @@ realized_compute = finch.compute(lazy_computation)
 While the code above would suffice for trivial operations, most programs that people want to write in high level languages are not as trivial, and eliding the laziness and compute is desirable. To this end, finch has a procedure for automatically inserting these calls in the form of an `@jit` decorator.
 
 
-```
+```py
 @finch.jit
 def add_with_self(a):
     return A + A
@@ -150,3 +151,7 @@ csr_10x10 = finch.asarray(matrix_10x10, format="csr")
 ```
 
 For 10x10 matricies, the cost of converting between formats likely exceeds the computation gains, but for large matricies, formats like CSR are what underpine the huge calculations possible in the space.
+
+## Optimized Formats.
+
+As opposed to the prior arts in sparse tensor computation within Python, finch is not limited to only handling 2D sparse arrays, and can instead nest sparse arrays to form sparse tensors. This restriction even allows for the mixing of the different sparse array formats to describe one array. The top level format (the first index) might be a sparse list format, but it might hold a sparse hash level, for instance.

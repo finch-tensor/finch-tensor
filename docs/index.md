@@ -1,12 +1,8 @@
-# Finch: Flexible, Optimized Sparse Array Programming Suite
+# Finch: Sparse Arrays for Python
 
 
-!!! warning "Stability Notice"
-    Finch is *pre-alpha software*. Sparse array optimization is an active
-    field of research, and sharp corners are present which may be confusing
-    to users unfamiliar with theory of sparse array optimizations.
 
-
+![Finch Sparse Array](./images/hero.svg)
 ## Sparse Array Definition
 
 A sparse array is an array where most entries are blank. Usually, these blanks are represented by 0 or some other, selected value. Sparse arrays provide asymptotic time and space complexity benefits compared to dense arrays for some classes of problems.
@@ -21,6 +17,11 @@ A sparse array is an array where most entries are blank. Usually, these blanks a
 | Custom Sparse Array Formats         | &check;   | &cross;      | &cross;       |
 | Binary operations supported on tensors of different formats | &check;   | &cross;      | &cross;       |
 
+
+!!! warning "Stability Notice"
+    Finch is *pre-alpha software*. Sparse array optimization is an active
+    field of research, and sharp corners are present which may be confusing
+    to users unfamiliar with theory of sparse array optimizations.
 
 
 ## Dimensionality

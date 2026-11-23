@@ -88,8 +88,16 @@ either by manually implementing the operations, which was never done for every c
 
 Finch can efficiently solve all of these problems with only a couple of definitions per level format, thanks to work done by Willow Marie Ahrens (who is a major contributor to Finch) in developing [Looplets](https://arxiv.org/abs/2209.05250).
 
+## Compiler Lowering in Finch
+
+Finch executes programs first by walking the tree of computations (`lazy`) and then computing values (`compute`). After the tree of computations is walked, prior to execution, finch analyzes the structure of the data and formats and automatically selects the best order of operations and format required to perform the user's calculation. While programs are written in imperative-fashion in finch, they are lowered to a more declarative format (called finch logic), which only describes which calculations are required. Finch notation is a thin-lowering over finch logic which translates finch logic to loops over dense formats (called looplets). Once finch notation is generated. Next, the compiler generates finch assembly, which a fully typed, simplistic imperative language designed to express fundamental control flow. Finch assembly is then lowered to a  variety of backends, with the C backend being the default and most capable, but interpreters for the format exist, and JIT compilation via [Numba](https://numba.pydata.org/) and [MLIR](https://mlir.llvm.org/). Finch's goal is to be a sparse tensor compiler that efficiently executes sparse tensor routines everywhere. While not as many platforms are supported as we would like, extending finch to also work on disk and on GPUs are active areas of research.
+
+
+
 ### What is a Looplet?
 
 A Looplet is a data structure that describes iteration and seeking over a level. This is actually sufficient to implement the matrix operations the project concerns itself with. To people not familiar with efficient low-level math, the majority of the computation time is usually spent fetching values from memory. The average processor can do a _lot_ of multiplications and additions in the time it takes to fetch a value from memory.
 
-A looplet functionally allows for
+## Schedulers
+
+A scheduler determines the intermediate formats and order of operations that will performed in the target runtime. Currently, schedulers can be found in `finch.autoschedule`.

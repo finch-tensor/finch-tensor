@@ -10,7 +10,8 @@ edit_uri = "blob/main/docs/"
 nav = [
   { "Introduction" = "index.md" },
   { "Coming from Numpy" = "coming-from-numpy.md" },
-  { "A Graph Analog" = "graph.md" },
+  { "Compilation Targets" = "targets.md" },
+  { "Sparse Array Formats" = "sparse-array-formats.md" },
   { "Under The Hood" = "under-the-hood.md" },
   { "Issue Tracker" = "https://github.com/finch-tensor/finch-tensor/issues" },
 ]
