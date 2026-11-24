@@ -101,3 +101,7 @@ A Looplet is a data structure that describes iteration and seeking over a level.
 ## Schedulers
 
 A scheduler determines the intermediate formats and order of operations that will performed in the target runtime. Currently, schedulers can be found in `finch.autoschedule`.
+
+## Lazy and Compute
+
+Sparse array problem spaces lend themselves to certain optimizations that are not possible when arrays are dense. By building the program execution tree _first_ and then executing it, the finch library can determine dependencies and re-order computations to minimize the time and calculations required to compute a result. `finch.lazy` and `finch.compute` are a pair of functions that allow finch to defer calculations and build it's execution tree and advance. The `finch.lazy` function defers computation until a `finch.compute` is called, which gives the finch scheduler a chance to reorder execution and decide on types of intermediate formats. Normally users are expected to use finch's `@finch.jit`, which will automatically insert lazy and compute calls around tensors when necessary. Custom routines and alternative expressions may want to have the more low level calls to lazy and compute available, so finch provides them in the interface.

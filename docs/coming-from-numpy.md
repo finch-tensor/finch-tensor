@@ -5,24 +5,15 @@
 
 [Numpy](https://numpy.org/) is the most popular array programming library in Python. You are not expected to know Numpy to be able to use Finch; however, as many members of the community do use Numpy, this guide exists for them.
 
-## What is a sparse array?
+## Sparse Tensor Definition
 
-In efforts not to bore with tediously long definitions, we describe increasingly precise definitions of sparse arrays, to the extent that they are implemented by this package.
+Sparse tensors are tensors of values where most of the entries are a single value. This value is most often zero, but can be other values such as infinity in the case of distance matrices and is called the fill value. Sparse tensors are useful to express as their representation can require signficantly less memory or storage compared to more traditional, contiguous tensor storage. They also can allow some operations to be performed much faster than traditional, dense array storage mechanisms, as sparse array compilers, such as finch, can avoiding performing calculations on the fill value.
 
-!!! info "Definition 1: An Array"
-    An array is a contiguous, ordered sequence of values of finite length, which can be indexed and iterated over.
+## When are sparse tensors useful?
 
-!!! info "Definition 2: Sparse Arrays (introduction)"
-    A sparse array is an array where most values are zero. Some notable examples include arrays of the identity transform (I, aka `np.eye`) and triangular matrices.
+Sparse arrays are a restriction on dense arrays, so anything numerical result that can be computed on the sparse arrays could alternatively been computed on dense arrays. Sparse arrays are more structured than dense arrays and more limited in scope, but, in exchange, they can be significantly more performant. One classic example is Sampled Dense Dense Matrix Multiplication, written <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"> <mrow> <mi>A</mi> <mo>∘</mo> <mrow> <mo stretchy="true" form="prefix">(</mo> <mi>B</mi> <mi>C</mi> <mo stretchy="true" form="postfix">)</mo> </mrow></mrow></math>, with B and C dense and A sparse. In traditional dense regimes, B and C must be multiplied in their entirety and then must compute the element-wise product with A. An optimizing sparse compiler, such as finch, can analyze this calculation and only compute the entries that will be involved in the element-wise product with sparse matrix A. If the matrix A is highly sparse, this optimziation is a significant improvement compared to the dense calculation.
 
-!!! info "Definition 3: Sparse arrays _slightly_ more generally"
-    A sparse array is a representation of an array when an appreciable number of entries in that array are zero.
-
-!!! info "Definition 4: Sparse arrays. Zeros are not special."
-    A sparse array, practically, is a useful method of representing an array when an appreciable number of entries is some-non-zero value, called the fill. A matrix which represents the pairwise distance of two groups may have unreachable entries represented using infinity as a value, for instance.
-
-!!! info "Definition 5: Extending to sparse tensors"
-    A sparse matrix is a sparse array of sparse arrays of values. A sparse tensor is a sparse array of sparse matrices. Finch allows this nesting pattern to continue, allowing for the construction of arbitrarily "nested" (high-dimensional) sparse tensors.
+While sparse arrays can reduce the amount of work required when the problem is structured suitably, they do incur overhead in their storage layouts. Sparse array formats often require a representation of their indices to be stored alongside the array values, and they often have less optimal memory access patterns on modern hardware when compared to dense arrays. Finch is smart enough to recognize when the data is obviously too dense for sparse arrays to have performance advantages and will fall back to using dense arrays when necessary. However, in general, dense arrays are performant enough for most use cases, and sticking with the simplicity of dense arrays when possible is often a pragmatic choice. For problems that cannot be computed densely, finch provides a state of the art evaluation engine which automatically optimizes sparse tensor programs.
 
 ## Installation
 
@@ -95,22 +86,6 @@ from finch.autoschedule import COMPILE_NUMBA_GALLEY
 finch.autoschedule.set_default_backend(COMPILE_NUMBA_GALLEY)
 ```
 
-## Performing simple operations.
-
-Due to finch's flexibility, it's actually possible to perform operations on these matrices in an efficient manner using `lazy` and `compute`. In order to efficiently perform these operations, it's wise to wrap them in `lazy` and `compute` function calls.
-
-```py
-lazy_computation = finch.lazy(array_10x10) + finch.lazy(array_10x10)
-realized_compute = finch.compute(lazy_computation)
-```
-
-
-`realized_compute` will now hold the result of adding `array_10x10` to itself, and it will do no extra work to add the empty slots in the array.
-
-## The JIT
-
-While the code above would suffice for trivial operations, most programs that people want to write in high level languages are not as trivial, and eliding the laziness and compute is desirable. To this end, finch has a procedure for automatically inserting these calls in the form of an `@jit` decorator.
-
 
 ```py
 @finch.jit
@@ -119,14 +94,6 @@ def add_with_self(a):
 
 add_with_self(array_10x10)
 ```
-
-
-This performs the same operation as above, but automatically inserts the lazy and compute calls, reducing the mental overhead associated with writing procedures in sparse array regimes.
-
-## So why lazy and compute?
-
-Optimization. Sparse array problem spaces lend themselves to certain optimizations that are not possible when arrays are dense. By building the program execution tree _first_ and then executing it, the finch library can determine dependencies and re-order computations to minimize the time and calculations required to compute a result.
-
 
 
 

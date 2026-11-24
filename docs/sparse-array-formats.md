@@ -29,7 +29,11 @@ row, col, value = unzip(*L)
 As COO must store the row and column values for each non-zero (non-fill) entry, it becomes more memory efficient when the array is less than 1/3 dense. However, this is not where efficiency gains begin, because memory access patterns compared to dense arrays are subpar. Some gains can be achieved by sorting the array, which helps slightly with reads, but does not help with writes to the array.
 
 
-# Sparse Hash Level
+![COO Diagram](./images/coo.svg)
+
+Note that the actual finch definition of COO is more general, and does not have row and column fields, as finch's COO implementation is not limited to only matrices.
+
+## Sparse Hash Level
 
 
 A sparse hash level creates a hashmap that maps indexes to values in an array. Because of it's lookup characteristics and storage mechanism, it can perform COO on certain workloads, particularly write heavy work loads, such as matrix multiplication outputs. It can sometimes be more efficient to first compute a result and store it in a sparse hash level, and then later transform that sparse hash level to another format such as CSR.
@@ -47,4 +51,6 @@ Below is a visualization of a 4 X 5 sparse matrix in CSR format, with the second
 
 CSR can be directly indexed for each row, but cannot be directly indexed for each column. For row r, the lower bound on that row's data is `rl = row_ptr[r]` and the upper bound is `rh = row_ptr[r+1]`. The column indices are stored in `col_indicies[rl..rh]` and the values in that column are `values[rl..rh]`. The first value can be found at (`r`, `col_indicies[rl..rh][0]`, `values[rl..rh][0]`), the second in the row is stored at (`r`, `col_indicies[rl..rh][1]`, `values[rl..rh][1]`). Note that because CSR is a truly sparse array, the concept of a "second" value might not be index 1 in the matrix, so it must be looked up in the `col_indices[rl..rh]` array instead.
 
-CSR does requires at least the memory to store number per row, regardless of whether any entries are present in that row, but for most matrices, the access patterns and sparsity more than make up for it, and make it a much more efficient format than COO for most read-heavy operations.
+Note that CSR, as provided in the examples, can be more memory efficient than COO, and almost always will be when each row in the matrix has at least one value. Regardless of it's memory efficiency, CSR is a much more efficient for reads when compared to COO, and therefore is often a good choice for performing sparse array operations.
+
+Note that CSR also has an sister format named CSC (compressed sparse column), which essentially just flips whether the top level array refers to rows or refers to columns. This is useful for certain operations, but most likely, CSR will be seen much more frequently.

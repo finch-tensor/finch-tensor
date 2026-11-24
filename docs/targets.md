@@ -37,11 +37,17 @@ with finch.autoschedule.with_default_scheduler(finch.autoschedule.INTERPRET_ASSE
     The terminology around schedulers is obfuscated by conflations and elisions. Discussions often assume collaborators can disambiguate the intentioned meaning through their knowledge of standard background compiler theory.
 
 **finch logic**: high level, declarative, query based language describing computation to be performed on tensors. Lowers to finch notation. Usually derived by analying a computation written in Python syntax.
+
 **finch notation**: declarative, control-flow based language describing computation to be performed on tensors. Lowers from finch logic. Lowers to finch assembly.
+
 **finch assembly**: a typed, detailed, limited low level language representation, independent of target. Lowers from finch notation, lowers to system programming language backends.
+
 **lowering**: the transformation from a higher level of implied detail to a lower level of realized detail, while preserving the semantics of the higher level.
+
 **pass**: a traversal over a program which rewrites the program to a semantically equivalent program, usually used to optimize the program either for semantic interpretability or performance.
+
 **target**: an environment for describing a numerical computation, often a low level, high performance language. Due to the low level nature of a target, often, targets are hardware specific.
+
 **scheduler**:  A series of compiler lowerings and passes to reach a target format.
 
 # The C Compilation Target.
