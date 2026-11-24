@@ -20,12 +20,24 @@ from finch.finch_logic import (
     StatsFactory,
     TensorStats,
 )
-from finch.tensor import BufferizedNDArrayFType
+from finch.tensor import BufferizedNDArrayFType, ScalarFType
 from finch.tensor.fiber_tensor import FiberTensorFType
 from finch.tensor.level import DenseLevelFType, ElementLevelFType, SparseListLevelFType
 from finch.util.logging import LOG_LOGIC_POST_OPT
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
+
+
+def stores_nothing(lhs: lgc.Alias, shape_type: tuple) -> bool:
+    """Whether lhs is fused over every field of shape_type, so it holds one
+    value in each fused iteration."""
+    return 0 < lhs.nfused == len(shape_type)
+
+
+def scalar_ftype(fill_type: AbstractFillFType) -> ScalarFType:
+    """The format of an alias which stores none of its fields, whose value is
+    set in each fused iteration."""
+    return ScalarFType(fill_type.element_type, fill_type)
 
 
 class MonoLogicFormatter(LogicFormatter):
@@ -66,16 +78,21 @@ class MonoLogicFormatter(LogicFormatter):
                     lgc.Table(lgc.Alias() as lhs, _), _, _
                 ):
                     node.infer_shape_type(shape_types)
-                    lhs = lhs.unfused
-                    if lhs not in bindings:
+                    alias = lhs.unfused
+                    if alias not in bindings:
+                        # Every field of a fused alias is stored, so it spans
+                        # the fused iterations like any other tensor.
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftype(np.intp)
-                            for dim in shape_types[lhs]
+                            for dim in shape_types[alias]
                         )
 
-                        tns = self.get_tensor_ftype(fill_types[lhs], shape_type)
+                        if stores_nothing(lhs, shape_type):
+                            tns = scalar_ftype(fill_types[alias])
+                        else:
+                            tns = self.get_tensor_ftype(fill_types[alias], shape_type)
 
-                        bindings[lhs] = tns
+                        bindings[alias] = tns
                     return node
                 case lgc.Produces():
                     return node

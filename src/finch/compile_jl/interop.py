@@ -4,7 +4,7 @@ from typing import Any, cast
 
 import numpy as np
 
-from finch.algebra import ftype
+from finch.algebra import StaticFill, ftype
 from finch.codegen import NumpyBuffer, NumpyBufferFType
 from finch.finch_assembly import Buffer
 from finch.tensor import (
@@ -18,7 +18,6 @@ from finch.tensor import (
     SparseCOOLevel,
     SparseHashLevel,
     SparseListLevel,
-    Temp0D,
     element,
 )
 from finch.tensor.np_wrapper import NumPyWrapper
@@ -367,12 +366,10 @@ def tensor_to_jl(obj, pin_fill: bool = False):
     """Convert a tensor to its Julia counterpart, optionally pinning its fill."""
     if hasattr(obj, "raw_julia_obj"):
         return obj.raw_julia_obj
-    if is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor):
+    if is_julia_obj(obj) and (
+        jl.isa(obj, jl.Finch.Tensor) or jl.isa(obj, jl.Finch.Scalar)
+    ):
         return obj
-    if isinstance(obj, Temp0D):
-        # A kernel resets a Temp0D before reading it, so it is passed the Finch
-        # scalar types.py constructs for its format, whatever its value.
-        return jl.seval(jl_dtypes.ftype_to_jl_constructor_str(obj.ftype))
     if isinstance(obj, FiberTensor):
         if obj.pos != 0:
             raise ValueError("Only root-position FiberTensor objects can use Julia")
@@ -388,7 +385,9 @@ def tensor_to_jl(obj, pin_fill: bool = False):
         )
         return _ndarray_to_jl_tensor(obj._data, fill, copy=False)
     if isinstance(obj, Scalar):
-        return scalar_to_jl(obj.val, pin_fill=pin_fill)
+        fill = jl_dtypes._zero_value(obj.element_type) if pin_fill else obj.fill_value
+        scalar_t = jl.seval(jl_dtypes.scalar_type_str(fill, obj.element_type))
+        return scalar_t(_as_julia_scalar(obj.val))
     if isinstance(obj, PatternTensor):
         return _pattern_tensor_to_jl(obj)
     if isinstance(obj, FillTensor):
@@ -414,6 +413,10 @@ def scalar_to_jl(val, pin_fill: bool = False):
 
 
 def jl_tensor_to_python(obj):
+    if is_julia_obj(obj) and jl.isa(obj, jl.Finch.Scalar):
+        # A one element Julia array converts to the numpy dtype of the scalar.
+        val, fill = np.asarray(jl.collect((obj.val, jl.Finch.fill_value(obj))))
+        return Scalar(val, fill_value=StaticFill(fill))
     if not (is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor)):
         return obj
     lvl = jl_level_to_python(obj.lvl)

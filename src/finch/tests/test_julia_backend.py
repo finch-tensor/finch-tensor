@@ -1273,7 +1273,7 @@ def test_julia_kernels_keep_their_own_scalars_in_finch_scalars():
     from finch.autoschedule import COMPILE_JULIA_GALLEY
 
     # Two row sums of a CSR matrix run in one loop over its rows, each summing
-    # into a Temp0D accumulator, which Finch.jl keeps in a variable.
+    # into a scalar accumulator, which Finch.jl keeps in a variable.
     rng = np.random.default_rng(0)
     data = rng.random((20, 30)) * (rng.random((20, 30)) < 0.3)
     data[3] = 0.0
@@ -1291,5 +1291,23 @@ def test_julia_kernels_keep_their_own_scalars_in_finch_scalars():
     runtime = loader.runtime
     assert isinstance(runtime, DefaultFinchJLRuntime)
     codes = [kernel.jl_code for kernel in runtime._kernels.values()]
-    # Each accumulator is a Temp0D, which the Finch kernel keeps in a scalar.
+    # Each accumulator is a Finch scalar, which the kernel keeps in a variable.
     assert any(code.count("Finch.Scalar{0.0, Float64}(0.0)") == 2 for code in codes)
+
+
+@pytest.mark.parametrize("static", [True, False], ids=["static", "dynamic"])
+def test_julia_scalars_are_passed_as_their_kernel_prototypes(static):
+    _requires_julia_backend()
+    from finch.algebra import StaticFill, is_dynamic
+    from finch.compile_jl.types import ftype_to_jl_type_str
+    from finch.tensor import Scalar
+
+    scalar = Scalar(np.float64(2.0))
+    if static:
+        scalar = scalar.with_fill(StaticFill(np.float64(0.0)))
+    # A kernel is compiled for the prototype of each argument's format, so a
+    # scalar must be passed as a Julia object of that type. A dynamic fill is
+    # pinned, as the runtime pins it.
+    jl_obj = tensor_to_jl(scalar, pin_fill=is_dynamic(scalar.ftype.fill_type))
+    assert str(jl.string(jl.typeof(jl_obj))) == ftype_to_jl_type_str(scalar.ftype)
+    assert jl_tensor_to_python(jl_obj).val == 2.0

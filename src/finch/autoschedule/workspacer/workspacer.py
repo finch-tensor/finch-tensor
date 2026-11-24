@@ -40,7 +40,7 @@ from finch.finch_logic import (
     TensorStats,
 )
 from finch.symbolic import Namespace, PostOrderDFS, PostWalk, Rewrite
-from finch.tensor import element, temp_0d
+from finch.tensor import ScalarFType
 
 
 def definitions(
@@ -160,7 +160,7 @@ def add_accumulators(
     over all of them, as add_workspace does. The workspace stores no fields,
     so it is declared before the loops it reduces over, accumulates the value
     of one element of the output, and is copied into it once those loops end.
-    Return the program and the format of each workspace, a Temp0D, which a
+    Return the program and the format of each workspace, a Scalar, which a
     backend may keep in a register, where it would load and store the output
     in every iteration, and could not keep it there when another output might
     alias it. Where a sparse input leaves nothing to accumulate, the reset and
@@ -187,7 +187,7 @@ def add_accumulators(
         staged = add_workspace(prgm, alias, depth, acc)
         assert isinstance(staged, Plan)
         prgm = staged
-        formats[acc] = temp_0d(element(fill, fill.element_type))
+        formats[acc] = ScalarFType(fill.element_type, fill)
     return prgm, formats
 
 

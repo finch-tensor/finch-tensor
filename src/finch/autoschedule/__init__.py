@@ -17,6 +17,7 @@ from finch.symbolic import PostOrderDFS, PostWalk, PreWalk
 
 from .capture import LogicCapture
 from .compiler import CompilerFormLowerer, LogicCompiler, NotationGenerator
+from .cse_extractor import CSEExtractor
 from .default_schedulers import (
     COMPILE_JULIA,
     COMPILE_JULIA_GALLEY,
@@ -67,6 +68,7 @@ __all__ = [
     "Aggregate",
     "Alias",
     "BufferizedNDArrayFormatter",
+    "CSEExtractor",
     "CompilerFormLowerer",
     "CostProtocolizer",
     "DefaultLogicFactorizer",

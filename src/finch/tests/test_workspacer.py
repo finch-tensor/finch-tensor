@@ -78,10 +78,9 @@ from finch.tensor import (
     DenseLevel,
     ElementLevel,
     FiberTensor,
+    ScalarFType,
     SparseListLevel,
-    Temp0DFType,
     element,
-    temp_0d,
 )
 
 
@@ -393,8 +392,9 @@ def test_accumulators_hold_each_entry_an_inner_loop_reduces_into():
     tensor = fl.asarray(np.ones((2, 2)))
     bindings: dict[Alias, TensorFType] = {a: tensor.ftype, b: tensor.ftype}
     staged, formats = add_accumulators(plan, bindings)
-    # The accumulator holds one element, which the kernel keeps to itself.
-    assert formats == {acc.unfused: temp_0d(element(0.0, ftype(np.float64)))}
+    # The accumulator holds one element, a scalar the kernel keeps to itself.
+    fill = StaticFillFType(np.float64(0.0))
+    assert formats == {acc.unfused: ScalarFType(ftype(np.float64), fill)}
     assert staged == Plan(
         (
             Fuse(
@@ -496,10 +496,10 @@ def test_workspacer_accumulates_row_sums_which_merge_into_one_pass():
             assert (lhs_1, lhs_2) == (s, t)
         case prgm:
             raise AssertionError(f"Expected one pass over a: {prgm}")
-    # Each accumulator stores only its element, which the kernel keeps to itself.
+    # Each accumulator stores only its element, a scalar the kernel keeps to itself.
     for acc in (s_acc, t_acc):
         fmt = capture.last_bindings[acc.unfused]
-        assert isinstance(fmt, Temp0DFType)
+        assert isinstance(fmt, ScalarFType)
         assert fmt.ndim == 0
 
     program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
