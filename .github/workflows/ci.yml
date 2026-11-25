@@ -3,6 +3,8 @@ defaults:
     shell: bash -el {0}
 
 name: CI
+permissions:
+  contents: read
 jobs:
   test:
     strategy:
@@ -21,8 +23,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v7
-      - uses: prefix-dev/setup-pixi@v0.11.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
         with:
           pixi-version: v0.84.2
           environments: >-
@@ -30,14 +34,16 @@ jobs:
             ${{ matrix.suite.environment }}
       - name: Run tests
         run: pixi run -e ${{ matrix.suite.environment }} ${{ matrix.suite.task }} ${{ matrix.suite.task == 'test' && 'no-commit-to-branch' || '' }} -- --junit-xml=test-${{ matrix.os }}-Env-${{ matrix.suite.environment }}.xml
-      - uses: codecov/codecov-action@v7
+      - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
 
   test-julia:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v7
-      - uses: prefix-dev/setup-pixi@v0.11.3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
         with:
           pixi-version: v0.84.2
           environments: >-
@@ -45,7 +51,7 @@ jobs:
             test-julia
       - name: Run Julia backend tests
         run: pixi run test-julia -- -x -v --junit-xml=test-ubuntu-latest-Env-test-julia.xml
-      - uses: codecov/codecov-action@v7
+      - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
 
 on:
   # Trigger the workflow on push or pull request,

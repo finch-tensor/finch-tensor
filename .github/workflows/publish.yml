@@ -1,18 +1,22 @@
 name: Publish
 on:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.x'
       - name: Install dependencies
         run: pip install build
-      - uses: prefix-dev/setup-pixi@v0.11.3
+      - uses: prefix-dev/setup-pixi@9936258fee697aff89b3fed6ca1f80a382ef694e # v0.11.3
         with:
           pixi-version: v0.84.2
       - name: Get version
@@ -23,7 +27,7 @@ jobs:
       - name: Build PyPI package
         run: python -m build
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           password: ${{ secrets.PYPI_TOKEN }}
           skip-existing: true
@@ -32,10 +36,6 @@ jobs:
       - name: Build and publish to Prefix.dev
         run: pixi publish --target-channel https://prefix.dev/finch-tensor
       - name: Create a Release
-        uses: softprops/action-gh-release@v3
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          name: Release ${{ env.VERSION }}
-          make_latest: true
-          tag_name: ${{ env.VERSION }}
+        run: gh release create "$VERSION" --title "Release $VERSION" --target "$GITHUB_SHA" --latest
