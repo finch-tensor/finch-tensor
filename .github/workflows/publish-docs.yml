@@ -1,21 +1,18 @@
-name: Docs
+name: Publish Docs
 on:
   push:
     branches:
       - master
       - main
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/configure-pages@v6
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -24,9 +21,13 @@ jobs:
           pixi-version: v0.84.2
           environments: >-
             docs
-      - run: pixi run build-docs -- --clean
-      - uses: actions/upload-pages-artifact@v5
+      - run: |
+          pixi run build-docs -- --clean
+          touch site/.nojekyll
+      - uses: JamesIves/github-pages-deploy-action@v4.9.0
         with:
-          path: site
-      - uses: actions/deploy-pages@v5
-        id: deployment
+          folder: site
+          branch: gh-pages
+          # Keep PR previews deployed by rossjrw/pr-preview-action
+          clean-exclude: pr-preview/
+          force: false
